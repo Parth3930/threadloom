@@ -85,6 +85,17 @@ pub fn init_project() -> anyhow::Result<()> {
         fs::write(tailwind_cfg_path, new_content)?;
     }
 
+    // Patch package.json
+    let package_json_path = format!("{}/package.json", name);
+    if let Ok(content) = fs::read_to_string(&package_json_path) {
+        let new_content = if content.contains("\"name\":") {
+            content.replace("\"name\": \"demo\"", &format!("\"name\": \"{}\"", name))
+        } else {
+            content.replacen("{", &format!("{{\n  \"name\": \"{}\",", name), 1)
+        };
+        fs::write(&package_json_path, new_content)?;
+    }
+
     if setup_tw {
         println!("  {}Running {} install...{}", CYAN, pm, RESET);
         #[cfg(target_os = "windows")]

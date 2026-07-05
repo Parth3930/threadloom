@@ -14,6 +14,7 @@ pub fn demo_component() -> View {
 
     let (api_response, set_api_response) = create_signal("Click to fetch...".to_string());
     let (counter, set_counter) = create_signal(0);
+    let (cookie_val, set_cookie_val) = create_signal(threadloom_dom::get_cookie!("demo_cookie").unwrap_or_default());
 
     threadloom! {
         div(class="flex flex-col gap-8") {
@@ -260,6 +261,38 @@ pub fn demo_component() -> View {
                         div(class="flex") {
                             Button(label="Go to /name", primary=true, on_click={|| {
                                 crate::store::navigate("/name");
+                            }})
+                        }
+                    }
+                }
+
+                // Cookie Management Demo
+                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
+                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Cookie Management" }
+                    div(class="flex flex-col gap-4") {
+                        div(class="text-sm text-gray-600 dark:text-gray-400") {
+                            "Current demo_cookie value: " { move || cookie_val.get() }
+                        }
+                        input(
+                            id="cookie_input",
+                            class="tl-input border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-transparent text-gray-900 dark:text-gray-100",
+                            type="text",
+                            placeholder="Set cookie value",
+                            value=move || cookie_val.get(),
+                            on_input={move || {
+                                let val = threadloom_dom::get_value!("cookie_input");
+                                set_cookie_val.set(val);
+                            }}
+                        )
+                        div(class="flex gap-2") {
+                            Button(label="Save Cookie", primary=true, on_click={move || {
+                                threadloom_dom::set_cookie!("demo_cookie", cookie_val.get(), 3600);
+                                threadloom_dom::alert!("Cookie saved for 1 hour!");
+                            }})
+                            Button(label="Clear Cookie", primary=false, on_click={move || {
+                                set_cookie_val.set("".to_string());
+                                threadloom_dom::set_cookie!("demo_cookie", "", 0);
+                                threadloom_dom::alert!("Cookie cleared!");
                             }})
                         }
                     }

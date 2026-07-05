@@ -270,3 +270,61 @@ pub fn toggle_html_class(class: &str, active: bool) {
         }
     }
 }
+
+// ponytail: keep it simple. use max-age for expiration, no complex date parsing.
+#[macro_export]
+macro_rules! get_cookie {
+    () => {{
+        let mut cookie_string = String::new();
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                use web_sys::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                    if let Ok(c) = html_doc.cookie() {
+                        cookie_string = c;
+                    }
+                }
+            }
+        }
+        cookie_string
+    }};
+    ($name:expr) => {{
+        let cookies = $crate::get_cookie!();
+        let name = $name;
+        let mut result = None;
+        for c in cookies.split(';') {
+            let c = c.trim();
+            if c.starts_with(name) && c[name.len()..].starts_with('=') {
+                result = Some(c[name.len() + 1..].to_string());
+                break;
+            }
+        }
+        result
+    }};
+}
+
+#[macro_export]
+macro_rules! set_cookie {
+    ($name:expr, $value:expr) => {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                use web_sys::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                    let cookie_str = format!("{}={}; path=/", $name, $value);
+                    let _ = html_doc.set_cookie(&cookie_str);
+                }
+            }
+        }
+    };
+    ($name:expr, $value:expr, $max_age:expr) => {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                use web_sys::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                    let cookie_str = format!("{}={}; max-age={}; path=/", $name, $value, $max_age);
+                    let _ = html_doc.set_cookie(&cookie_str);
+                }
+            }
+        }
+    };
+}
