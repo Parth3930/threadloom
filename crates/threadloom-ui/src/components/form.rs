@@ -2,15 +2,22 @@ use std::rc::Rc;
 use threadloom_core::{element, text, View, IntoView};
 use crate::{Callback, Callback1, OptClass};
 
+/// Properties for the Button component.
 #[derive(Default)]
 pub struct ButtonProps {
+    /// The text label displayed inside the button.
     pub label: String,
+    /// If true, applies primary styling. Otherwise, applies secondary styling.
     pub primary: bool,
+    /// Callback triggered when the button is clicked.
     pub on_click: Callback,
+    /// Callback triggered when the mouse enters or leaves the button.
     pub on_hover: Callback,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
+/// A standard button component.
 #[allow(non_snake_case)]
 pub fn Button(props: ButtonProps) -> View {
     let class = if props.primary { "tl-btn tl-btn-primary" } else { "tl-btn tl-btn-secondary" };

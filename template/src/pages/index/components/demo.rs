@@ -240,6 +240,30 @@ pub fn demo_component() -> View {
                         }
                     }
                 }
+
+                // Global Store Demo
+                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
+                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Global Store Demo" }
+                    div(class="flex flex-col gap-4") {
+                        Label(text="Enter your name to test global state persistence:", r#for="name_input")
+                        input(
+                            id="name_input",
+                            class="tl-input border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-transparent text-gray-900 dark:text-gray-100",
+                            type="text",
+                            placeholder="Your Name",
+                            value=move || crate::store::GlobalState::get(),
+                            on_input={move || {
+                                let val = threadloom_dom::get_value!("name_input");
+                                crate::store::GlobalState::set(val);
+                            }}
+                        )
+                        div(class="flex") {
+                            Button(label="Go to /name", primary=true, on_click={|| {
+                                crate::store::navigate("/name");
+                            }})
+                        }
+                    }
+                }
             }
         }
     }

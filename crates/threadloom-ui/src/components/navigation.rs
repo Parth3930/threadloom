@@ -36,15 +36,22 @@ pub fn tabs(tab_labels: Vec<String>, active_index: usize, on_tab_click: impl Int
     Tabs(TabsProps { tab_labels, active_index, on_tab_click: on_tab_click.into(), panels, ..Default::default() })
 }
 
+/// Properties for the Dropdown component.
 #[derive(Default)]
 pub struct DropdownProps {
+    /// The text to display on the dropdown toggle button.
     pub label: String,
+    /// Whether the dropdown menu is currently visible.
     pub open: bool,
+    /// The list of items (usually buttons or links) inside the dropdown menu.
     pub items: Vec<View>,
+    /// Callback triggered when the dropdown button is clicked.
     pub on_toggle: Callback,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
+/// A dropdown menu component that toggles a list of items.
 #[allow(non_snake_case)]
 pub fn Dropdown(props: DropdownProps) -> View {
     let mut b = element("div").attr("class", "tl-dropdown-container");

@@ -713,6 +713,32 @@ pub fn fragment(children: impl IntoIterator<Item = View>) -> View {
     View::Fragment(children.into_iter().collect())
 }
 
+#[macro_export]
+macro_rules! create_store {
+    ($vis:vis $name:ident, $type:ty, $init:expr) => {
+        $vis struct $name;
+        impl $name {
+            fn store() -> ($crate::ReadSignal<$type>, $crate::WriteSignal<$type>) {
+                thread_local! {
+                    static STORE: ($crate::ReadSignal<$type>, $crate::WriteSignal<$type>) = $crate::create_signal($init);
+                }
+                STORE.with(|s| *s)
+            }
+            $vis fn get() -> $type {
+                Self::store().0.get()
+            }
+            $vis fn set(val: $type) {
+                Self::store().1.set(val)
+            }
+            $vis fn update(f: impl FnOnce(&mut $type)) {
+                let mut val = Self::get();
+                f(&mut val);
+                Self::set(val);
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

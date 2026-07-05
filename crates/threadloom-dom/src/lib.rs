@@ -99,33 +99,53 @@ pub fn tick() -> Result<(), JsValue> {
     // For Phase 3 skeletal routing, we just re-evaluate pending boundaries local to this shard.
     let pending = take_pending_boundaries();
     
-    BOUNDARIES.with(|b| {
-        let mut boundaries = b.borrow_mut();
-        for id in pending {
-            let updated = if let Some((old_node, compute)) = boundaries.get(&id) {
-                let view = id.track(|| {
-                    let mut comp = compute.borrow_mut();
-                    comp()
-                });
-                let new_node = render_view(&document, view)?;
-                if let Some(parent) = old_node.parent_node() {
-                    parent.replace_child(&new_node, old_node)?;
-                    Some((new_node, compute.clone()))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            
-            if let Some(new_data) = updated {
-                boundaries.insert(id, new_data);
+    let mut updates = Vec::new();
+    
+    for id in pending {
+        let entry = BOUNDARIES.with(|b| b.borrow().get(&id).cloned());
+        if let Some((old_node, compute)) = entry {
+            let view = id.track(|| {
+                let mut comp = compute.borrow_mut();
+                comp()
+            });
+            let new_node = render_view(&document, view)?;
+            if let Some(parent) = old_node.parent_node() {
+                parent.replace_child(&new_node, &old_node)?;
+                updates.push((id, new_node, compute));
             }
         }
-        Ok::<(), JsValue>(())
-    })?;
+    }
+    
+    BOUNDARIES.with(|b| {
+        let mut boundaries = b.borrow_mut();
+        for (id, new_node, compute) in updates {
+            boundaries.insert(id, (new_node, compute));
+        }
+    });
 
     Ok(())
+}
+
+#[macro_export]
+macro_rules! get_value {
+    ($id:expr) => {{
+        let mut val = String::new();
+        if let Some(w) = web_sys::window() {
+            if let Some(d) = w.document() {
+                if let Some(el) = d.get_element_by_id($id) {
+                    use web_sys::wasm_bindgen::JsCast;
+                    if let Ok(input_el) = el.clone().dyn_into::<web_sys::HtmlInputElement>() {
+                        val = input_el.value();
+                    } else if let Ok(textarea_el) = el.clone().dyn_into::<web_sys::HtmlTextAreaElement>() {
+                        val = textarea_el.value();
+                    } else if let Ok(select_el) = el.dyn_into::<web_sys::HtmlSelectElement>() {
+                        val = select_el.value();
+                    }
+                }
+            }
+        }
+        val
+    }};
 }
 
 #[macro_export]

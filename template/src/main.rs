@@ -4,6 +4,8 @@
 mod pages;
 #[cfg(target_arch = "wasm32")]
 mod routes;
+#[cfg(target_arch = "wasm32")]
+mod store;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod api;
@@ -16,8 +18,27 @@ fn main() {
     let doc = window.document().unwrap();
     let body = doc.body().unwrap();
     
-    let path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
-    let view = routes::render_route(&path);
+    let initial_path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
+    let (path_sig, set_path_sig) = threadloom_core::create_signal(initial_path);
+    
+    crate::store::ROUTER_SETTER.with(|s| {
+        *s.borrow_mut() = Some(set_path_sig);
+    });
+
+    use web_sys::wasm_bindgen::JsCast;
+    let set_path_clone = set_path_sig;
+    let closure = web_sys::wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+        if let Some(w) = web_sys::window() {
+            let p = w.location().pathname().unwrap_or_else(|_| "/".to_string());
+            set_path_clone.set(p);
+        }
+    }) as Box<dyn FnMut()>);
+    window.add_event_listener_with_callback("popstate", closure.as_ref().unchecked_ref()).unwrap();
+    closure.forget();
+
+    let view = threadloom_core::dyn_node(move || {
+        routes::render_route(&path_sig.get())
+    });
     
     threadloom_dom::mount(view, &body).unwrap();
 }

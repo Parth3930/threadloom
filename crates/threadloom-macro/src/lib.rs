@@ -115,14 +115,13 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
             
             if is_component {
                 let tag = &el.tag;
-                let props_name = syn::Ident::new(&format!("{}Props", tag_name_str), tag.span());
+                let props_name = syn::Ident::new(&format!("{}Props", tag_name_str), proc_macro2::Span::call_site());
                 
                 let mut prop_assignments = Vec::new();
                 for attr in &el.attrs {
                     let name = &attr.name;
                     let value = &attr.value;
-                    let span = value.span();
-                    prop_assignments.push(quote::quote_spanned! {span=>
+                    prop_assignments.push(quote::quote! {
                         #name: (#value).into()
                     });
                 }
@@ -133,10 +132,9 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                     children_tokens.push(render_node(child, child_path));
                 }
                 
-                let span = tag.span();
-                quote::quote_spanned! {span=>
+                quote::quote! {
                     ::threadloom_core::IntoView::into_view(
-                        ::threadloom_ui::#tag(::threadloom_ui::#props_name {
+                        #tag(::threadloom_ui::#props_name {
                             #(#prop_assignments,)*
                             children: vec![#(#children_tokens),*],
                             ..::std::default::Default::default()
