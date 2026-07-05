@@ -177,8 +177,11 @@ pub fn hero_component() -> View {
             p(class="text-xl text-gray-400 max-w-2xl mb-10") {
                 "Threadloom provides a seamless full-stack experience with macro-based UI components, file-system routing, and built-in hot reloading."
             }
-            button(class="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-105 transition-transform duration-200 shadow-[0_0_40px_rgba(255,255,255,0.3)]") {
-                "Get Started"
+            button(
+                class="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-105 transition-transform duration-200 shadow-[0_0_40px_rgba(255,255,255,0.3)]",
+                onclick="fetch('/api/hello').then(r=>r.text()).then(t=>alert('API says: ' + t))"
+            ) {
+                "Get Started (Test API)"
             }
         }
     }
