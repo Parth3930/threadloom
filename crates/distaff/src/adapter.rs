@@ -39,21 +39,25 @@ impl FrameworkAdapter {
             SupportedFramework::Dioxus => {
                 let mut cmd = std::process::Command::new("dx");
                 cmd.arg("build");
+                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
             SupportedFramework::Leptos => {
                 let mut cmd = std::process::Command::new("cargo");
                 cmd.args(["leptos", "build"]);
+                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
             SupportedFramework::Yew => {
                 let mut cmd = std::process::Command::new("trunk");
                 cmd.arg("build");
+                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
             SupportedFramework::Threadloom => {
                 let mut cmd = std::process::Command::new("trunk");
                 cmd.arg("build");
+                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
         }

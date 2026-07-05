@@ -37,11 +37,15 @@ pub async fn start_dev_server(port: u16, plugins: Arc<Mutex<Vec<Box<dyn DistaffP
     Ok(())
 }
 
-async fn index_handler() -> axum::response::Html<String> {
+async fn index_handler() -> axum::response::Response {
+    use axum::response::IntoResponse;
     let index = std::fs::read_to_string("dist/index.html")
         .unwrap_or_else(|_| "<h1>Build failed or missing dist/index.html</h1>".into());
     let injected = index.replace("</body>", "<script src='/__distaff/hmr.js'></script></body>");
-    axum::response::Html(injected)
+    (
+        [(axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")],
+        axum::response::Html(injected)
+    ).into_response()
 }
 
 async fn fallback_handler(uri: axum::http::Uri) -> axum::response::Response {
@@ -51,7 +55,7 @@ async fn fallback_handler(uri: axum::http::Uri) -> axum::response::Response {
     
     // For SPA routes (no file extension), serve index.html so the client router can handle it
     if !path.contains('.') {
-        return index_handler().await.into_response();
+        return index_handler().await;
     }
     
     // Missing asset: serve custom 404 or default beautiful 404
@@ -78,7 +82,11 @@ async fn fallback_handler(uri: axum::http::Uri) -> axum::response::Response {
 </html>"#.to_string()
     });
     
-    (axum::http::StatusCode::NOT_FOUND, axum::response::Html(custom_404)).into_response()
+    (
+        axum::http::StatusCode::NOT_FOUND,
+        [(axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")],
+        axum::response::Html(custom_404)
+    ).into_response()
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(tx): State<broadcast::Sender<String>>) -> axum::response::Response {

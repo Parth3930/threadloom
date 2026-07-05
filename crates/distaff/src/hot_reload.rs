@@ -30,23 +30,27 @@ pub fn restart_backend() {
         .ok();
 }
 
-/// Returns true if the path is a generated/output file we should never react to.
 fn is_output_path(p: &str) -> bool {
-    p.contains("dist")
+    let p = p.replace("\\", "/");
+    p.contains("/dist/") || p.ends_with("/dist") || p.starts_with("dist/") || p == "dist"
         || p.contains("generated_")
         || p.contains("tailwind.css")
         || p.contains(".git")
-        || p.contains("target")
-        || p.contains("assets\\tailwind")
-        || p.contains("assets/tailwind")
+        || p.contains("/target/") || p.ends_with("/target") || p.starts_with("target/") || p == "target"
+        || p.contains("Cargo.lock")
+        || p.contains("src/routes.rs")
+        || p.contains("src/api_routes.rs")
+        || (p.contains("pages") && p.ends_with("mod.rs"))
+        || (p.contains("api") && p.ends_with("mod.rs"))
+        || p.ends_with(".env")
 }
 
 /// Returns true if the path belongs to backend-only code.
 /// Only `src/api/**` and `api_routes.rs` are backend.
 /// `src/main.rs` is the WASM entry point — treated as frontend.
 fn is_backend_path(p: &str) -> bool {
+    let p = p.replace("\\", "/");
     p.contains("src/api")
-        || p.contains("src\\api")
         || p.ends_with("api_routes.rs")
 }
 
@@ -83,12 +87,14 @@ pub fn spawn_watcher<P: AsRef<Path>>(
 
                     let mut needs_backend = false;
                     let mut needs_frontend = false;
+                    let mut triggering_files = Vec::new();
 
                     for event in &events {
                         let p = event.path.to_string_lossy();
                         if is_output_path(&p) {
                             continue; // ignore build artifacts
                         }
+                        triggering_files.push(p.to_string());
                         if is_backend_path(&p) {
                             needs_backend = true;
                         } else {
@@ -99,6 +105,8 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                     if !needs_backend && !needs_frontend {
                         continue;
                     }
+                    
+                    tracing::info!("File changed: {:?}", triggering_files);
 
                     // Lock out further events for the duration of the build
                     IS_BUILDING.store(true, Ordering::SeqCst);
@@ -122,7 +130,9 @@ pub fn spawn_watcher<P: AsRef<Path>>(
 
                     if needs_frontend {
                         info!("Frontend file changed — rebuilding WASM...");
-                        let _ = std::process::Command::new("trunk").arg("build").status();
+                        let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+                        let mut build_cmd = adapter.build_command();
+                        let _ = build_cmd.status();
                         info!("Rebuild complete, sending reload signal");
                         let _ = tx.send(r#"{"type": "reload"}"#.to_string());
                     }
