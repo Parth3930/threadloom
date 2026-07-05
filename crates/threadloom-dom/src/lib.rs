@@ -103,7 +103,7 @@ pub fn tick() -> Result<(), JsValue> {
                     let mut comp = compute.borrow_mut();
                     comp()
                 };
-                let new_node = render_view(document, view)?;
+                let new_node = render_view(&document, view)?;
                 if let Some(parent) = old_node.parent_node() {
                     parent.replace_child(&new_node, old_node)?;
                     Some((new_node, compute.clone()))
