@@ -59,7 +59,14 @@ pub fn generate_routes() {
     routes_rs.push_str("    match path {\n");
 
     for (url_path, module_path) in routes {
-        routes_rs.push_str(&format!("        \"{}\" | \"{}/\" => crate::pages::{}::page::page(),\n", url_path, url_path, module_path));
+        if url_path == "/index" {
+            routes_rs.push_str(&format!("        \"/\" | \"/index\" | \"/index/\" => crate::pages::{}::page::page(),\n", module_path));
+        } else if url_path.ends_with("/index") {
+            let base_path = url_path.strip_suffix("/index").unwrap();
+            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" | \"{}\" | \"{}/\" => crate::pages::{}::page::page(),\n", base_path, base_path, url_path, url_path, module_path));
+        } else {
+            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" => crate::pages::{}::page::page(),\n", url_path, url_path, module_path));
+        }
     }
 
     routes_rs.push_str("        _ => threadloom_macro::threadloom! { div { \"404 Not Found\" } }\n");

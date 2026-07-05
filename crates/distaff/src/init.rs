@@ -41,6 +41,7 @@ pub fn init_project() -> anyhow::Result<()> {
     // Create directories
     fs::create_dir_all(format!("{}/src/pages/index/components", name))?;
     fs::create_dir_all(format!("{}/src/api/hello", name))?;
+    fs::create_dir_all(format!("{}/assets", name))?;
     
     // Cargo.toml
     let cargo_toml = format!(r#"[package]
