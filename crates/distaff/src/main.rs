@@ -107,9 +107,17 @@ async fn main() -> anyhow::Result<()> {
             println!("Updating distaff to the latest version...");
             let status = std::process::Command::new("cargo").args(["install", "distaff", "--force"]).status()?;
             if status.success() {
-                println!("Distaff updated successfully!");
+                println!("Distaff updated successfully from crates.io!");
             } else {
-                eprintln!("Failed to update distaff.");
+                println!("Not found on crates.io, falling back to Git repository...");
+                let git_status = std::process::Command::new("cargo")
+                    .args(["install", "--git", "https://github.com/Parth3930/threadloom.git", "distaff", "--force"])
+                    .status()?;
+                if git_status.success() {
+                    println!("Distaff updated successfully from Git!");
+                } else {
+                    eprintln!("Failed to update distaff.");
+                }
             }
         }
     }
