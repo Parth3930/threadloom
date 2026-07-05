@@ -93,7 +93,7 @@ impl Parse for ViewMacro {
     }
 }
 
-fn render_node(node: &Node) -> TokenStream2 {
+fn render_node(node: &Node, path: String) -> TokenStream2 {
     match node {
         Node::Text(lit) => {
             quote! {
@@ -110,6 +110,11 @@ fn render_node(node: &Node) -> TokenStream2 {
             let tag_name = el.tag.to_string();
             let mut builder = quote! { ::threadloom_core::element(#tag_name) };
             
+            // Inject stable ID for hot reloading
+            builder = quote! {
+                #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
+            };
+            
             for attr in &el.attrs {
                 let name = attr.name.to_string();
                 let value = &attr.value;
@@ -121,8 +126,9 @@ fn render_node(node: &Node) -> TokenStream2 {
                 }
             }
             
-            for child in &el.children {
-                let child_tokens = render_node(child);
+            for (i, child) in el.children.iter().enumerate() {
+                let child_path = format!("{}-{}", path, i);
+                let child_tokens = render_node(child, child_path);
                 builder = quote! { #builder.child(#child_tokens) };
             }
             
@@ -138,8 +144,8 @@ pub fn threadloom(input: TokenStream) -> TokenStream {
     let view = parse_macro_input!(input as ViewMacro);
     
     let mut tokens = Vec::new();
-    for node in &view.nodes {
-        tokens.push(render_node(node));
+    for (i, node) in view.nodes.iter().enumerate() {
+        tokens.push(render_node(node, i.to_string()));
     }
     
     let expanded = if tokens.len() == 1 {

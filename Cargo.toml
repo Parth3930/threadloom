@@ -10,3 +10,8 @@ members = [
 
     "benches/threadloom_vs_yew/yew-app", "crates/threadloom-desktop", "crates/threadloom-ui", "benches/threadloom_vs_yew/threadloom-app",
 ]
+
+[profile.dev]
+opt-level = 0
+lto = false
+debug = true

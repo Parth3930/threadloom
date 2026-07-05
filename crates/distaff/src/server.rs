@@ -110,8 +110,45 @@ async fn hmr_script() -> &'static str {
         if (msg.type === 'reload') {
             window.location.reload();
         } else if (msg.type === 'patch') {
-            console.log('Hot patching component state', msg.data);
-            // TODO: integrate with threadloom-core patch receiver
+            console.log('Tier 1 Hot Patching DOM', msg.data);
+            let success = true;
+            msg.data.forEach(patch => {
+                // The AST path for a text node is like "0-1-2" (child 2 of element "0-1")
+                // Text nodes don't have data-th-id, so we find the parent element.
+                let parts = patch.path.split('-');
+                let childIndex = parseInt(parts.pop(), 10);
+                let parentPath = parts.join('-');
+                
+                if (parentPath === "") {
+                    console.warn("Cannot patch root text node");
+                    success = false;
+                    return;
+                }
+                
+                const els = document.querySelectorAll(`[data-th-id$="-${parentPath}"]`);
+                if (els.length > 0) {
+                    els.forEach(el => { 
+                        // Update the text node at childIndex
+                        let targetNode = el.childNodes[childIndex];
+                        if (targetNode && targetNode.nodeType === 3) {
+                            targetNode.textContent = patch.text;
+                        } else if (el.childNodes.length === 1) {
+                            // Fallback if index is off due to dynamic nodes
+                            el.textContent = patch.text;
+                        } else {
+                            console.warn("Could not reliably patch text node inside mixed children");
+                            success = false;
+                        }
+                    });
+                } else {
+                    console.warn("Hot patch failed: could not find element for path", parentPath);
+                    success = false;
+                }
+            });
+            
+            if (!success) {
+                window.location.reload(); // Fallback if any patch failed
+            }
         }
     };
     "#

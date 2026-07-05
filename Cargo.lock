@@ -699,15 +699,19 @@ dependencies = [
  "lazy_static",
  "notify",
  "notify-debouncer-mini",
+ "proc-macro2",
+ "quote",
  "reqwest",
  "rust-embed",
  "serde",
  "serde_json",
+ "syn 2.0.118",
  "tokio",
  "tokio-tungstenite 0.21.0",
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]

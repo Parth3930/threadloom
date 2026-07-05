@@ -27,11 +27,8 @@ impl DistaffPlugin for TailwindPlugin {
             .wait()?;
         Ok(())
     }
-    fn on_file_change(&mut self, path: &Path) -> anyhow::Result<()> {
-        if path.extension().and_then(|s| s.to_str()) == Some("rs") || 
-           path.extension().and_then(|s| s.to_str()) == Some("html") {
-            self.on_build_start()?;
-        }
+    fn on_file_change(&mut self, _path: &Path) -> anyhow::Result<()> {
+        // Do nothing in dev watcher, handled by background `--watch` process.
         Ok(())
     }
 }

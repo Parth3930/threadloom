@@ -8,6 +8,7 @@ mod plugins;
 mod adapter;
 mod init;
 mod mod_gen;
+mod hot_patch;
 
 #[derive(Parser)]
 #[command(name = "distaff")]

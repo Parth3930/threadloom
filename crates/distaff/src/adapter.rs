@@ -39,26 +39,35 @@ impl FrameworkAdapter {
             SupportedFramework::Dioxus => {
                 let mut cmd = std::process::Command::new("dx");
                 cmd.arg("build");
-                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
             SupportedFramework::Leptos => {
                 let mut cmd = std::process::Command::new("cargo");
                 cmd.args(["leptos", "build"]);
-                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
-            SupportedFramework::Yew => {
+            SupportedFramework::Yew | SupportedFramework::Threadloom => {
                 let mut cmd = std::process::Command::new("trunk");
                 cmd.arg("build");
-                cmd.env("CARGO_INCREMENTAL", "0");
                 cmd
             }
-            SupportedFramework::Threadloom => {
-                let mut cmd = std::process::Command::new("trunk");
-                cmd.arg("build");
-                cmd.env("CARGO_INCREMENTAL", "0");
-                cmd
+        }
+    }
+
+    pub fn watch_commands(&self) -> Vec<std::process::Command> {
+        match self.framework {
+            SupportedFramework::Dioxus => {
+                vec![]
+            }
+            SupportedFramework::Leptos => {
+                vec![]
+            }
+            SupportedFramework::Yew | SupportedFramework::Threadloom => {
+                // Spawn tailwind watch alongside distaff for instant CSS
+                let mut tailwind = std::process::Command::new("npx");
+                tailwind.args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"]);
+                
+                vec![tailwind]
             }
         }
     }
