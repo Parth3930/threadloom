@@ -25,7 +25,7 @@ use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventR
 use std::time::Duration;
 
 use crate::plugins::DistaffPlugin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub fn spawn_watcher<P: AsRef<Path>>(watch_path: P, tx: broadcast::Sender<String>, plugins: Arc<Mutex<Vec<Box<dyn DistaffPlugin + Send>>>>) -> anyhow::Result<()> {
     let path = watch_path.as_ref().to_path_buf();
