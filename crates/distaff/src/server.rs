@@ -160,6 +160,26 @@ async fn hmr_script() -> &'static str {
                     return;
                 }
                 
+                if (patch.action === 'update_attrs') {
+                    const els = getExactEls(patch.path);
+                    if (els.length > 0) {
+                        els.forEach(el => {
+                            Object.keys(patch.attrs).forEach(key => {
+                                if (patch.attrs[key] === null) {
+                                    el.removeAttribute(key);
+                                } else {
+                                    el.setAttribute(key, patch.attrs[key]);
+                                }
+                            });
+                        });
+                    } else {
+                        console.warn("Hot patch failed: could not find element for attrs", patch.path);
+                        success = false;
+                    }
+                    return;
+                }
+
+                
                 // Fallback to update_text for legacy or explicit action
                 let path = patch.path;
                 let text = patch.text;

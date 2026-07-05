@@ -3,7 +3,7 @@ use threadloom_core::{create_effect, create_signal, IntoView, View};
 use threadloom_macro::threadloom;
 
 pub fn page() -> View {
-    let (is_dark, set_dark) = create_signal(false);
+    let (is_dark, set_dark) = create_signal(true);
     let dark_signal = is_dark.clone();
     let is_dark_click = is_dark.clone();
 
