@@ -28,10 +28,17 @@ pub fn init_project() -> anyhow::Result<()> {
     io::stdin().read_line(&mut tw)?;
     let setup_tw = tw.trim().eq_ignore_ascii_case("y");
 
+    print!("  {}?{} Which package manager? (npm/bun) [npm]: ", GREEN, RESET);
+    io::stdout().flush()?;
+    let mut pm = String::new();
+    io::stdin().read_line(&mut pm)?;
+    let pm = pm.trim();
+    let pm = if pm.is_empty() { "npm" } else { pm };
+
     println!("\n  {}Scaffolding full-stack project...{}", YELLOW, RESET);
 
     // Create directories
-    fs::create_dir_all(format!("{}/src/pages/home", name))?;
+    fs::create_dir_all(format!("{}/src/pages/home/components", name))?;
     fs::create_dir_all(format!("{}/src/api/hello", name))?;
     
     // Cargo.toml
@@ -90,17 +97,19 @@ fn main() {
     // src/pages/mod.rs
     fs::write(format!("{}/src/pages/mod.rs", name), "pub mod home;\n")?;
     // src/pages/home/mod.rs
-    fs::write(format!("{}/src/pages/home/mod.rs", name), "pub mod page;\npub mod component;\n")?;
+    fs::write(format!("{}/src/pages/home/mod.rs", name), "pub mod page;\npub mod components;\n")?;
+    // src/pages/home/components/mod.rs
+    fs::write(format!("{}/src/pages/home/components/mod.rs", name), "pub mod hero;\n")?;
 
     // src/pages/home/page.rs
     let page_rs = r#"use threadloom_core::View;
 use threadloom_macro::threadloom;
-use super::component::hero_component;
+use super::components::hero::hero_component;
 
 pub fn page() -> View {
     threadloom! {
         div(class="container mx-auto p-8") {
-            hero_component()
+            { hero_component() }
             p(class="text-gray-500 mt-4") { "Welcome to your new full-stack Threadloom app." }
         }
     }
@@ -108,7 +117,7 @@ pub fn page() -> View {
 "#;
     fs::write(format!("{}/src/pages/home/page.rs", name), page_rs)?;
 
-    // src/pages/home/component.rs
+    // src/pages/home/components/hero.rs
     let comp_rs = r#"use threadloom_core::View;
 use threadloom_macro::threadloom;
 
@@ -120,7 +129,7 @@ pub fn hero_component() -> View {
     }
 }
 "#;
-    fs::write(format!("{}/src/pages/home/component.rs", name), comp_rs)?;
+    fs::write(format!("{}/src/pages/home/components/hero.rs", name), comp_rs)?;
 
     // src/api/mod.rs
     fs::write(format!("{}/src/api/mod.rs", name), "pub mod hello;\n")?;
@@ -153,11 +162,11 @@ module.exports = {
 }
 "#)?;
         
-        println!("  {}Running npm install...{}", CYAN, RESET);
+        println!("  {}Running {} install...{}", CYAN, pm, RESET);
         #[cfg(target_os = "windows")]
-        let _ = std::process::Command::new("cmd").args(["/C", "npm install"]).current_dir(&name).status();
+        let _ = std::process::Command::new("cmd").args(["/C", pm, "install"]).current_dir(&name).status();
         #[cfg(not(target_os = "windows"))]
-        let _ = std::process::Command::new("npm").args(["install"]).current_dir(&name).status();
+        let _ = std::process::Command::new(pm).args(["install"]).current_dir(&name).status();
     } else {
         fs::write(format!("{}/style.css", name), "body { font-family: sans-serif; }\n")?;
     }

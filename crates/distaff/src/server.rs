@@ -21,7 +21,7 @@ pub async fn start_dev_server(port: u16, plugins: Arc<Mutex<Vec<Box<dyn DistaffP
         .route("/__distaff/hmr.js", get(hmr_script))
         .route("/__distaff/ws", get(ws_handler))
         .nest_service("/assets", ServeDir::new("assets"))
-        .fallback_service(ServeDir::new("dist"))
+        .fallback_service(ServeDir::new("dist").fallback(get(fallback_handler)))
         .with_state(tx);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -41,6 +41,43 @@ async fn index_handler() -> axum::response::Html<String> {
         .unwrap_or_else(|_| "<h1>Build failed or missing dist/index.html</h1>".into());
     let injected = index.replace("</body>", "<script src='/__distaff/hmr.js'></script></body>");
     axum::response::Html(injected)
+}
+
+async fn fallback_handler(uri: axum::http::Uri) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    
+    let path = uri.path();
+    
+    // For SPA routes (no file extension), serve index.html so the client router can handle it
+    if !path.contains('.') {
+        return index_handler().await.into_response();
+    }
+    
+    // Missing asset: serve custom 404 or default beautiful 404
+    let custom_404 = std::fs::read_to_string("404.html").unwrap_or_else(|_| {
+        r#"<!DOCTYPE html>
+<html>
+<head>
+    <title>404 - Not Found</title>
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { text-align: center; padding: 3rem; background: #1e293b; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); border: 1px solid #334155; }
+        h1 { font-size: 5rem; margin: 0; color: #3b82f6; line-height: 1; }
+        h2 { font-size: 1.5rem; margin-top: 1rem; color: #cbd5e1; }
+        p { font-size: 1rem; color: #94a3b8; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>404</h1>
+        <h2>Route not found</h2>
+        <p>Customise this page by creating <b>404.html</b> in your project root.</p>
+    </div>
+</body>
+</html>"#.to_string()
+    });
+    
+    (axum::http::StatusCode::NOT_FOUND, axum::response::Html(custom_404)).into_response()
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(tx): State<broadcast::Sender<String>>) -> axum::response::Response {
