@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{Document, Element, Node};
 
 thread_local! {
-    static BOUNDARIES: RefCell<HashMap<NodeId, Node>> = RefCell::new(HashMap::new());
+    static BOUNDARIES: RefCell<HashMap<NodeId, (Node, Rc<RefCell<dyn FnMut() -> View>>)>> = RefCell::new(HashMap::new());
 }
 
 pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
@@ -43,6 +43,7 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         use wasm_bindgen::JsCast;
                         let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                             cb();
+                            let _ = crate::tick();
                         }) as Box<dyn FnMut()>);
                         el.add_event_listener_with_callback(&k, closure.as_ref().unchecked_ref())?;
                         closure.forget();
@@ -56,12 +57,15 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             Ok(el.into())
         }
         View::DynamicNode(boundary) => {
-            let mut compute = boundary.compute.borrow_mut();
-            let view = compute();
+            let view = {
+                let mut compute = boundary.compute.borrow_mut();
+                compute()
+            };
             let node = render_view(document, view)?;
             
+            let compute_rc = boundary.compute.clone();
             BOUNDARIES.with(|b| {
-                b.borrow_mut().insert(boundary.id, node.clone());
+                b.borrow_mut().insert(boundary.id, (node.clone(), compute_rc));
             });
             
             Ok(node)
@@ -94,16 +98,24 @@ pub fn tick() -> Result<(), JsValue> {
     BOUNDARIES.with(|b| {
         let mut boundaries = b.borrow_mut();
         for id in pending {
-            if let Some(old_node) = boundaries.get(&id) {
-                // We don't have the original boundary struct here in the map, 
-                // but in a real system the scheduler would send the computed new View or Patch.
-                // For this stub, we just replace it with a text node to show it updated.
-                // A complete integration requires the scheduler to send `SchedulerMsg` back to DOM.
-                let new_node = document.create_text_node("Updated!");
+            let updated = if let Some((old_node, compute)) = boundaries.get(&id) {
+                let view = {
+                    let mut comp = compute.borrow_mut();
+                    comp()
+                };
+                let new_node = render_view(document, view)?;
                 if let Some(parent) = old_node.parent_node() {
                     parent.replace_child(&new_node, old_node)?;
-                    boundaries.insert(id, new_node.into());
+                    Some((new_node, compute.clone()))
+                } else {
+                    None
                 }
+            } else {
+                None
+            };
+            
+            if let Some(new_data) = updated {
+                boundaries.insert(id, new_data);
             }
         }
         Ok::<(), JsValue>(())
