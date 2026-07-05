@@ -4,22 +4,9 @@ use threadloom_macro::threadloom;
 
 pub fn page() -> View {
     let (is_dark, set_dark) = create_signal(true);
-    let dark_signal = is_dark.clone();
-    let is_dark_click = is_dark.clone();
 
     create_effect(move || {
-        let is_dark = dark_signal.get();
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(html) = document.document_element() {
-                    if is_dark {
-                        let _ = html.set_attribute("class", "dark");
-                    } else {
-                        let _ = html.remove_attribute("class");
-                    }
-                }
-            }
-        }
+        threadloom_dom::toggle_html_class("dark", is_dark.get());
     });
 
     threadloom! {
@@ -34,12 +21,11 @@ pub fn page() -> View {
                     a(href="#", class="hover:text-blue-500 font-medium") { "Get Started" }
                     button(
                         class="p-2 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors text-gray-800 dark:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-                        on_click=move || { set_dark.set(!is_dark_click.get()); }
+                        on_click=move || { set_dark.set(!is_dark.get()); }
                     ) {
                         {
-                            let dark_svg = is_dark.clone();
                             move || {
-                                if dark_svg.get() {
+                                if is_dark.get() {
                                     threadloom! {
                                         svg(xmlns="http://www.w3.org/2000/svg", viewBox="0 0 24 24", class="svg-icon w-5 h-5") {
                                             circle(cx="12", cy="12", r="4") {}

@@ -5,6 +5,7 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::ext::IdentExt;
 use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result};
+use syn::spanned::Spanned;
 
 enum Node {
     Element(Element),
@@ -96,44 +97,81 @@ impl Parse for ViewMacro {
 fn render_node(node: &Node, path: String) -> TokenStream2 {
     match node {
         Node::Text(lit) => {
-            quote! {
+            let span = lit.span();
+            quote::quote_spanned! {span=>
                 ::threadloom_core::text(#lit)
             }
         }
         Node::Expr(expr) => {
-            quote! {
+            let span = expr.span();
+            quote::quote_spanned! {span=>
                 #[allow(unused_braces)]
                 ::threadloom_core::IntoView::into_view(#expr)
             }
         }
         Node::Element(el) => {
-            let tag_name = el.tag.to_string();
-            let mut builder = quote! { ::threadloom_core::element(#tag_name) };
+            let tag_name_str = el.tag.to_string();
+            let is_component = tag_name_str.chars().next().unwrap().is_uppercase();
             
-            // Inject stable ID for hot reloading
-            builder = quote! {
-                #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
-            };
-            
-            for attr in &el.attrs {
-                let name = attr.name.to_string();
-                let value = &attr.value;
-                if attr.is_event {
-                    let event_name = name.strip_prefix("on_").unwrap();
-                    builder = quote! { #builder.on(#event_name, #value) };
-                } else {
-                    builder = quote! { #builder.attr(#name, #value) };
+            if is_component {
+                let tag = &el.tag;
+                let props_name = syn::Ident::new(&format!("{}Props", tag_name_str), tag.span());
+                
+                let mut prop_assignments = Vec::new();
+                for attr in &el.attrs {
+                    let name = &attr.name;
+                    let value = &attr.value;
+                    let span = value.span();
+                    prop_assignments.push(quote::quote_spanned! {span=>
+                        #name: (#value).into()
+                    });
                 }
-            }
-            
-            for (i, child) in el.children.iter().enumerate() {
-                let child_path = format!("{}-{}", path, i);
-                let child_tokens = render_node(child, child_path);
-                builder = quote! { #builder.child(#child_tokens) };
-            }
-            
-            quote! {
-                ::threadloom_core::IntoView::into_view(#builder)
+                
+                let mut children_tokens = Vec::new();
+                for (i, child) in el.children.iter().enumerate() {
+                    let child_path = format!("{}-{}", path, i);
+                    children_tokens.push(render_node(child, child_path));
+                }
+                
+                let span = tag.span();
+                quote::quote_spanned! {span=>
+                    ::threadloom_core::IntoView::into_view(
+                        ::threadloom_ui::#tag(::threadloom_ui::#props_name {
+                            #(#prop_assignments,)*
+                            children: vec![#(#children_tokens),*],
+                            ..::std::default::Default::default()
+                        })
+                    )
+                }
+            } else {
+                let mut builder = quote! { ::threadloom_core::element(#tag_name_str) };
+                
+                // Inject stable ID for hot reloading
+                builder = quote! {
+                    #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
+                };
+                
+                for attr in &el.attrs {
+                    let name_str = attr.name.to_string();
+                    let value = &attr.value;
+                    let span = value.span();
+                    if attr.is_event {
+                        let event_name = name_str.strip_prefix("on_").unwrap();
+                        builder = quote::quote_spanned! {span=> #builder.on(#event_name, #value) };
+                    } else {
+                        builder = quote::quote_spanned! {span=> #builder.attr(#name_str, #value) };
+                    }
+                }
+                
+                for (i, child) in el.children.iter().enumerate() {
+                    let child_path = format!("{}-{}", path, i);
+                    let child_tokens = render_node(child, child_path);
+                    builder = quote! { #builder.child(#child_tokens) };
+                }
+                
+                quote! {
+                    ::threadloom_core::IntoView::into_view(#builder)
+                }
             }
         }
     }

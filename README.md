@@ -7,7 +7,31 @@ A Vite-equivalent full-stack web framework and dev server for Rust.
 - **Component-Based UI:** Build beautiful web interfaces in Rust using macro-based component syntax.
 - **Full-Stack Scaffolding:** Includes a Next.js style app router layout with `pages` and `api` directories.
 - **Distaff Dev Server:** Fast hot-reloading dev server natively built for Rust frameworks, supporting Tailwind CSS integration.
-- **Signal-Based Reactivity:** Fine-grained, zero-overhead reactive state management.
+- **Signal-Based Reactivity:** Fine-grained, zero-overhead reactive state management with Copyable signal IDs (no `clone()` needed!).
+- **React-like Ergonomics:** Write Capitalized components with named props directly in the `threadloom!` macro, backed by full IntelliSense.
+
+## Example
+
+```rust
+use threadloom_core::create_signal;
+use threadloom_macro::threadloom;
+use threadloom_ui::Button; // Capitalized components!
+
+fn counter_app() -> impl threadloom_core::IntoView {
+    // Signals are Copy, so you can move them freely!
+    let (count, set_count) = create_signal(0);
+    
+    threadloom! {
+        div(class="flex flex-col gap-4 items-center") {
+            h1(class="text-2xl") { "Counter: " { move || count.get() } } // Primitives implement IntoView directly
+            
+            // Named props and full intellisense for your closures!
+            Button(label="Increment", primary=true, on_click={move || set_count.set(count.get() + 1)})
+        }
+    }
+}
+```
+
 
 ## Installation
 

@@ -128,4 +128,125 @@ pub fn tick() -> Result<(), JsValue> {
     Ok(())
 }
 
+#[macro_export]
+macro_rules! spawn {
+    ($fut:expr) => {
+        wasm_bindgen_futures::spawn_local(async move {
+            $fut.await;
+            let _ = $crate::tick();
+        });
+    };
+}
 
+#[macro_export]
+macro_rules! fetch {
+    // With body
+    ($method:ident $url:expr, $body:expr => |$text:ident| $success:block) => {
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(resp) = reqwasm::http::Request::$method($url).body($body).send().await {
+                if let Ok($text) = resp.text().await {
+                    $success
+                    let _ = $crate::tick();
+                }
+            }
+        });
+    };
+    ($method:ident $url:expr, $body:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
+        wasm_bindgen_futures::spawn_local(async move {
+            match reqwasm::http::Request::$method($url).body($body).send().await {
+                Ok(resp) => {
+                    match resp.text().await {
+                        Ok($text) => {
+                            $success
+                            let _ = $crate::tick();
+                        }
+                        Err(e) => {
+                            let $err = format!("Parse error: {:?}", e);
+                            $error
+                            let _ = $crate::tick();
+                        }
+                    }
+                }
+                Err(e) => {
+                    let $err = format!("Fetch error: {:?}", e);
+                    $error
+                    let _ = $crate::tick();
+                }
+            }
+        });
+    };
+
+    // Without body
+    ($method:ident $url:expr => |$text:ident| $success:block) => {
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(resp) = reqwasm::http::Request::$method($url).send().await {
+                if let Ok($text) = resp.text().await {
+                    $success
+                    let _ = $crate::tick();
+                }
+            }
+        });
+    };
+    ($method:ident $url:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
+        wasm_bindgen_futures::spawn_local(async move {
+            match reqwasm::http::Request::$method($url).send().await {
+                Ok(resp) => {
+                    match resp.text().await {
+                        Ok($text) => {
+                            $success
+                            let _ = $crate::tick();
+                        }
+                        Err(e) => {
+                            let $err = format!("Parse error: {:?}", e);
+                            $error
+                            let _ = $crate::tick();
+                        }
+                    }
+                }
+                Err(e) => {
+                    let $err = format!("Fetch error: {:?}", e);
+                    $error
+                    let _ = $crate::tick();
+                }
+            }
+        });
+    };
+
+    // Default GET
+    ($url:expr => |$text:ident| $success:block) => {
+        $crate::fetch!(get $url => |$text| $success)
+    };
+    ($url:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
+        $crate::fetch!(get $url => |$text| $success, |$err| $error)
+    };
+}
+
+#[macro_export]
+macro_rules! alert {
+    ($msg:expr) => {
+        if let Some(window) = web_sys::window() {
+            let _ = window.alert_with_message($msg);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! log {
+    ($($t:tt)*) => {
+        web_sys::console::log_1(&format!($($t)*).into());
+    }
+}
+
+pub fn toggle_html_class(class: &str, active: bool) {
+    if let Some(window) = web_sys::window() {
+        if let Some(document) = window.document() {
+            if let Some(html) = document.document_element() {
+                if active {
+                    let _ = html.set_attribute("class", class);
+                } else {
+                    let _ = html.remove_attribute("class");
+                }
+            }
+        }
+    }
+}

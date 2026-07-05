@@ -34,6 +34,7 @@ struct Node {
     compute: Option<ComputeFn>,
     is_effect: bool,
     version: usize,
+    value: Option<Box<dyn std::any::Any>>,
 }
 
 struct Graph {
@@ -77,7 +78,20 @@ impl NodeId {
         Self { runtime_id, index }
     }
 
-    fn new(is_effect: bool, compute: Option<ComputeFn>) -> Self {
+    pub fn new_empty() -> Self {
+        Self::new(false, None, None)
+    }
+
+    fn set_compute(&self, compute: ComputeFn) {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(node) = &mut g.nodes[self.index] {
+                node.compute = Some(compute);
+            }
+        });
+    }
+
+    fn new(is_effect: bool, compute: Option<ComputeFn>, value: Option<Box<dyn std::any::Any>>) -> Self {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             let index = g.next_id;
@@ -92,6 +106,7 @@ impl NodeId {
                 compute,
                 is_effect,
                 version: 0,
+                value,
             }));
             id
         })
@@ -335,62 +350,66 @@ pub fn run_effects() {
 
 pub struct ReadSignal<T> {
     id: NodeId,
-    value: Rc<RefCell<T>>,
+    _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: Clone> Clone for ReadSignal<T> {
+impl<T> Copy for ReadSignal<T> {}
+impl<T> Clone for ReadSignal<T> {
     fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            value: self.value.clone(),
-        }
+        *self
     }
 }
 
 pub struct WriteSignal<T> {
     id: NodeId,
-    value: Rc<RefCell<T>>,
+    _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: Clone> Clone for WriteSignal<T> {
+impl<T> Copy for WriteSignal<T> {}
+impl<T> Clone for WriteSignal<T> {
     fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            value: self.value.clone(),
-        }
+        *self
     }
 }
 
-pub fn create_signal<T: Clone>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
-    let value = Rc::new(RefCell::new(initial));
-    let id = NodeId::new(false, None);
+pub fn create_signal<T: Clone + 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
+    let id = NodeId::new(false, None, Some(Box::new(initial)));
     (
         ReadSignal {
             id,
-            value: value.clone(),
+            _marker: std::marker::PhantomData,
         },
-        WriteSignal { id, value },
+        WriteSignal {
+            id,
+            _marker: std::marker::PhantomData,
+        },
     )
 }
 
-impl<T: Clone> ReadSignal<T> {
+impl<T: Clone + 'static> ReadSignal<T> {
     pub fn get(&self) -> T {
         self.id.record_read();
-        self.value.borrow().clone()
+        GRAPH.with(|g| {
+            let g = g.borrow();
+            let node = g.nodes[self.id.index].as_ref().unwrap();
+            node.value.as_ref().unwrap().downcast_ref::<T>().unwrap().clone()
+        })
     }
 }
 
-impl<T: Clone + PartialEq> WriteSignal<T> {
+impl<T: Clone + PartialEq + 'static> WriteSignal<T> {
     pub fn set(&self, new_value: T) {
-        let changed = {
-            let mut val = self.value.borrow_mut();
+        let changed = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let node = g.nodes[self.id.index].as_mut().unwrap();
+            let val = node.value.as_mut().unwrap().downcast_mut::<T>().unwrap();
             if *val == new_value {
                 false
             } else {
                 *val = new_value;
                 true
             }
-        };
+        });
         if changed {
             self.id.mark_dirty();
             run_effects();
@@ -407,7 +426,7 @@ where
         true
     }));
 
-    let id = NodeId::new(true, Some(compute.clone()));
+    let id = NodeId::new(true, Some(compute.clone()), None);
 
     id.mark_dirty();
     run_effects();
@@ -415,15 +434,13 @@ where
 
 pub struct Memo<T> {
     id: NodeId,
-    value: Rc<RefCell<Option<T>>>,
+    _marker: std::marker::PhantomData<T>,
 }
 
+impl<T> Copy for Memo<T> {}
 impl<T> Clone for Memo<T> {
     fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            value: self.value.clone(),
-        }
+        *self
     }
 }
 
@@ -432,34 +449,46 @@ where
     F: FnMut() -> T + 'static,
     T: Clone + PartialEq + 'static,
 {
-    let value = Rc::new(RefCell::new(None));
-    let val_clone = value.clone();
+    let id = NodeId::new_empty();
+
+    GRAPH.with(|g| {
+        g.borrow_mut().nodes[id.index].as_mut().unwrap().value = Some(Box::new(None::<T>));
+    });
 
     let compute: ComputeFn = Rc::new(RefCell::new(move || {
         let new_value = f();
-        let mut val = val_clone.borrow_mut();
-        match &*val {
-            Some(old_value) if *old_value == new_value => false,
-            _ => {
-                *val = Some(new_value);
-                true
+        let changed = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let node = g.nodes[id.index].as_mut().unwrap();
+            let val_any = node.value.as_mut().unwrap();
+            let val = val_any.downcast_mut::<Option<T>>().unwrap();
+            match val {
+                Some(old_value) if *old_value == new_value => false,
+                _ => {
+                    *val = Some(new_value);
+                    true
+                }
             }
-        }
+        });
+        changed
     }));
 
-    let id = NodeId::new(false, Some(compute.clone()));
-
+    id.set_compute(compute);
     id.mark_dirty();
     id.update_if_necessary();
 
-    Memo { id, value }
+    Memo { id, _marker: std::marker::PhantomData }
 }
 
-impl<T: Clone> Memo<T> {
+impl<T: Clone + 'static> Memo<T> {
     pub fn get(&self) -> T {
         self.id.update_if_necessary();
         self.id.record_read();
-        self.value.borrow().clone().unwrap()
+        GRAPH.with(|g| {
+            let g = g.borrow();
+            let node = g.nodes[self.id.index].as_ref().unwrap();
+            node.value.as_ref().unwrap().downcast_ref::<Option<T>>().unwrap().clone().unwrap()
+        })
     }
 }
 
@@ -607,12 +636,26 @@ impl<T: IntoView> IntoView for Option<T> {
         self.map(|t| t.into_view()).unwrap_or(View::None)
     }
 }
-impl<F: FnMut() -> View + 'static> IntoView for F {
-    fn into_view(self) -> View {
-        let id = NodeId::new(true, None);
+
+macro_rules! impl_into_view_for_display {
+    ($($t:ty),*) => {
+        $(
+            impl IntoView for $t {
+                fn into_view(self) -> View {
+                    View::Text(self.to_string())
+                }
+            }
+        )*
+    }
+}
+impl_into_view_for_display!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize, f32, f64, bool);
+
+impl<T: IntoView + 'static, F: FnMut() -> T + 'static> IntoView for F {
+    fn into_view(mut self) -> View {
+        let id = NodeId::new(true, None, None);
         View::DynamicNode(Boundary {
             id,
-            compute: Rc::new(RefCell::new(self)),
+            compute: Rc::new(RefCell::new(move || self().into_view())),
         })
     }
 }

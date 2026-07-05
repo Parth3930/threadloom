@@ -1,6 +1,6 @@
-use threadloom_core::{View, create_signal};
+use threadloom_core::{create_signal, View};
 use threadloom_macro::threadloom;
-use threadloom_ui::{button, input, checkbox, radio, accordion, textarea, label, dropdown, select, toast, toast_container, tabs, data_table, tooltip, hamburger, dialog};
+use threadloom_ui::*;
 
 pub fn demo_component() -> View {
     let (terms_agreed, set_terms_agreed) = create_signal(false);
@@ -11,25 +11,25 @@ pub fn demo_component() -> View {
     let (active_tab, set_active_tab) = create_signal(0);
     let (hamburger_open, set_hamburger_open) = create_signal(false);
     let (select_val, set_select_val) = create_signal("1".to_string());
-    
+
     let (api_response, set_api_response) = create_signal("Click to fetch...".to_string());
     let (counter, set_counter) = create_signal(0);
-    
+
     threadloom! {
         div(class="flex flex-col gap-8") {
             div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
-                
+
                 // Forms & Inputs
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Forms & Inputs" }
                     h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Buttons" }
                     div(class="flex gap-4 items-center") {
-                        { button("Primary Button", true, || { 
-                            let _ = web_sys::window().unwrap().alert_with_message("Primary Button Clicked!"); 
-                        }) }
-                        { button("Secondary Button", false, || {
-                            let _ = web_sys::window().unwrap().alert_with_message("Secondary Button Clicked!"); 
-                        }) }
+                        Button(label="Primary Button", primary=true, on_click={|| {
+                            threadloom_dom::alert!("Primary Button Clicked!");
+                        }})
+                        Button(label="Secondary Button", primary=false, on_click={|| {
+                            threadloom_dom::alert!("Secondary Button Clicked!");
+                        }})
                     }
                 }
 
@@ -38,10 +38,10 @@ pub fn demo_component() -> View {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Text Inputs" }
                     div(class="flex flex-col gap-2") {
                         div(class="flex flex-col gap-1") {
-                            { label("Username", "user") }
-                            { input("", "Enter your username...", || {}) }
+                            Label(text="Username", r#for="user")
+                            Input(value="", placeholder="Enter your username...", on_input={|| {}})
                         }
-                        { textarea("", "Write a message...", || {}) }
+                        Textarea(value="", placeholder="Write a message...", on_input={|| {}})
                     }
                 }
 
@@ -49,192 +49,156 @@ pub fn demo_component() -> View {
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Selections" }
                     div(class="flex items-center gap-2") {
-                        { 
-                            let terms = terms_agreed.clone();
-                            let set_terms = set_terms_agreed.clone();
-                            move || {
-                                let t = terms.clone();
-                                let st = set_terms.clone();
-                                checkbox(t.get(), "terms", move || { st.set(!t.get()); })
-                            }
-                        }
-                        { label("Accept Terms & Conditions", "terms") }
+                        { move || threadloom_core::IntoView::into_view(threadloom! { Checkbox(checked={terms_agreed.get()}, id="terms", on_change={move || { set_terms_agreed.set(!terms_agreed.get()); }}) }) }
+                        Label(text="Accept Terms & Conditions", r#for="terms")
                     }
-                    div(class="flex gap-4") {
-                        div(class="flex items-center gap-2") {
-                            {
-                                let opt = selected_option.clone();
-                                let set_opt = set_selected_option.clone();
-                                move || {
-                                    let o = opt.clone();
-                                    let so = set_opt.clone();
-                                    radio(o.get() == 1, "opt1", "options", move || { so.set(1); })
-                                }
+                    { move || threadloom_core::IntoView::into_view(threadloom! { RadioGroup(
+                        options=vec![
+                            ("1".to_string(), "Option 1".to_string()),
+                            ("2".to_string(), "Option 2".to_string()),
+                        ],
+                        selected_value={selected_option.get().to_string()},
+                        name="options",
+                        on_change={move |val: String| {
+                            if let Ok(num) = val.parse::<i32>() {
+                                set_selected_option.set(num);
                             }
-                            { label("Option 1", "opt1") }
-                        }
-                        div(class="flex items-center gap-2") {
-                            {
-                                let opt = selected_option.clone();
-                                let set_opt = set_selected_option.clone();
-                                move || {
-                                    let o = opt.clone();
-                                    let so = set_opt.clone();
-                                    radio(o.get() == 2, "opt2", "options", move || { so.set(2); })
-                                }
-                            }
-                            { label("Option 2", "opt2") }
-                        }
-                    }
+                        }}
+                    ) }) }
                 }
-                
+
                 // Interactive
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Interactive" }
-                    { 
-                        let acc = accordion_open.clone();
-                        let set_acc = set_accordion_open.clone();
-                        move || {
-                            let a = acc.clone();
-                            let sa = set_acc.clone();
-                            accordion(
-                                "Click to Expand Accordion",
-                                a.get(),
-                                threadloom! { p(class="p-4 text-gray-600 dark:text-gray-400") { "Accordion content here! Very premium and smooth." } },
-                                move || { sa.set(!a.get()); },
-                                ()
-                            )
+                    { move || threadloom_core::IntoView::into_view(threadloom! {
+                        Accordion(
+                            title="Click to Expand",
+                            open={accordion_open.get()},
+                            on_toggle={move || set_accordion_open.set(!accordion_open.get())}
+                        ) {
+                            p(class="text-gray-600 dark:text-gray-400 p-4") {
+                                "This content is revealed with a smooth height transition. It's built into the Accordion component."
+                            }
                         }
-                    }
+                    }) }
                     div(class="mt-4 flex flex-col gap-4") {
-                        { 
-                            let drop = dropdown_open.clone();
-                            let set_drop = set_dropdown_open.clone();
-                            move || {
-                                let d = drop.clone();
-                                let sd = set_drop.clone();
-                                dropdown(
-                                    "Open Menu Dropdown",
-                                    d.get(),
-                                    vec![
-                                        threadloom! { button(class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left dark:text-gray-200") { "Profile" } },
-                                        threadloom! { button(class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left dark:text-gray-200") { "Settings" } }
-                                    ],
-                                    move || { sd.set(!d.get()); }
-                                )
-                            }
-                        }
-                        
+                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                            Dropdown(
+                                label="Actions",
+                                open={dropdown_open.get()},
+                                on_toggle={move || set_dropdown_open.set(!dropdown_open.get())},
+                                items=vec![
+                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) { "Edit" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) { "Duplicate" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { div(class="tl-dropdown-divider") }),
+                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item text-red-600 dark:text-red-400", on_click={move || set_dropdown_open.set(false)}) { "Delete" } }),
+                                ]
+                            )
+                        }) }
+
                         div(class="mt-2") {
-                            { 
-                                let set_dlg = set_dialog_open.clone();
-                                button("Open Modal", false, move || {
-                                    set_dlg.set(true); 
-                                }) 
-                            }
+                            Button(label="Open Modal", primary=false, on_click={move || set_dialog_open.set(true)}) {}
+                            { move || threadloom_core::IntoView::into_view(threadloom! { Tooltip(tooltip_text="This explains the icon") {
+                                button(class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300") {
+                                    "ℹ️"
+                                }
+                            } }) }
                         }
-                        { 
-                            let dlg = dialog_open.clone();
-                            let set_dlg2 = set_dialog_open.clone();
-                            move || {
-                                let d = dlg.clone();
-                                let sd = set_dlg2.clone();
-                                dialog(
-                                    d.get(),
-                                    "Example Modal",
-                                    threadloom! {
-                                        p(class="text-gray-600 dark:text-gray-400 py-4") {
-                                            "This is a premium modal built with Threadloom UI."
+                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                            Dialog(
+                                open={dialog_open.get()},
+                                title="Example Modal",
+                                on_close={move || set_dialog_open.set(false)},
+                                footer={
+                                    threadloom_core::IntoView::into_view(threadloom! {
+                                        div(class="flex gap-2 mt-4") {
+                                            Button(label="Cancel", primary=false, on_click={move || set_dialog_open.set(false)})
+                                            Button(label="Confirm Action", primary=true, on_click={move || set_dialog_open.set(false)})
                                         }
-                                    },
-                                    move || { sd.set(false); }
-                                )
+                                    })
+                                }
+                            ) {
+                                p(class="text-gray-600 dark:text-gray-400 py-4") {
+                                    "This is a premium modal built with Threadloom UI. You can fully customize its footer actions!"
+                                }
                             }
-                        }
+                        }) }
                     }
                 }
-                
+
                 // More Interactive
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "More Interactive" }
-                    
+
                     h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Select & Tabs" }
-                    { 
-                        let sel = select_val.clone();
-                        let set_sel = set_select_val.clone();
-                        move || {
-                            let s = sel.clone();
-                            let ss = set_sel.clone();
-                            select(
-                                vec![
-                                    ("1".to_string(), "Option 1".to_string()),
-                                    ("2".to_string(), "Option 2".to_string()),
-                                ],
-                                s.get(),
-                                move || { 
-                                    let next = if s.get() == "1" { "2" } else { "1" };
-                                    ss.set(next.to_string()); 
-                                } 
-                            )
-                        }
-                    }
+                    { move || threadloom_core::IntoView::into_view(threadloom! { Select(
+                        options=vec![
+                            ("1".to_string(), "Option 1".to_string()),
+                            ("2".to_string(), "Option 2".to_string()),
+                        ],
+                        selected_value={select_val.get()},
+                        on_change={move || {
+                            let next = if select_val.get() == "1" { "2" } else { "1" };
+                            set_select_val.set(next.to_string());
+                        }}
+                    ) }) }
                     div(class="mt-6") {
-                        { 
-                            let tab = active_tab.clone();
-                            let set_tab = set_active_tab.clone();
-                            move || {
-                                let t = tab.clone();
-                                let st = set_tab.clone();
-                                tabs(
-                                    vec!["Tab 1".to_string(), "Tab 2".to_string()],
-                                    t.get(),
-                                    move |idx| { st.set(idx); },
-                                    vec![
-                                        threadloom! { p(class="p-4 text-gray-600 dark:text-gray-400") { "This is the content for Tab 1. Very clean." } },
-                                        threadloom! { p(class="p-4 text-gray-600 dark:text-gray-400") { "This is the content for Tab 2. Much wow." } }
-                                    ]
-                                )
-                            }
-                        }
+                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                            Tabs(
+                                tab_labels=vec!["Profile".to_string(), "Settings".to_string(), "Notifications".to_string()],
+                                active_index={active_tab.get()},
+                                on_tab_click={move |i: usize| set_active_tab.set(i)},
+                                panels=vec![
+                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Your profile information." } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Update your settings here." } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "You have 3 unread messages." } }),
+                                ]
+                            )
+                        }) }
                     }
                 }
 
                 // Data & Misc
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Data & Misc" }
-                    
+
                     div(class="flex gap-4 items-center mb-4") {
-                        { 
-                            let ham = hamburger_open.clone();
-                            let set_ham = set_hamburger_open.clone();
-                            move || {
-                                let h = ham.clone();
-                                let sh = set_ham.clone();
-                                hamburger(h.get(), move || { sh.set(!h.get()); }, ()) 
-                            }
-                        }
-                        { tooltip(
-                            threadloom! { span(class="text-blue-500 underline cursor-help dark:text-blue-400 font-medium") { "Hover me" } },
-                            "This is a tooltip!"
-                        ) }
+                        { move || threadloom_core::IntoView::into_view(threadloom! { Hamburger(open={hamburger_open.get()}, on_toggle={move || set_hamburger_open.set(!hamburger_open.get())}) }) }
+                        { threadloom_core::IntoView::into_view(threadloom! { Tooltip(
+                            tooltip_text="This is a tooltip!"
+                        ) {
+                            span(class="text-blue-500 underline cursor-help dark:text-blue-400 font-medium") { "Hover me" }
+                        } }) }
                     }
 
-                    { 
-                        data_table(
-                            vec!["ID".to_string(), "Name".to_string(), "Role".to_string()],
-                            vec![
-                                vec![threadloom! { span(class="dark:text-gray-300") { "1" } }, threadloom! { span(class="dark:text-gray-300 font-medium") { "Alice" } }, threadloom! { span(class="dark:text-gray-300") { "Admin" } }],
-                                vec![threadloom! { span(class="dark:text-gray-300") { "2" } }, threadloom! { span(class="dark:text-gray-300 font-medium") { "Bob" } }, threadloom! { span(class="dark:text-gray-300") { "User" } }]
+                    {
+                        threadloom_core::IntoView::into_view(threadloom! { DataTable(
+                            headers=vec!["Name".to_string(), "Status".to_string(), "Role".to_string()],
+                            rows=vec![
+                                vec![
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Alice" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200") { "Active" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { "Admin" })
+                                ],
+                                vec![
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Bob" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300") { "Offline" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { "Editor" })
+                                ],
+                                vec![
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Charlie" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200") { "Away" } }),
+                                    threadloom_core::IntoView::into_view(threadloom! { "Viewer" })
+                                ],
                             ]
-                        ) 
+                        ) })
                     }
 
                     div(class="mt-6 relative") {
                         h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4") { "Toasts" }
-                        { 
+                        {
                             button("Show Toast", false, move || {
-                                // Normally we'd spawn a toast here, but for demo we just show the static container
-                            }) 
+                            })
                         }
                         { toast_container(vec![
                             toast("Action completed successfully!")
@@ -245,28 +209,17 @@ pub fn demo_component() -> View {
                 // Counter & API Demo
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "State & API" }
-                    
+
                     div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
                         // Counter
                         div(class="flex flex-col items-center gap-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800") {
                             h4(class="text-lg font-medium text-gray-800 dark:text-gray-200") { "Counter Component" }
                             div(class="text-4xl font-bold text-blue-600 dark:text-blue-400 tabular-nums") {
-                                { 
-                                    let cnt = counter.clone();
-                                    move || threadloom! { span() { { cnt.get().to_string() } } }
-                                }
+                                { move || counter.get() }
                             }
                             div(class="flex gap-2 mt-2") {
-                                {
-                                    let cnt = counter.clone();
-                                    let set_cnt = set_counter.clone();
-                                    button("-1", false, move || { set_cnt.set(cnt.get() - 1); })
-                                }
-                                {
-                                    let cnt = counter.clone();
-                                    let set_cnt = set_counter.clone();
-                                    button("+1", true, move || { set_cnt.set(cnt.get() + 1); })
-                                }
+                                Button(label="-1", primary=false, on_click={move || { set_counter.set(counter.get() - 1); }})
+                                Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
                             }
                         }
 
@@ -274,42 +227,16 @@ pub fn demo_component() -> View {
                         div(class="flex flex-col items-center gap-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800") {
                             h4(class="text-lg font-medium text-gray-800 dark:text-gray-200") { "API Integration" }
                             p(class="text-sm text-gray-600 dark:text-gray-400 text-center min-h-[2.5rem] flex items-center italic") {
-                                {
-                                    let resp = api_response.clone();
-                                    move || threadloom! { span() { { resp.get() } } }
-                                }
+                                { move || api_response.get() }
                             }
-                            {
-                                let set_resp = set_api_response.clone();
-                                button("Fetch from Backend", true, move || {
-                                    set_resp.set("Fetching...".to_string());
-                                    let sr = set_resp.clone();
-                                    wasm_bindgen_futures::spawn_local(async move {
-                                        match reqwasm::http::Request::get("/api/hello").send().await {
-                                            Ok(resp) => {
-                                                web_sys::console::log_1(&format!("Response status: {}", resp.status()).into());
-                                                match resp.text().await {
-                                                    Ok(text) => {
-                                                        web_sys::console::log_1(&format!("Response text: {}", text).into());
-                                                        sr.set(text);
-                                                        let _ = threadloom_dom::tick();
-                                                    }
-                                                    Err(e) => {
-                                                        web_sys::console::log_1(&format!("Error parsing text: {:?}", e).into());
-                                                        sr.set("Error reading response".to_string());
-                                                        let _ = threadloom_dom::tick();
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                web_sys::console::log_1(&format!("Fetch error: {:?}", e).into());
-                                                sr.set(format!("Error: {:?}", e));
-                                                let _ = threadloom_dom::tick();
-                                            }
-                                        }
-                                    });
-                                })
-                            }
+                            Button(label="Fetch from Backend", primary=true, on_click={move || {
+                                set_api_response.set("Fetching...".to_string());
+                                threadloom_dom::fetch!("/api/hello" => |text| {
+                                    set_api_response.set(text);
+                                }, |e| {
+                                    set_api_response.set(e);
+                                });
+                            }})
                         }
                     }
                 }
