@@ -46,6 +46,8 @@ threadloom-macro = {{ path = "../threadloom/crates/threadloom-macro" }}
 threadloom-dom = {{ path = "../threadloom/crates/threadloom-dom" }}
 threadloom-ui = {{ path = "../threadloom/crates/threadloom-ui" }}
 web-sys = {{ version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement"] }}
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = "0.7.9"
 tokio = {{ version = "1.0", features = ["full"] }}
 "#, name);
@@ -70,6 +72,8 @@ tokio = {{ version = "1.0", features = ["full"] }}
 
     // src/main.rs
     let main_rs = r#"mod pages;
+
+#[cfg(not(target_arch = "wasm32"))]
 mod api;
 
 use threadloom_dom::mount;
@@ -148,6 +152,12 @@ module.exports = {
   plugins: [],
 }
 "#)?;
+        
+        println!("  {}Running npm install...{}", CYAN, RESET);
+        #[cfg(target_os = "windows")]
+        let _ = std::process::Command::new("cmd").args(["/C", "npm install"]).current_dir(&name).status();
+        #[cfg(not(target_os = "windows"))]
+        let _ = std::process::Command::new("npm").args(["install"]).current_dir(&name).status();
     } else {
         fs::write(format!("{}/style.css", name), "body { font-family: sans-serif; }\n")?;
     }
@@ -155,9 +165,6 @@ module.exports = {
     println!("  {}✔{} Project {} created successfully!", GREEN, RESET, name);
     println!("\n  Next steps:");
     println!("    {}cd {}{}", CYAN, name, RESET);
-    if setup_tw {
-        println!("    {}npm install{}", CYAN, RESET);
-    }
     println!("    {}distaff run{}\n", CYAN, RESET);
     Ok(())
 }
