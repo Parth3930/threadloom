@@ -132,12 +132,13 @@ async fn main() -> std::io::Result<()> {
     // src/pages/index/mod.rs
     fs::write(format!("{}/src/pages/index/mod.rs", name), "pub mod page;\npub mod components;\n")?;
     // src/pages/index/components/mod.rs
-    fs::write(format!("{}/src/pages/index/components/mod.rs", name), "pub mod hero;\n")?;
+    fs::write(format!("{}/src/pages/index/components/mod.rs", name), "pub mod hero;\npub mod counter;\n")?;
 
     // src/pages/index/page.rs
     let page_rs = r#"use threadloom_core::View;
 use threadloom_macro::threadloom;
 use super::components::hero::hero_component;
+use super::components::counter::counter_component;
 
 pub fn page() -> View {
     threadloom! {
@@ -151,7 +152,7 @@ pub fn page() -> View {
                 div(class="relative container mx-auto px-6 py-24 flex flex-col items-center justify-center text-center") {
                     { hero_component() }
                     
-                    div(class="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl text-left") {
+                    div(class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl text-left") {
                         div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-cyan-500/50 transition-colors duration-300 group") {
                             div(class="text-3xl mb-4") { "📁" }
                             h2(class="text-2xl font-semibold mb-4 text-cyan-400 group-hover:text-cyan-300 transition-colors") { "File-Based Routing" }
@@ -171,6 +172,8 @@ pub fn page() -> View {
                                 "Open your browser dev tools and fetch from " code(class="bg-black/40 px-2 py-1 rounded text-blue-300 text-sm") { "/api/hello" } " to see it in action!"
                             }
                         }
+
+                        { counter_component() }
                     }
                 }
             }
@@ -179,6 +182,34 @@ pub fn page() -> View {
 }
 "#;
     fs::write(format!("{}/src/pages/index/page.rs", name), page_rs)?;
+
+    // src/pages/index/components/counter.rs
+    let counter_rs = r#"use threadloom_core::{View, create_signal, IntoView};
+use threadloom_macro::threadloom;
+
+pub fn counter_component() -> View {
+    let (count, set_count) = create_signal(0);
+
+    threadloom! {
+        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-purple-500/50 transition-colors duration-300 flex flex-col items-center justify-center group text-center") {
+            div(class="text-3xl mb-4") { "⚛" }
+            h2(class="text-2xl font-semibold mb-4 text-purple-400 group-hover:text-purple-300 transition-colors") { "State Management" }
+            p(class="text-gray-400 leading-relaxed mb-6") { 
+                "Threadloom includes built-in reactive primitives like signals and memos. "
+                "Click the button to see it in action!"
+            }
+            
+            button(
+                class="px-6 py-2 bg-purple-500/20 text-purple-300 rounded-full font-semibold border border-purple-500/30 hover:bg-purple-500/30 transition-colors",
+                on_click=move || { set_count.set(count.get() + 1); }
+            ) {
+                { move || format!("Count is: {}", count.get()).into_view() }
+            }
+        }
+    }
+}
+"#;
+    fs::write(format!("{}/src/pages/index/components/counter.rs", name), counter_rs)?;
 
     // src/pages/index/components/hero.rs
     let comp_rs = r#"use threadloom_core::View;
