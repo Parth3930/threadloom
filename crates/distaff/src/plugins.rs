@@ -14,6 +14,13 @@ impl DistaffPlugin for TailwindPlugin {
     fn name(&self) -> &'static str { "Tailwind" }
     fn on_build_start(&mut self) -> anyhow::Result<()> {
         info!("Running TailwindCSS build...");
+        #[cfg(target_os = "windows")]
+        Command::new("cmd")
+            .args(["/C", "npx", "tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
+            .spawn()?
+            .wait()?;
+        
+        #[cfg(not(target_os = "windows"))]
         Command::new("npx")
             .args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
             .spawn()?

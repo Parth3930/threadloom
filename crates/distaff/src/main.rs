@@ -65,11 +65,6 @@ async fn main() -> anyhow::Result<()> {
             }
             info!("Starting distaff dev server on port {}", port);
             
-            let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
-            info!("Detected framework. Running initial build...");
-            let mut build_cmd = adapter.build_command();
-            let _ = build_cmd.status();
-
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
                 Box::new(plugins::AutoModPlugin),
@@ -78,8 +73,15 @@ async fn main() -> anyhow::Result<()> {
             ];
 
             for p in &mut plugins {
-                let _ = p.on_build_start();
+                if let Err(e) = p.on_build_start() {
+                    tracing::error!("Plugin {} failed on build start: {}", p.name(), e);
+                }
             }
+
+            let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+            info!("Detected framework. Running initial build...");
+            let mut build_cmd = adapter.build_command();
+            let _ = build_cmd.status();
 
             let plugins = std::sync::Arc::new(std::sync::Mutex::new(plugins));
             
@@ -94,7 +96,9 @@ async fn main() -> anyhow::Result<()> {
                 Box::new(plugins::EnvInjectionPlugin),
             ];
             for p in &mut plugins {
-                let _ = p.on_build_start();
+                if let Err(e) = p.on_build_start() {
+                    tracing::error!("Plugin {} failed on build start: {}", p.name(), e);
+                }
             }
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
             let mut build_cmd = adapter.build_command();
