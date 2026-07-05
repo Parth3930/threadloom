@@ -183,12 +183,13 @@ pub fn page() -> View {
 "#;
     fs::write(format!("{}/src/pages/index/page.rs", name), page_rs)?;
 
-    // src/pages/index/components/counter.rs
+// src/pages/index/components/counter.rs
     let counter_rs = r#"use threadloom_core::{View, create_signal, IntoView};
 use threadloom_macro::threadloom;
 
 pub fn counter_component() -> View {
     let (count, set_count) = create_signal(0);
+    let count_text = count.clone();
 
     threadloom! {
         div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-purple-500/50 transition-colors duration-300 flex flex-col items-center justify-center group text-center") {
@@ -203,7 +204,7 @@ pub fn counter_component() -> View {
                 class="px-6 py-2 bg-purple-500/20 text-purple-300 rounded-full font-semibold border border-purple-500/30 hover:bg-purple-500/30 transition-colors",
                 on_click=move || { set_count.set(count.get() + 1); }
             ) {
-                { move || format!("Count is: {}", count.get()).into_view() }
+                { move || format!("Count is: {}", count_text.get()).into_view() }
             }
         }
     }
