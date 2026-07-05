@@ -14,7 +14,8 @@ pub fn demo_component() -> View {
 
     let (api_response, set_api_response) = create_signal("Click to fetch...".to_string());
     let (counter, set_counter) = create_signal(0);
-    let (cookie_val, set_cookie_val) = create_signal(threadloom_dom::get_cookie!("demo_cookie").unwrap_or_default());
+    let (cookie_val, set_cookie_val) =
+        create_signal(threadloom_dom::get_cookie!("demo_cookie").unwrap_or_default());
 
     threadloom! {
         div(class="flex flex-col gap-8") {
@@ -220,7 +221,7 @@ pub fn demo_component() -> View {
                             }
                             div(class="flex gap-2 mt-2") {
                                 Button(label="-1", primary=false, on_click={move || { set_counter.set(counter.get() - 1); }})
-                                Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
+                                    Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
                             }
                         }
 

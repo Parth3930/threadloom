@@ -120,13 +120,37 @@ async fn hmr_script() -> &'static str {
                             .filter(el => regex.test(el.getAttribute('data-th-id')));
             };
 
+            const shiftIds = (parentPath, startIndex, delta) => {
+                const prefix = parentPath === "" ? "hot-" : "hot-" + parentPath + "-";
+                const els = document.querySelectorAll(`[data-th-id^="${prefix}"]`);
+                const elsArray = Array.from(els).map(el => {
+                    const id = el.getAttribute('data-th-id');
+                    if (!id) return null;
+                    const suffix = id.substring(prefix.length);
+                    const parts = suffix.split('-');
+                    const index = parseInt(parts[0], 10);
+                    return { el, id, index, remainder: parts.slice(1).join('-') };
+                }).filter(item => item !== null && !isNaN(item.index));
+                
+                elsArray.sort((a, b) => (b.index - a.index) * Math.sign(delta));
+                
+                elsArray.forEach(item => {
+                    if (item.index >= startIndex) {
+                        const newIndex = item.index + delta;
+                        const newId = prefix + newIndex + (item.remainder ? "-" + item.remainder : "");
+                        item.el.setAttribute('data-th-id', newId);
+                    }
+                });
+            };
+
             msg.data.forEach(patch => {
                 if (patch.action === 'remove') {
                     const els = getExactEls(patch.path);
                     if (els.length > 0) {
                         els.forEach(el => el.remove());
+                        shiftIds(patch.parent_path, patch.index + 1, -1);
                     } else {
-                        console.warn("Hot patch failed: could not find element to remove for path", patch.path);
+                        console.warn("Hot patch failed: could not find element to remove", patch.path);
                         success = false;
                     }
                     return;
@@ -135,18 +159,17 @@ async fn hmr_script() -> &'static str {
                 if (patch.action === 'add') {
                     const parentEls = getExactEls(patch.parent_path);
                     if (parentEls.length > 0) {
+                        shiftIds(patch.parent_path, patch.index, 1);
                         parentEls.forEach(parentEl => {
                             const template = document.createElement('template');
                             template.innerHTML = patch.html;
                             const newEl = template.content.firstChild;
-                            let refChild = null;
-                            if (patch.before_path) {
-                                const beforeEls = getExactEls(patch.before_path);
-                                if (beforeEls.length > 0) refChild = beforeEls[0];
-                            }
-                            if (!refChild) {
-                                refChild = parentEl.childNodes[patch.index];
-                            }
+                            
+                            const prefix = patch.parent_path === "" ? "hot-" : "hot-" + patch.parent_path + "-";
+                            const refChildId = prefix + (patch.index + 1);
+                            
+                            const refChild = Array.from(parentEl.children).find(c => c.getAttribute('data-th-id') === refChildId);
+                            
                             if (refChild) {
                                 parentEl.insertBefore(newEl, refChild);
                             } else {
@@ -174,6 +197,21 @@ async fn hmr_script() -> &'static str {
                         });
                     } else {
                         console.warn("Hot patch failed: could not find element for attrs", patch.path);
+                        success = false;
+                    }
+                    return;
+                }
+                
+                if (patch.action === 'replace') {
+                    const els = getExactEls(patch.path);
+                    if (els.length > 0) {
+                        els.forEach(el => {
+                            const template = document.createElement('template');
+                            template.innerHTML = patch.html;
+                            el.replaceWith(template.content.firstChild);
+                        });
+                    } else {
+                        console.warn("Hot patch failed: could not find element to replace", patch.path);
                         success = false;
                     }
                     return;

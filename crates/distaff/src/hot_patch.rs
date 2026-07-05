@@ -197,11 +197,7 @@ fn diff_nodes(
 ) -> bool {
     if old_nodes.len() == new_nodes.len() {
         for (i, (old_node, new_node)) in old_nodes.iter().zip(new_nodes.iter()).enumerate() {
-            let path = if base_path.is_empty() {
-                i.to_string()
-            } else {
-                format!("{}-{}", base_path, i)
-            };
+            let path = if base_path.is_empty() { i.to_string() } else { format!("{}-{}", base_path, i) };
             if !diff_single_node(old_node, new_node, &path, patches) {
                 return false;
             }
@@ -209,73 +205,96 @@ fn diff_nodes(
         return true;
     }
 
-    if base_path.is_empty() {
-        return false;
+    let mut old_i = 0;
+    let mut new_i = 0;
+    let mut temp_patches = Vec::new();
+    
+    while old_i < old_nodes.len() && new_i < new_nodes.len() {
+        if node_to_string(&old_nodes[old_i]) == node_to_string(&new_nodes[new_i]) {
+            old_i += 1;
+            new_i += 1;
+        } else {
+            break;
+        }
     }
-
-    if old_nodes.len() > new_nodes.len() {
-        let mut old_idx = 0;
-        let mut new_idx = 0;
-        let mut removed_paths = Vec::new();
-
-        while old_idx < old_nodes.len() {
-            let path = format!("{}-{}", base_path, old_idx);
-            if new_idx < new_nodes.len()
-                && node_to_string(&old_nodes[old_idx]) == node_to_string(&new_nodes[new_idx])
-            {
-                old_idx += 1;
-                new_idx += 1;
-            } else {
-                removed_paths.push(path);
-                old_idx += 1;
-            }
+    
+    let mut old_j = old_nodes.len();
+    let mut new_j = new_nodes.len();
+    
+    while old_j > old_i && new_j > new_i {
+        if node_to_string(&old_nodes[old_j - 1]) == node_to_string(&new_nodes[new_j - 1]) {
+            old_j -= 1;
+            new_j -= 1;
+        } else {
+            break;
         }
-
-        if new_idx == new_nodes.len() {
-            for path in removed_paths {
-                patches.push(serde_json::json!({
-                    "action": "remove",
-                    "path": path
-                }));
-            }
-            return true;
-        }
-    } else if old_nodes.len() < new_nodes.len() {
-        let mut old_idx = 0;
-        let mut new_idx = 0;
-        let mut added_nodes = Vec::new();
-
-        while new_idx < new_nodes.len() {
-            let path = format!("{}-{}", base_path, new_idx);
-            if old_idx < old_nodes.len()
-                && node_to_string(&old_nodes[old_idx]) == node_to_string(&new_nodes[new_idx])
-            {
-                old_idx += 1;
-                new_idx += 1;
-            } else {
-                if let Some(html) = node_to_html(&new_nodes[new_idx], &path) {
-                    added_nodes.push((new_idx, path, html));
-                    new_idx += 1;
-                } else {
+    }
+    
+    if old_i == old_j {
+        for idx in new_i..new_j {
+            let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
+            
+            // Cannot hot patch add components or expressions
+            if let Node::Element(el) = &new_nodes[idx] {
+                if el.tag.to_string().chars().next().unwrap().is_uppercase() {
                     return false;
                 }
+            } else {
+                // Return false for Text and Expr to be perfectly safe with DOM indices
+                return false;
             }
-        }
 
-        if old_idx == old_nodes.len() {
-            for (idx, path, html) in added_nodes {
-                patches.push(serde_json::json!({
+            if let Some(html) = node_to_html(&new_nodes[idx], &path) {
+                temp_patches.push(serde_json::json!({
                     "action": "add",
                     "parent_path": base_path,
                     "index": idx,
                     "path": path,
                     "html": html
                 }));
+            } else {
+                return false;
             }
-            return true;
         }
+        patches.extend(temp_patches);
+        return true;
     }
+    
+    if new_i == new_j {
+        for idx in (old_i..old_j).rev() {
+            let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
+            
+            // Cannot reliably remove components, exprs, or text via data-th-id
+            if let Node::Element(el) = &old_nodes[idx] {
+                if el.tag.to_string().chars().next().unwrap().is_uppercase() {
+                    return false;
+                }
+            } else {
+                return false;
+            }
 
+            temp_patches.push(serde_json::json!({
+                "action": "remove",
+                "path": path,
+                "index": idx,
+                "parent_path": base_path
+            }));
+        }
+        patches.extend(temp_patches);
+        return true;
+    }
+    
+    if old_j - old_i == new_j - new_i {
+        for k in 0..(old_j - old_i) {
+            let path = if base_path.is_empty() { (old_i + k).to_string() } else { format!("{}-{}", base_path, old_i + k) };
+            if !diff_single_node(&old_nodes[old_i + k], &new_nodes[new_i + k], &path, &mut temp_patches) {
+                return false;
+            }
+        }
+        patches.extend(temp_patches);
+        return true;
+    }
+    
     false
 }
 
@@ -297,102 +316,130 @@ fn diff_single_node(
             true
         }
         (Node::Element(old_el), Node::Element(new_el)) => {
+            let original_patches_len = patches.len();
+            let mut can_patch = true;
+
             if old_el.tag.to_string() != new_el.tag.to_string() {
-                return false;
+                can_patch = false;
             }
 
-            let mut old_attrs = std::collections::HashMap::new();
-            for attr in &old_el.attrs {
-                old_attrs.insert(attr.name.to_string(), attr);
-            }
-            let mut new_attrs = std::collections::HashMap::new();
-            for attr in &new_el.attrs {
-                new_attrs.insert(attr.name.to_string(), attr);
-            }
+            if can_patch {
+                let mut old_attrs = std::collections::HashMap::new();
+                for attr in &old_el.attrs {
+                    old_attrs.insert(attr.name.to_string(), attr);
+                }
+                let mut new_attrs = std::collections::HashMap::new();
+                for attr in &new_el.attrs {
+                    new_attrs.insert(attr.name.to_string(), attr);
+                }
 
-            let mut attrs_diff = std::collections::HashMap::new();
+                let mut attrs_diff = std::collections::HashMap::new();
 
-            // Check for added or modified attributes
-            for (key, new_attr) in &new_attrs {
-                match old_attrs.get(key) {
-                    Some(old_attr) => {
-                        let old_name = &old_attr.name;
-                        let old_val = &old_attr.value;
-                        let new_name = &new_attr.name;
-                        let new_val = &new_attr.value;
-                        let old_val_str = quote::quote!(#old_name = #old_val).to_string();
-                        let new_val_str = quote::quote!(#new_name = #new_val).to_string();
-                        if old_val_str != new_val_str {
-                            // It changed. Can we hot patch it?
-                            if new_attr.is_event || old_attr.is_event {
-                                return false;
+                for (key, new_attr) in &new_attrs {
+                    match old_attrs.get(key) {
+                        Some(old_attr) => {
+                            let old_name = &old_attr.name;
+                            let old_val = &old_attr.value;
+                            let new_name = &new_attr.name;
+                            let new_val = &new_attr.value;
+                            let old_val_str = quote::quote!(#old_name = #old_val).to_string();
+                            let new_val_str = quote::quote!(#new_name = #new_val).to_string();
+                            if old_val_str != new_val_str {
+                                if new_attr.is_event || old_attr.is_event {
+                                    can_patch = false;
+                                    break;
+                                }
+                                if let (
+                                    syn::Expr::Lit(syn::ExprLit {
+                                        lit: syn::Lit::Str(new_lit),
+                                        ..
+                                    }),
+                                    syn::Expr::Lit(syn::ExprLit {
+                                        lit: syn::Lit::Str(_),
+                                        ..
+                                    }),
+                                ) = (&new_attr.value, &old_attr.value)
+                                {
+                                    attrs_diff.insert(
+                                        key.clone(),
+                                        serde_json::Value::String(new_lit.value()),
+                                    );
+                                } else {
+                                    can_patch = false;
+                                    break;
+                                }
                             }
-                            if let (
-                                syn::Expr::Lit(syn::ExprLit {
-                                    lit: syn::Lit::Str(new_lit),
-                                    ..
-                                }),
-                                syn::Expr::Lit(syn::ExprLit {
-                                    lit: syn::Lit::Str(_),
-                                    ..
-                                }),
-                            ) = (&new_attr.value, &old_attr.value)
+                        }
+                        None => {
+                            if new_attr.is_event {
+                                can_patch = false;
+                                break;
+                            }
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(new_lit),
+                                ..
+                            }) = &new_attr.value
                             {
-                                attrs_diff.insert(
-                                    key.clone(),
-                                    serde_json::Value::String(new_lit.value()),
-                                );
+                                attrs_diff
+                                    .insert(key.clone(), serde_json::Value::String(new_lit.value()));
                             } else {
-                                return false; // not string literals
+                                can_patch = false;
+                                break;
                             }
                         }
                     }
-                    None => {
-                        // Added
-                        if new_attr.is_event {
-                            return false;
-                        }
-                        if let syn::Expr::Lit(syn::ExprLit {
-                            lit: syn::Lit::Str(new_lit),
-                            ..
-                        }) = &new_attr.value
-                        {
-                            attrs_diff
-                                .insert(key.clone(), serde_json::Value::String(new_lit.value()));
-                        } else {
-                            return false;
+                }
+
+                if can_patch {
+                    for (key, old_attr) in &old_attrs {
+                        if !new_attrs.contains_key(key) {
+                            if old_attr.is_event {
+                                can_patch = false;
+                                break;
+                            }
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(_),
+                                ..
+                            }) = &old_attr.value
+                            {
+                                attrs_diff.insert(key.clone(), serde_json::Value::Null);
+                            } else {
+                                can_patch = false;
+                                break;
+                            }
                         }
                     }
                 }
-            }
 
-            // Check for removed attributes
-            for (key, old_attr) in &old_attrs {
-                if !new_attrs.contains_key(key) {
-                    if old_attr.is_event {
-                        return false;
-                    }
-                    if let syn::Expr::Lit(syn::ExprLit {
-                        lit: syn::Lit::Str(_),
-                        ..
-                    }) = &old_attr.value
-                    {
-                        attrs_diff.insert(key.clone(), serde_json::Value::Null);
-                    } else {
-                        return false;
-                    }
+                if can_patch && !attrs_diff.is_empty() {
+                    patches.push(serde_json::json!({
+                        "action": "update_attrs",
+                        "path": path,
+                        "attrs": attrs_diff
+                    }));
                 }
             }
 
-            if !attrs_diff.is_empty() {
-                patches.push(serde_json::json!({
-                    "action": "update_attrs",
-                    "path": path,
-                    "attrs": attrs_diff
-                }));
+            if can_patch {
+                if !diff_nodes(&old_el.children, &new_el.children, path, patches) {
+                    can_patch = false;
+                }
             }
 
-            diff_nodes(&old_el.children, &new_el.children, path, patches)
+            if !can_patch {
+                patches.truncate(original_patches_len);
+                if let Some(html) = node_to_html(new_node, path) {
+                    patches.push(serde_json::json!({
+                        "action": "replace",
+                        "path": path,
+                        "html": html
+                    }));
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            true
         }
         (Node::Expr(old_expr), Node::Expr(new_expr)) => {
             quote::quote!(#old_expr).to_string() == quote::quote!(#new_expr).to_string()
