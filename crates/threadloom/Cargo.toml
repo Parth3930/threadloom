@@ -1,0 +1,11 @@
+[package]
+name = "threadloom"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+threadloom-core = { path = "../threadloom-core" }
+threadloom-macro = { path = "../threadloom-macro" }
+
+[dev-dependencies]
+trybuild = "1.0"

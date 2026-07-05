@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Yew Benchmark</title>
+  <link rel="modulepreload" href="/yew-app-407eca64e6fdd68.js" crossorigin="anonymous" integrity="sha384-MQUukQ+qr9t8cowNFsdk5IxnKYskzaaRHCzg2+4oLKWVVDx0tj6JDvuWnYPgbkZ2"><link rel="preload" href="/yew-app-407eca64e6fdd68_bg.wasm" crossorigin="anonymous" integrity="sha384-ZUi+VwgA1pGAN5sDcH5G1FTbPn2FEmjfwdWBiv0kGJJ/dCavdFPYxdGl6smysB4c" as="fetch" type="application/wasm"></head>
+  <body>
+  
+<script type="module">
+import init, * as bindings from '/yew-app-407eca64e6fdd68.js';
+const wasm = await init({ module_or_path: '/yew-app-407eca64e6fdd68_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>

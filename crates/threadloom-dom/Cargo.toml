@@ -1,0 +1,15 @@
+[package]
+name = "threadloom-dom"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Document", "Element", "HtmlElement", "Window", "Node", "Text"] }
+threadloom-core = { path = "../threadloom-core" }
+threadloom-scheduler = { path = "../threadloom-scheduler" }
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

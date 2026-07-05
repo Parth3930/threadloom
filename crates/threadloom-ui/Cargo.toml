@@ -1,0 +1,9 @@
+[package]
+name = "threadloom-ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+threadloom-core = { path = "../threadloom-core" }
+threadloom-macro = { path = "../threadloom-macro" }
+

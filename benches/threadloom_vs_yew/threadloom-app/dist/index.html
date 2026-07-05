@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Threadloom Benchmark</title>
+  <link rel="modulepreload" href="/threadloom-app-be5502c15ab90dfb.js" crossorigin="anonymous" integrity="sha384-GuaY7HokiUdw3lBQF6Ab5qGroXLRsSxwjIWJpdkQX279z7Rsjgm6vmjZ2WnpS+8K"><link rel="preload" href="/threadloom-app-be5502c15ab90dfb_bg.wasm" crossorigin="anonymous" integrity="sha384-H0QQ6wdPoDTGV85oLhqz7Ls+pT02ydGM2f576NUzoSwqIGkqeS48AAXGerdAvjL2" as="fetch" type="application/wasm"></head>
+  <body>
+  
+<script type="module">
+import init, * as bindings from '/threadloom-app-be5502c15ab90dfb.js';
+const wasm = await init({ module_or_path: '/threadloom-app-be5502c15ab90dfb_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>

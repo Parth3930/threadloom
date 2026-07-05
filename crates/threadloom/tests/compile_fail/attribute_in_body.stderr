@@ -1,0 +1,5 @@
+error: Expected element tag, string literal, or { expression } block
+ --> tests/compile_fail/attribute_in_body.rs:6:15
+  |
+6 |             id="my-div"
+  |               ^

@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/threadloom-core",
+    "crates/threadloom-macro",
+    "crates/threadloom-scheduler",
+    "crates/threadloom-dom",
+    "crates/threadloom",
+    "crates/distaff",
+
+    "benches/threadloom_vs_yew/yew-app", "crates/threadloom-desktop", "crates/threadloom-ui", "benches/threadloom_vs_yew/threadloom-app",
+]

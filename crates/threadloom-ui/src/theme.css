@@ -1,0 +1,190 @@
+:root {
+  --tl-color-primary: #3b82f6;
+  --tl-color-primary-hover: #2563eb;
+  --tl-color-background: #ffffff;
+  --tl-color-surface: #f3f4f6;
+  --tl-color-text: #111827;
+  --tl-color-text-muted: #6b7280;
+  --tl-color-border: #e5e7eb;
+  --tl-color-danger: #ef4444;
+  --tl-color-success: #10b981;
+
+  --tl-radius: 0.375rem;
+  --tl-spacing-sm: 0.5rem;
+  --tl-spacing-md: 1rem;
+  --tl-spacing-lg: 1.5rem;
+  
+  --tl-font-sans: system-ui, -apple-system, sans-serif;
+}
+
+/* Button */
+.tl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tl-spacing-sm) var(--tl-spacing-md);
+  border-radius: var(--tl-radius);
+  font-family: var(--tl-font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+.tl-btn-primary {
+  background-color: var(--tl-color-primary);
+  color: white;
+}
+.tl-btn-primary:hover {
+  background-color: var(--tl-color-primary-hover);
+}
+.tl-btn-secondary {
+  background-color: var(--tl-color-surface);
+  color: var(--tl-color-text);
+  border-color: var(--tl-color-border);
+}
+
+/* Input */
+.tl-input {
+  display: flex;
+  width: 100%;
+  padding: var(--tl-spacing-sm) var(--tl-spacing-md);
+  border-radius: var(--tl-radius);
+  border: 1px solid var(--tl-color-border);
+  background-color: var(--tl-color-background);
+  color: var(--tl-color-text);
+  font-family: var(--tl-font-sans);
+}
+.tl-input:focus {
+  outline: 2px solid var(--tl-color-primary);
+  outline-offset: -1px;
+}
+
+/* Label */
+.tl-label {
+  display: block;
+  font-family: var(--tl-font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--tl-color-text);
+  margin-bottom: 0.25rem;
+}
+
+/* Dialog */
+.tl-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tl-dialog {
+  background: var(--tl-color-background);
+  border-radius: var(--tl-radius);
+  padding: var(--tl-spacing-lg);
+  max-width: 32rem;
+  width: 100%;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+}
+
+/* Toast */
+.tl-toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tl-toast {
+  background: var(--tl-color-background);
+  border: 1px solid var(--tl-color-border);
+  border-radius: var(--tl-radius);
+  padding: var(--tl-spacing-md);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+/* Tabs */
+.tl-tabs-list {
+  display: flex;
+  border-bottom: 1px solid var(--tl-color-border);
+  gap: 1rem;
+}
+.tl-tab {
+  padding: 0.5rem 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tl-tab[aria-selected="true"] {
+  border-bottom-color: var(--tl-color-primary);
+  color: var(--tl-color-primary);
+}
+
+/* Table */
+.tl-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tl-table th, .tl-table td {
+  padding: var(--tl-spacing-sm) var(--tl-spacing-md);
+  border-bottom: 1px solid var(--tl-color-border);
+  text-align: left;
+}
+
+/* Checkbox / Radio */
+.tl-checkbox, .tl-radio {
+  margin-right: 0.5rem;
+}
+
+/* Tooltip */
+.tl-tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.tl-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tl-color-text);
+  color: var(--tl-color-background);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--tl-radius);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.tl-tooltip-wrapper:hover .tl-tooltip,
+.tl-tooltip-wrapper:focus-within .tl-tooltip {
+  opacity: 1;
+}
+
+/* Dropdown */
+.tl-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+.tl-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  background: var(--tl-color-background);
+  border: 1px solid var(--tl-color-border);
+  border-radius: var(--tl-radius);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  min-width: 10rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+.tl-dropdown-menu > * {
+  padding: var(--tl-spacing-sm) var(--tl-spacing-md);
+  cursor: pointer;
+}
+.tl-dropdown-menu > *:hover {
+  background: var(--tl-color-surface);
+}

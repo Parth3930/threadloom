@@ -1,0 +1,9 @@
+[package]
+name = "threadloom-desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wry = "0.40"
+tao = "0.30"
+tokio = { version = "1.0", features = ["full"] }

@@ -1,0 +1,26 @@
+[package]
+name = "threadloom-distaff"
+version = "0.1.0"
+edition = "2021"
+description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
+publish = false # Prevent accidental publish until ready
+
+[[bin]]
+name = "distaff"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+tokio = { version = "1.32", features = ["full"] }
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+notify = "6.1"
+notify-debouncer-mini = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+cargo_metadata = "0.18"
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+anyhow = "1.0"

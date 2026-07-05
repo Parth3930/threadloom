@@ -1,0 +1,5 @@
+error: Expected '=' after attribute 'id'
+ --> tests/compile_fail/bad_attribute.rs:5:16
+  |
+5 |         div(id "my-div") {
+  |                ^^^^^^^^
