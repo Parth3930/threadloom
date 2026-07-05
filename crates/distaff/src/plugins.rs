@@ -16,12 +16,14 @@ impl DistaffPlugin for TailwindPlugin {
         info!("Running TailwindCSS build...");
         #[cfg(target_os = "windows")]
         Command::new("cmd")
+            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
             .args(["/C", "npx", "tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
             .spawn()?
             .wait()?;
         
         #[cfg(not(target_os = "windows"))]
         Command::new("npx")
+            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
             .args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
             .spawn()?
             .wait()?;

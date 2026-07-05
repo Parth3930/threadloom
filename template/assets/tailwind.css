@@ -1581,6 +1581,12 @@ select.tl-input:is(.dark *) {
   gap: 2rem;
 }
 
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rounded-3xl {
   border-radius: 1.5rem;
 }

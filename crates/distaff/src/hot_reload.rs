@@ -1,11 +1,11 @@
-use std::path::Path;
-use tokio::sync::broadcast;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::process::{Command, Child};
-use tracing::{info, error};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
+use std::path::Path;
+use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::broadcast;
+use tracing::{error, info};
 
 use crate::plugins::DistaffPlugin;
 
@@ -18,9 +18,46 @@ lazy_static::lazy_static! {
     static ref IS_BUILDING: AtomicBool = AtomicBool::new(false);
 }
 
+fn robust_canonicalize(p: &std::path::Path) -> String {
+    let mut normalized = String::new();
+    let abs_path = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(p)
+    };
+
+    // We do NOT use std::fs::canonicalize at all!
+    // Just lexical normalization to avoid locking / atomic save issues.
+    for component in abs_path.components() {
+        match component {
+            std::path::Component::Prefix(prefix) => {
+                normalized.push_str(&prefix.as_os_str().to_string_lossy())
+            }
+            std::path::Component::RootDir => {
+                if !normalized.ends_with('\\') && !normalized.ends_with('/') {
+                    normalized.push('/');
+                }
+            }
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if let Some(idx) = normalized.rfind('/') {
+                    normalized.truncate(idx);
+                }
+            }
+            std::path::Component::Normal(c) => {
+                if !normalized.ends_with('/') && !normalized.is_empty() {
+                    normalized.push('/');
+                }
+                normalized.push_str(&c.to_string_lossy());
+            }
+        }
+    }
+    normalized.replace("\\", "/").to_lowercase()
+}
+
 pub fn restart_backend() {
     let mut child_guard = BACKEND_PROCESS.lock().unwrap();
-    
+
     // Check if cargo-hot is installed
     let has_cargo_hot = Command::new("cargo")
         .args(["hot", "--help"])
@@ -70,7 +107,10 @@ fn is_output_path(p: &str) -> bool {
     p.contains("generated_")
         || p.contains("tailwind.css")
         || p.contains(".git")
-        || p.contains("/target/") || p.ends_with("/target") || p.starts_with("target/") || p == "target"
+        || p.contains("/target/")
+        || p.ends_with("/target")
+        || p.starts_with("target/")
+        || p == "target"
         || p.contains("Cargo.lock")
         || p.contains("src/routes.rs")
         || p.contains("src/api_routes.rs")
@@ -79,13 +119,9 @@ fn is_output_path(p: &str) -> bool {
         || p.ends_with(".env")
 }
 
-/// Returns true if the path belongs to backend-only code.
-/// Only `src/api/**` and `api_routes.rs` are backend.
-/// `src/main.rs` is the WASM entry point — treated as frontend.
 fn is_backend_path(p: &str) -> bool {
     let p = p.replace("\\", "/");
-    p.contains("src/api")
-        || p.ends_with("api_routes.rs")
+    p.contains("src/api") || p.ends_with("api_routes.rs")
 }
 
 pub fn spawn_watcher<P: AsRef<Path>>(
@@ -98,10 +134,13 @@ pub fn spawn_watcher<P: AsRef<Path>>(
     // Preload FILE_CACHE so the very first edit can be hot patched
     info!("Preloading file cache for hot patcher...");
     let mut cache = FILE_CACHE.lock().unwrap();
-    for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(&path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let p = entry.path();
         if p.extension().and_then(|s| s.to_str()) == Some("rs") {
-            let p_str = p.to_string_lossy().to_string();
+            let p_str = robust_canonicalize(p);
             // Ignore target, dist, assets
             let p_normalized = p_str.replace("\\", "/");
             if !p_normalized.contains("/target/") && !p_normalized.contains("/dist/") {
@@ -120,7 +159,10 @@ pub fn spawn_watcher<P: AsRef<Path>>(
         let (notify_tx, notify_rx) = std::sync::mpsc::channel();
         let mut debouncer = match new_debouncer(Duration::from_millis(500), notify_tx) {
             Ok(d) => d,
-            Err(e) => { error!("Failed to initialize debouncer: {}", e); return; }
+            Err(e) => {
+                error!("Failed to initialize debouncer: {}", e);
+                return;
+            }
         };
 
         if let Err(e) = debouncer.watcher().watch(&path, RecursiveMode::Recursive) {
@@ -133,7 +175,6 @@ pub fn spawn_watcher<P: AsRef<Path>>(
         for res in notify_rx {
             match res {
                 Ok(events) => {
-                    // While a build is running, all incoming events are noise — skip them.
                     if IS_BUILDING.load(Ordering::SeqCst) {
                         continue;
                     }
@@ -146,14 +187,21 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         let p = event.path.to_string_lossy();
                         let p_normalized = p.replace("\\", "/");
 
-                        if p_normalized.contains("/dist/") || p_normalized.ends_with("/dist") || p_normalized.starts_with("dist/") || p_normalized == "dist" ||
-                           p_normalized.contains("/assets/") || p_normalized.ends_with("/assets") || p_normalized.starts_with("assets/") || p_normalized == "assets" {
+                        if p_normalized.contains("/dist/")
+                            || p_normalized.ends_with("/dist")
+                            || p_normalized.starts_with("dist/")
+                            || p_normalized == "dist"
+                            || p_normalized.contains("/assets/")
+                            || p_normalized.ends_with("/assets")
+                            || p_normalized.starts_with("assets/")
+                            || p_normalized == "assets"
+                        {
                             needs_reload = true;
                             continue;
                         }
 
                         if is_output_path(&p) {
-                            continue; // ignore build artifacts
+                            continue;
                         }
                         triggering_files.push(p.to_string());
                         if is_backend_path(&p) {
@@ -164,21 +212,22 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                     if !needs_backend && !needs_reload && triggering_files.is_empty() {
                         continue;
                     }
-                    
+
                     if !triggering_files.is_empty() {
                         tracing::info!("File changed: {:?}", triggering_files);
                     }
 
-                    // Lock out further events for the duration of the build
                     IS_BUILDING.store(true, Ordering::SeqCst);
 
-                    // Run plugin hooks on changed source files
                     if !triggering_files.is_empty() {
                         if let Ok(mut lock) = plugins.lock() {
                             for event in &events {
                                 let p = event.path.to_string_lossy();
                                 let p_normalized = p.replace("\\", "/");
-                                if !is_output_path(&p) && !p_normalized.contains("/dist/") && !p_normalized.starts_with("dist/") {
+                                if !is_output_path(&p)
+                                    && !p_normalized.contains("/dist/")
+                                    && !p_normalized.starts_with("dist/")
+                                {
                                     for plugin in lock.iter_mut() {
                                         let _ = plugin.on_file_change(&event.path);
                                     }
@@ -188,9 +237,11 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                     }
 
                     if needs_backend {
-                        // cargo-hot handles backend patching automatically. 
-                        // If we fall back to cargo run, we need to restart it manually.
-                        let has_cargo_hot = Command::new("cargo").args(["hot", "--help"]).output().map(|o| o.status.success()).unwrap_or(false);
+                        let has_cargo_hot = Command::new("cargo")
+                            .args(["hot", "--help"])
+                            .output()
+                            .map(|o| o.status.success())
+                            .unwrap_or(false);
                         if has_cargo_hot {
                             info!("Backend file changed — subsecond patching Actix...");
                         } else {
@@ -199,39 +250,66 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         }
                     }
 
-                    // Check if we can intercept the frontend build with a Tier 1 hot patch
                     let mut handled_via_patch = false;
                     if !triggering_files.is_empty() {
                         let mut cache = FILE_CACHE.lock().unwrap();
-                        handled_via_patch = true; // Assume true until proven otherwise
-                        
+                        handled_via_patch = true;
+
                         for p in &triggering_files {
                             if !p.ends_with(".rs") {
                                 handled_via_patch = false;
                                 break;
                             }
-                            
-                            let new_content = std::fs::read_to_string(p).unwrap_or_default();
-                            let old_content = cache.get(p).cloned().unwrap_or_default();
-                            
+
+                            let p_path = std::path::Path::new(p);
+                            let cache_key = robust_canonicalize(p_path);
+
+                            let mut new_content = std::fs::read_to_string(p).unwrap_or_default();
+                            if new_content.is_empty() {
+                                std::thread::sleep(std::time::Duration::from_millis(50));
+                                new_content = std::fs::read_to_string(p).unwrap_or_default();
+                            }
+                            let old_content = cache.get(&cache_key).cloned().unwrap_or_default();
+
                             if old_content.is_empty() {
+                                tracing::info!(
+                                    "Hot patch failed: old_content is empty for key: {}",
+                                    cache_key
+                                );
                                 handled_via_patch = false;
                             } else if old_content != new_content {
-                                if let Some(patch) = crate::hot_patch::attempt_hot_patch(&old_content, &new_content, p) {
+                                if let Some(patch) = crate::hot_patch::attempt_hot_patch(
+                                    &old_content,
+                                    &new_content,
+                                    p,
+                                ) {
                                     info!("Tier 1 Template Hot Patch generated for {:?}", p);
                                     let _ = tx.send(patch.to_string());
                                 } else {
+                                    tracing::info!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
                                     handled_via_patch = false;
                                 }
+                            } else {
+                                tracing::info!(
+                                    "Hot patch skipped: old_content == new_content for {:?}",
+                                    p
+                                );
                             }
-                            
-                            cache.insert(p.clone(), new_content);
+
+                            if !new_content.is_empty() {
+                                cache.insert(cache_key, new_content);
+                            }
                         }
                     }
 
-                    if !handled_via_patch && !triggering_files.is_empty() && !needs_backend && !needs_reload {
+                    if !handled_via_patch
+                        && !triggering_files.is_empty()
+                        && !needs_backend
+                        && !needs_reload
+                    {
                         info!("Frontend file changed structurally — full WASM build...");
-                        let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+                        let adapter =
+                            crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
                         let mut build_cmd = adapter.build_command();
                         let _ = build_cmd.status();
                         info!("Rebuild complete, sending reload signal");
@@ -243,7 +321,6 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         let _ = tx.send(r#"{"type": "reload"}"#.to_string());
                     }
 
-                    // Release the build lock — watcher is live again
                     IS_BUILDING.store(false, Ordering::SeqCst);
                 }
                 Err(e) => error!("Watch error: {:?}", e),
