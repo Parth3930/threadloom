@@ -12,28 +12,29 @@ pub fn init_project() -> anyhow::Result<()> {
     println!("\n  {}🚀 Welcome to Distaff! Let's build something amazing.{}", BOLD, RESET);
     println!("  {}{}─────────────────────────────────────────────────────────{}\n", CYAN, BOLD, RESET);
 
-    print!("  {}?{} Project name: ", GREEN, RESET);
-    io::stdout().flush()?;
-    let mut name = String::new();
-    io::stdin().read_line(&mut name)?;
+    use dialoguer::{theme::ColorfulTheme, Input, Confirm, Select};
+
+    let name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Project name")
+        .interact_text()?;
     let name = name.trim();
 
     if name.is_empty() {
         return Ok(());
     }
 
-    print!("  {}?{} Setup Tailwind CSS? (y/n): ", GREEN, RESET);
-    io::stdout().flush()?;
-    let mut tw = String::new();
-    io::stdin().read_line(&mut tw)?;
-    let setup_tw = tw.trim().eq_ignore_ascii_case("y");
+    let setup_tw = Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt("Setup Tailwind CSS?")
+        .default(true)
+        .interact()?;
 
-    print!("  {}?{} Which package manager? (npm/bun) [npm]: ", GREEN, RESET);
-    io::stdout().flush()?;
-    let mut pm = String::new();
-    io::stdin().read_line(&mut pm)?;
-    let pm = pm.trim();
-    let pm = if pm.is_empty() { "npm" } else { pm };
+    let pms = &["npm", "bun", "pnpm", "yarn"];
+    let pm_idx = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Which package manager?")
+        .default(0)
+        .items(&pms[..])
+        .interact()?;
+    let pm = pms[pm_idx];
 
     println!("\n  {}Scaffolding full-stack project...{}", YELLOW, RESET);
 
