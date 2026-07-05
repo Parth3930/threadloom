@@ -3,6 +3,7 @@ use axum::{Router, routing::{get, any}, response::Html, extract::{ws::{WebSocket
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use colored::Colorize;
 use tracing::info;
 
 use crate::plugins::DistaffPlugin;
@@ -31,7 +32,7 @@ pub async fn start_dev_server(port: u16, plugins: Arc<Mutex<Vec<Box<dyn DistaffP
     println!("\n  🚀 \x1b[1;32mDistaff Dev Server\x1b[0m ready in sub-second");
     println!("  ➜  \x1b[1;36mLocal:\x1b[0m   http://localhost:{}\n", port);
     
-    info!("Listening on http://{}", addr);
+    println!("{} http://{}", "[📡] serve:".green(), addr);
     
     axum::serve(listener, app).await?;
     Ok(())
@@ -174,7 +175,7 @@ async fn api_proxy(req: Request) -> axum::response::Response {
     match req_builder.send().await {
         Ok(res) => {
             let status = res.status();
-            tracing::info!("→ Backend: {} {}{} => {}", method, path, query, status);
+            println!("{}", format!("→ backend: {} {}{} => {}", method, path, query, status).bright_black());
             
             let mut response = axum::response::Response::builder().status(status);
             for (name, value) in res.headers() {

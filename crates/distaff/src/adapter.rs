@@ -18,16 +18,16 @@ impl FrameworkAdapter {
         let content = std::fs::read_to_string(cargo_toml).unwrap_or_default();
 
         let framework = if content.contains("dioxus") {
-            info!("Detected Dioxus framework");
+            tracing::debug!("Detected Dioxus framework");
             SupportedFramework::Dioxus
         } else if content.contains("leptos") {
-            info!("Detected Leptos framework");
+            tracing::debug!("Detected Leptos framework");
             SupportedFramework::Leptos
         } else if content.contains("yew") {
-            info!("Detected Yew framework");
+            tracing::debug!("Detected Yew framework");
             SupportedFramework::Yew
         } else {
-            info!("Detected Threadloom framework (default)");
+            tracing::debug!("Detected Threadloom framework (default)");
             SupportedFramework::Threadloom
         };
 
@@ -39,16 +39,19 @@ impl FrameworkAdapter {
             SupportedFramework::Dioxus => {
                 let mut cmd = std::process::Command::new("dx");
                 cmd.arg("build");
+                cmd.env("RUST_LOG", "error");
                 cmd
             }
             SupportedFramework::Leptos => {
                 let mut cmd = std::process::Command::new("cargo");
                 cmd.args(["leptos", "build"]);
+                cmd.env("RUST_LOG", "error");
                 cmd
             }
             SupportedFramework::Yew | SupportedFramework::Threadloom => {
                 let mut cmd = std::process::Command::new("trunk");
                 cmd.arg("build");
+                cmd.env("RUST_LOG", "error");
                 cmd
             }
         }

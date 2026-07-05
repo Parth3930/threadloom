@@ -13,7 +13,7 @@ pub struct TailwindPlugin;
 impl DistaffPlugin for TailwindPlugin {
     fn name(&self) -> &'static str { "Tailwind" }
     fn on_build_start(&mut self) -> anyhow::Result<()> {
-        info!("Running TailwindCSS build...");
+        tracing::debug!("TailwindCSS build");
         #[cfg(target_os = "windows")]
         Command::new("cmd")
             .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
@@ -39,7 +39,7 @@ pub struct SvgToComponentPlugin;
 impl DistaffPlugin for SvgToComponentPlugin {
     fn name(&self) -> &'static str { "SVG-to-Component" }
     fn on_build_start(&mut self) -> anyhow::Result<()> {
-        info!("Converting SVGs to Threadloom components...");
+        tracing::debug!("SVG to Threadloom conversion");
         // Minimal logic: read assets/*.svg, write to src/generated_svg.rs
         std::fs::write("src/generated_svg.rs", "// Auto-generated SVG components\n")?;
         Ok(())
@@ -79,7 +79,7 @@ pub struct EnvInjectionPlugin;
 impl DistaffPlugin for EnvInjectionPlugin {
     fn name(&self) -> &'static str { "Env-Injection" }
     fn on_build_start(&mut self) -> anyhow::Result<()> {
-        info!("Injecting .env variables...");
+        tracing::debug!("Injecting .env variables");
         if let Ok(env_content) = std::fs::read_to_string(".env") {
             let rs_content = format!(
                 "pub const ENV_VARS: &str = {:?};", 

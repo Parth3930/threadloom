@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tracing::{error, info};
+use colored::Colorize;
 
 use crate::plugins::DistaffPlugin;
 
@@ -58,6 +59,8 @@ fn robust_canonicalize(p: &std::path::Path) -> String {
 pub fn restart_backend() {
     let mut child_guard = BACKEND_PROCESS.lock().unwrap();
 
+    let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "actix_server=warn,actix_web=warn,info".to_string());
+
     // Check if cargo-hot is installed
     let has_cargo_hot = Command::new("cargo")
         .args(["hot", "--help"])
@@ -67,10 +70,11 @@ pub fn restart_backend() {
 
     if has_cargo_hot {
         if child_guard.is_none() {
-            info!("Starting Actix backend via cargo-hot on port 3001...");
+            println!("{} via cargo-hot port 3001", "[⚡] backend:".cyan());
             *child_guard = Command::new("cargo")
                 .args(["hot", "run"])
                 .env("PORT", "3001")
+                .env("RUST_LOG", &rust_log)
                 .spawn()
                 .ok();
         }
@@ -80,10 +84,11 @@ pub fn restart_backend() {
             let _ = child.kill();
             let _ = child.wait();
         }
-        info!("Starting Actix backend on port 3001 (cargo-hot not found)...");
+        println!("{} port 3001", "[⚡] backend:".cyan());
         *child_guard = Command::new("cargo")
             .args(["run"])
             .env("PORT", "3001")
+            .env("RUST_LOG", &rust_log)
             .spawn()
             .ok();
     }
@@ -92,7 +97,7 @@ pub fn restart_backend() {
 pub fn start_frontend_watcher() {
     let mut child_guard = FRONTEND_PROCESSES.lock().unwrap();
     if child_guard.is_empty() {
-        info!("Starting frontend watchers in background...");
+        tracing::debug!("Starting frontend watchers in background...");
         let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
         for mut cmd in adapter.watch_commands() {
             if let Ok(child) = cmd.spawn() {
@@ -132,7 +137,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
     let path = watch_path.as_ref().to_path_buf();
 
     // Preload FILE_CACHE so the very first edit can be hot patched
-    info!("Preloading file cache for hot patcher...");
+    tracing::debug!("Preloading file cache for hot patcher...");
     let mut cache = FILE_CACHE.lock().unwrap();
     for entry in walkdir::WalkDir::new(&path)
         .into_iter()
@@ -170,7 +175,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
             return;
         }
 
-        info!("Started hot reloader for {:?}", path);
+        tracing::debug!("Started hot reloader for {:?}", path);
 
         for res in notify_rx {
             match res {
@@ -214,7 +219,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                     }
 
                     if !triggering_files.is_empty() {
-                        tracing::info!("File changed: {:?}", triggering_files);
+                        // File changed log removed for cleaner output
                     }
 
                     IS_BUILDING.store(true, Ordering::SeqCst);
@@ -243,9 +248,9 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                             .map(|o| o.status.success())
                             .unwrap_or(false);
                         if has_cargo_hot {
-                            info!("Backend file changed — subsecond patching Actix...");
+                            println!("{} subsecond patch", "[⚡] backend:".cyan());
                         } else {
-                            info!("Backend file changed — restarting Actix...");
+                            println!("{} restart", "[⚡] backend:".cyan());
                             restart_backend();
                         }
                     }
@@ -272,7 +277,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                             let old_content = cache.get(&cache_key).cloned().unwrap_or_default();
 
                             if old_content.is_empty() {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Hot patch failed: old_content is empty for key: {}",
                                     cache_key
                                 );
@@ -283,14 +288,16 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                                     &new_content,
                                     p,
                                 ) {
-                                    info!("Tier 1 Template Hot Patch generated for {:?}", p);
+                                    let clean = p.replace("\\", "/");
+                                    let short = clean.split("/./").last().unwrap_or(&clean);
+                                    println!("{} {}", "[💫] hot reload:".cyan(), short);
                                     let _ = tx.send(patch.to_string());
                                 } else {
-                                    tracing::info!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
+                                    tracing::debug!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
                                     handled_via_patch = false;
                                 }
                             } else {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Hot patch skipped: old_content == new_content for {:?}",
                                     p
                                 );
@@ -307,17 +314,17 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         && !needs_backend
                         && !needs_reload
                     {
-                        info!("Frontend file changed structurally — full WASM build...");
+                        println!("{} full WASM", "[🏗️] rebuild:".yellow());
                         let adapter =
                             crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
                         let mut build_cmd = adapter.build_command();
                         let _ = build_cmd.status();
-                        info!("Rebuild complete, sending reload signal");
+                        println!("{} frontend", "[🔄] reload:".green());
                         let _ = tx.send(r#"{"type": "reload"}"#.to_string());
                     }
 
                     if needs_reload {
-                        info!("Build output changed — sending reload signal");
+                        tracing::debug!("Build output changed — sending reload signal");
                         let _ = tx.send(r#"{"type": "reload"}"#.to_string());
                     }
 

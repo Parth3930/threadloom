@@ -54,7 +54,15 @@ fn check_update() {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    let _ = colored::control::set_virtual_terminal(true);
+
+    use colored::Colorize;
+
     tracing_subscriber::fmt()
+        .without_time()
+        .with_target(false)
+        .with_level(false)
         .with_max_level(tracing::Level::INFO)
         .init();
     let cli = Cli::parse();
@@ -64,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
             if matches!(cli.command, Commands::Run { .. }) {
                 check_update();
             }
-            info!("Starting distaff dev server on port {}", port);
+            println!("{} starting on port {}", "[🚀] distaff:".green(), port);
             
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
@@ -80,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
-            info!("Detected framework. Running initial build...");
+            println!("{} initial WASM build", "[🏗️] build:".yellow());
             let mut build_cmd = adapter.build_command();
             let _ = build_cmd.status();
 
@@ -89,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
             server::start_dev_server(*port, plugins).await?;
         }
         Commands::Build => {
-            info!("Building for production...");
+            println!("{} production", "[🏗️] build:".yellow());
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
                 Box::new(plugins::AutoModPlugin),
