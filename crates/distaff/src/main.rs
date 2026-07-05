@@ -33,6 +33,8 @@ enum Commands {
     Build,
     /// Initialize a new project
     Init,
+    /// Update distaff to the latest version
+    Update,
 }
 
 fn check_update() {
@@ -100,6 +102,15 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             init::init_project()?;
+        }
+        Commands::Update => {
+            println!("Updating distaff to the latest version...");
+            let status = std::process::Command::new("cargo").args(["install", "distaff", "--force"]).status()?;
+            if status.success() {
+                println!("Distaff updated successfully!");
+            } else {
+                eprintln!("Failed to update distaff.");
+            }
         }
     }
     
