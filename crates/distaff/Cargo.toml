@@ -1,5 +1,5 @@
 [package]
-name = "threadloom-distaff"
+name = "distaff"
 version = "0.1.0"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"

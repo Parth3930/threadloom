@@ -14,7 +14,7 @@ A Vite-equivalent full-stack web framework and dev server for Rust.
 Install the `distaff` CLI tool globally:
 
 ```bash
-cargo install threadloom-distaff
+cargo install distaff
 ```
 
 *(Note: Distaff will auto-update itself when running `distaff run` if a newer version is published.)*

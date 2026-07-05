@@ -36,12 +36,12 @@ enum Commands {
 
 fn check_update() {
     println!("Checking for distaff updates...");
-    if let Ok(output) = std::process::Command::new("cargo").args(["search", "threadloom-distaff", "--limit", "1"]).output() {
+    if let Ok(output) = std::process::Command::new("cargo").args(["search", "distaff", "--limit", "1"]).output() {
         let out = String::from_utf8_lossy(&output.stdout);
         let version = env!("CARGO_PKG_VERSION");
-        if out.contains("threadloom-distaff =") && !out.contains(&format!("\"{}\"", version)) {
+        if out.contains("distaff =") && !out.contains(&format!("\"{}\"", version)) {
             println!("New version found! Updating...");
-            let _ = std::process::Command::new("cargo").args(["install", "threadloom-distaff"]).status();
+            let _ = std::process::Command::new("cargo").args(["install", "distaff"]).status();
         } else {
             println!("Distaff is up to date.");
         }
