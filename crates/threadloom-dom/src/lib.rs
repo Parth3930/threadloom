@@ -57,10 +57,10 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             Ok(el.into())
         }
         View::DynamicNode(boundary) => {
-            let view = {
+            let view = boundary.id.track(|| {
                 let mut compute = boundary.compute.borrow_mut();
                 compute()
-            };
+            });
             let node = render_view(document, view)?;
             
             let compute_rc = boundary.compute.clone();
@@ -99,10 +99,10 @@ pub fn tick() -> Result<(), JsValue> {
         let mut boundaries = b.borrow_mut();
         for id in pending {
             let updated = if let Some((old_node, compute)) = boundaries.get(&id) {
-                let view = {
+                let view = id.track(|| {
                     let mut comp = compute.borrow_mut();
                     comp()
-                };
+                });
                 let new_node = render_view(&document, view)?;
                 if let Some(parent) = old_node.parent_node() {
                     parent.replace_child(&new_node, old_node)?;
