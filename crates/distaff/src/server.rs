@@ -1,5 +1,5 @@
 use anyhow::Result;
-use axum::{Router, routing::get, response::Html, extract::{ws::{WebSocketUpgrade, WebSocket, Message}, State}};
+use axum::{Router, routing::{get, any}, response::Html, extract::{ws::{WebSocketUpgrade, WebSocket, Message}, State, Request}, body::Body};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
@@ -20,6 +20,7 @@ pub async fn start_dev_server(port: u16, plugins: Arc<Mutex<Vec<Box<dyn DistaffP
         .route("/", get(index_handler))
         .route("/__distaff/hmr.js", get(hmr_script))
         .route("/__distaff/ws", get(ws_handler))
+        .route("/api/*path", any(api_proxy))
         .nest_service("/assets", ServeDir::new("assets"))
         .fallback_service(ServeDir::new("dist").fallback(get(fallback_handler)))
         .with_state(tx);
@@ -106,4 +107,36 @@ async fn hmr_script() -> &'static str {
         }
     };
     "#
+}
+
+async fn api_proxy(req: Request) -> axum::response::Response {
+    let path = req.uri().path();
+    let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
+    let url = format!("http://127.0.0.1:3001{}{}", path, query);
+    
+    let client = reqwest::Client::new();
+    let mut req_builder = client.request(req.method().clone(), url);
+    for (name, value) in req.headers() {
+        req_builder = req_builder.header(name.clone(), value.clone());
+    }
+    
+    let bytes = axum::body::to_bytes(req.into_body(), usize::MAX).await.unwrap_or_default();
+    let req_builder = req_builder.body(bytes);
+
+    match req_builder.send().await {
+        Ok(res) => {
+            let mut response = axum::response::Response::builder().status(res.status());
+            for (name, value) in res.headers() {
+                response = response.header(name.clone(), value.clone());
+            }
+            let bytes = res.bytes().await.unwrap_or_default();
+            response.body(Body::from(bytes)).unwrap()
+        }
+        Err(e) => {
+            axum::response::Response::builder()
+                .status(502)
+                .body(Body::from(format!("Backend proxy error: {}", e)))
+                .unwrap()
+        }
+    }
 }

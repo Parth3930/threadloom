@@ -57,8 +57,8 @@ threadloom-ui = {{ path = "../threadloom/crates/threadloom-ui" }}
 web-sys = {{ version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "Location"] }}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-axum = "0.7.9"
-tokio = {{ version = "1.0", features = ["full"] }}
+actix-web = "4"
+actix-files = "0.6"
 "#, name);
     fs::write(format!("{}/Cargo.toml", name), cargo_toml)?;
 
@@ -80,24 +80,49 @@ tokio = {{ version = "1.0", features = ["full"] }}
     fs::write(format!("{}/index.html", name), index_html)?;
 
     // src/main.rs
-    let main_rs = r#"mod pages;
+    let main_rs = r#"#![allow(unused_imports)]
+
+mod pages;
 mod routes;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod api;
+#[cfg(not(target_arch = "wasm32"))]
+mod api_routes;
 
-use threadloom_dom::mount;
-
+#[cfg(target_arch = "wasm32")]
 fn main() {
     let window = web_sys::window().unwrap();
     let doc = window.document().unwrap();
     let body = doc.body().unwrap();
     
-    // Auto-generated Next.js style router
     let path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
     let view = routes::render_route(&path);
     
-    mount(view, &body).unwrap();
+    threadloom_dom::mount(view, &body).unwrap();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    use actix_web::{App, HttpServer};
+    use actix_files::Files;
+
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    println!("Starting Threadloom server on port {}", port);
+
+    HttpServer::new(|| {
+        App::new()
+            .configure(api_routes::configure_api)
+            .service(
+                Files::new("/", "./dist")
+                    .index_file("index.html")
+                    .default_handler(actix_files::NamedFile::open("./dist/index.html").unwrap())
+            )
+    })
+    .bind(format!("0.0.0.0:{}", port))?
+    .run()
+    .await
 }
 "#;
     fs::write(format!("{}/src/main.rs", name), main_rs)?;
@@ -195,11 +220,15 @@ pub fn hero_component() -> View {
     fs::write(format!("{}/src/api/hello/mod.rs", name), "pub mod route;\n")?;
 
     // src/api/hello/route.rs
-    let route_rs = r#"use axum::{routing::get, Router};
+    let route_rs = r#"use actix_web::{get, web, Responder, HttpResponse};
 
-// In a real full-stack setup, this would be auto-registered.
-pub fn router() -> Router {
-    Router::new().route("/api/hello", get(|| async { "Hello from Backend API!" }))
+#[get("/api/hello")]
+pub async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello from Actix Backend API!")
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(hello);
 }
 "#;
     fs::write(format!("{}/src/api/hello/route.rs", name), route_rs)?;

@@ -101,3 +101,41 @@ fn collect_routes(dir: &Path, prefix: &str, routes: &mut Vec<(String, String)>) 
         }
     }
 }
+
+pub fn generate_api_routes() {
+    let api_dir = std::path::Path::new("src/api");
+    if !api_dir.exists() {
+        return;
+    }
+    let mut api_configs = Vec::new();
+    collect_api_routes(api_dir, "api", &mut api_configs);
+
+    let mut out = String::new();
+    out.push_str("pub fn configure_api(cfg: &mut actix_web::web::ServiceConfig) {\n");
+    for path in api_configs {
+        out.push_str(&format!("    crate::{}::config(cfg);\n", path));
+    }
+    out.push_str("}\n");
+
+    let current = std::fs::read_to_string("src/api_routes.rs").unwrap_or_default();
+    if current != out {
+        let _ = std::fs::write("src/api_routes.rs", out);
+    }
+}
+
+fn collect_api_routes(dir: &std::path::Path, prefix: &str, routes: &mut Vec<String>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().unwrap().to_string_lossy().to_string();
+                let new_prefix = if prefix.is_empty() { name.clone() } else { format!("{}::{}", prefix, name) };
+                let route_file = path.join("route.rs");
+                if route_file.exists() {
+                    routes.push(format!("{}::route", new_prefix));
+                }
+                collect_api_routes(&path, &new_prefix, routes);
+            }
+        }
+    }
+}

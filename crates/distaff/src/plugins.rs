@@ -61,6 +61,7 @@ impl DistaffPlugin for AutoModPlugin {
         crate::mod_gen::generate_mods(std::path::Path::new("src/pages"));
         crate::mod_gen::generate_mods(std::path::Path::new("src/api"));
         crate::mod_gen::generate_routes();
+        crate::mod_gen::generate_api_routes();
         Ok(())
     }
 
@@ -70,6 +71,7 @@ impl DistaffPlugin for AutoModPlugin {
             crate::mod_gen::generate_mods(std::path::Path::new("src/pages"));
             crate::mod_gen::generate_mods(std::path::Path::new("src/api"));
             crate::mod_gen::generate_routes();
+            crate::mod_gen::generate_api_routes();
         }
         Ok(())
     }
