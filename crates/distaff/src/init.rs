@@ -82,7 +82,9 @@ actix-files = "0.6"
     // src/main.rs
     let main_rs = r#"#![allow(unused_imports)]
 
+#[cfg(target_arch = "wasm32")]
 mod pages;
+#[cfg(target_arch = "wasm32")]
 mod routes;
 
 #[cfg(not(target_arch = "wasm32"))]
