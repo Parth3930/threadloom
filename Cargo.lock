@@ -651,6 +651,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "distaff"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "cargo_metadata",
+ "clap",
+ "futures-util",
+ "notify",
+ "notify-debouncer-mini",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.21.0",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "dlopen2"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3344,26 +3364,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "threadloom-distaff"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "cargo_metadata",
- "clap",
- "futures-util",
- "notify",
- "notify-debouncer-mini",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.21.0",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "threadloom-dom"
 version = "0.1.0"
 dependencies = [
@@ -4474,10 +4474,6 @@ dependencies = [
  "once_cell",
  "pkg-config",
 ]
-
-[[package]]
-name = "xtask"
-version = "0.1.0"
 
 [[package]]
 name = "yew"

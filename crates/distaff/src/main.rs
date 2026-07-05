@@ -7,6 +7,7 @@ mod hot_reload;
 mod plugins;
 mod adapter;
 mod init;
+mod mod_gen;
 
 #[derive(Parser)]
 #[command(name = "distaff")]
@@ -69,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
+                Box::new(plugins::AutoModPlugin),
                 Box::new(plugins::SvgToComponentPlugin),
                 Box::new(plugins::EnvInjectionPlugin),
             ];
@@ -83,6 +85,15 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Build => {
             info!("Building for production...");
+            let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
+                Box::new(plugins::TailwindPlugin),
+                Box::new(plugins::AutoModPlugin),
+                Box::new(plugins::SvgToComponentPlugin),
+                Box::new(plugins::EnvInjectionPlugin),
+            ];
+            for p in &mut plugins {
+                let _ = p.on_build_start();
+            }
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
             let mut build_cmd = adapter.build_command();
             let _ = build_cmd.status();

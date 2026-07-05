@@ -45,7 +45,28 @@ impl DistaffPlugin for SvgToComponentPlugin {
         Ok(())
     }
 }
+pub struct AutoModPlugin;
 
+impl DistaffPlugin for AutoModPlugin {
+    fn name(&self) -> &'static str { "AutoModPlugin" }
+
+    fn on_build_start(&mut self) -> anyhow::Result<()> {
+        crate::mod_gen::generate_mods(std::path::Path::new("src/pages"));
+        crate::mod_gen::generate_mods(std::path::Path::new("src/api"));
+        crate::mod_gen::generate_routes();
+        Ok(())
+    }
+
+    fn on_file_change(&mut self, path: &std::path::Path) -> anyhow::Result<()> {
+        let p = path.to_string_lossy();
+        if p.starts_with("src/pages") || p.starts_with("src\\pages") || p.starts_with("src/api") || p.starts_with("src\\api") {
+            crate::mod_gen::generate_mods(std::path::Path::new("src/pages"));
+            crate::mod_gen::generate_mods(std::path::Path::new("src/api"));
+            crate::mod_gen::generate_routes();
+        }
+        Ok(())
+    }
+}
 pub struct EnvInjectionPlugin;
 impl DistaffPlugin for EnvInjectionPlugin {
     fn name(&self) -> &'static str { "Env-Injection" }

@@ -38,7 +38,7 @@ pub fn init_project() -> anyhow::Result<()> {
     println!("\n  {}Scaffolding full-stack project...{}", YELLOW, RESET);
 
     // Create directories
-    fs::create_dir_all(format!("{}/src/pages/home/components", name))?;
+    fs::create_dir_all(format!("{}/src/pages/index/components", name))?;
     fs::create_dir_all(format!("{}/src/api/hello", name))?;
     
     // Cargo.toml
@@ -52,7 +52,7 @@ threadloom-core = {{ path = "../threadloom/crates/threadloom-core" }}
 threadloom-macro = {{ path = "../threadloom/crates/threadloom-macro" }}
 threadloom-dom = {{ path = "../threadloom/crates/threadloom-dom" }}
 threadloom-ui = {{ path = "../threadloom/crates/threadloom-ui" }}
-web-sys = {{ version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement"] }}
+web-sys = {{ version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "Location"] }}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = "0.7.9"
@@ -79,6 +79,7 @@ tokio = {{ version = "1.0", features = ["full"] }}
 
     // src/main.rs
     let main_rs = r#"mod pages;
+mod routes;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod api;
@@ -89,47 +90,99 @@ fn main() {
     let window = web_sys::window().unwrap();
     let doc = window.document().unwrap();
     let body = doc.body().unwrap();
-    mount(pages::home::page::page(), &body).unwrap();
+    
+    // Auto-generated Next.js style router
+    let path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
+    let view = routes::render_route(&path);
+    
+    mount(view, &body).unwrap();
 }
 "#;
     fs::write(format!("{}/src/main.rs", name), main_rs)?;
 
     // src/pages/mod.rs
-    fs::write(format!("{}/src/pages/mod.rs", name), "pub mod home;\n")?;
-    // src/pages/home/mod.rs
-    fs::write(format!("{}/src/pages/home/mod.rs", name), "pub mod page;\npub mod components;\n")?;
-    // src/pages/home/components/mod.rs
-    fs::write(format!("{}/src/pages/home/components/mod.rs", name), "pub mod hero;\n")?;
+    fs::write(format!("{}/src/pages/mod.rs", name), "pub mod index;\n")?;
+    // src/pages/index/mod.rs
+    fs::write(format!("{}/src/pages/index/mod.rs", name), "pub mod page;\npub mod components;\n")?;
+    // src/pages/index/components/mod.rs
+    fs::write(format!("{}/src/pages/index/components/mod.rs", name), "pub mod hero;\n")?;
 
-    // src/pages/home/page.rs
+    // src/pages/index/page.rs
     let page_rs = r#"use threadloom_core::View;
 use threadloom_macro::threadloom;
 use super::components::hero::hero_component;
 
 pub fn page() -> View {
     threadloom! {
-        div(class="container mx-auto p-8") {
-            { hero_component() }
-            p(class="text-gray-500 mt-4") { "Welcome to your new full-stack Threadloom app." }
+        div(class="min-h-screen bg-gray-900 text-white font-sans selection:bg-cyan-500 selection:text-white") {
+            div(class="relative overflow-hidden") {
+                // Background decoration
+                div(class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-30 pointer-events-none") {
+                    div(class="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 blur-[100px] rounded-full") {}
+                }
+                
+                div(class="relative container mx-auto px-6 py-24 flex flex-col items-center justify-center text-center") {
+                    { hero_component() }
+                    
+                    div(class="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl text-left") {
+                        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-cyan-500/50 transition-colors duration-300 group") {
+                            div(class="text-3xl mb-4") { "📁" }
+                            h2(class="text-2xl font-semibold mb-4 text-cyan-400 group-hover:text-cyan-300 transition-colors") { "File-Based Routing" }
+                            p(class="text-gray-400 leading-relaxed") { 
+                                "Creating routes is as simple as adding files. "
+                                "This page lives at " code(class="bg-black/40 px-2 py-1 rounded text-cyan-300 text-sm") { "src/pages/index/page.rs" } ". "
+                                "Create new directories under " code(class="bg-black/40 px-2 py-1 rounded text-cyan-300 text-sm") { "src/pages/" } " to add more pages!"
+                            }
+                        }
+                        
+                        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-blue-500/50 transition-colors duration-300 group") {
+                            div(class="text-3xl mb-4") { "⚡" }
+                            h2(class="text-2xl font-semibold mb-4 text-blue-400 group-hover:text-blue-300 transition-colors") { "Full-Stack API" }
+                            p(class="text-gray-400 leading-relaxed") { 
+                                "Your backend API is built right in. Check out "
+                                code(class="bg-black/40 px-2 py-1 rounded text-blue-300 text-sm") { "src/api/hello/route.rs" } " to see how to build endpoints. "
+                                "Open your browser dev tools and fetch from " code(class="bg-black/40 px-2 py-1 rounded text-blue-300 text-sm") { "/api/hello" } " to see it in action!"
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 "#;
-    fs::write(format!("{}/src/pages/home/page.rs", name), page_rs)?;
+    fs::write(format!("{}/src/pages/index/page.rs", name), page_rs)?;
 
-    // src/pages/home/components/hero.rs
+    // src/pages/index/components/hero.rs
     let comp_rs = r#"use threadloom_core::View;
 use threadloom_macro::threadloom;
 
 pub fn hero_component() -> View {
     threadloom! {
-        div(class="bg-blue-600 text-white p-6 rounded-lg shadow-lg") {
-            h1(class="text-4xl font-bold") { "Hello from Component!" }
+        div(class="animate-fade-in-up flex flex-col items-center") {
+            div(class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-medium mb-8") {
+                span(class="relative flex h-2 w-2") {
+                    span(class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75") {}
+                    span(class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500") {}
+                }
+                "Distaff Dev Server Ready"
+            }
+            h1(class="text-6xl md:text-7xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400") {
+                "Build modern web apps"
+                br() {}
+                span(class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500") { "in pure Rust." }
+            }
+            p(class="text-xl text-gray-400 max-w-2xl mb-10") {
+                "Threadloom provides a seamless full-stack experience with macro-based UI components, file-system routing, and built-in hot reloading."
+            }
+            button(class="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-105 transition-transform duration-200 shadow-[0_0_40px_rgba(255,255,255,0.3)]") {
+                "Get Started"
+            }
         }
     }
 }
 "#;
-    fs::write(format!("{}/src/pages/home/components/hero.rs", name), comp_rs)?;
+    fs::write(format!("{}/src/pages/index/components/hero.rs", name), comp_rs)?;
 
     // src/api/mod.rs
     fs::write(format!("{}/src/api/mod.rs", name), "pub mod hello;\n")?;
