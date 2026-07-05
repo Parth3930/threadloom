@@ -176,6 +176,8 @@ pub fn spawn_watcher<P: AsRef<Path>>(
         }
 
         tracing::debug!("Started hot reloader for {:?}", path);
+        
+        let mut last_build_time = std::time::Instant::now().checked_sub(std::time::Duration::from_secs(10)).unwrap_or_else(std::time::Instant::now);
 
         for res in notify_rx {
             match res {
@@ -216,10 +218,6 @@ pub fn spawn_watcher<P: AsRef<Path>>(
 
                     if !needs_backend && !needs_reload && triggering_files.is_empty() {
                         continue;
-                    }
-
-                    if !triggering_files.is_empty() {
-                        // File changed log removed for cleaner output
                     }
 
                     IS_BUILDING.store(true, Ordering::SeqCst);
@@ -321,11 +319,16 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         let _ = build_cmd.status();
                         println!("{} frontend", "[🔄] reload:".green());
                         let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        last_build_time = std::time::Instant::now();
                     }
 
                     if needs_reload {
-                        tracing::debug!("Build output changed — sending reload signal");
-                        let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        if last_build_time.elapsed().as_secs() > 2 {
+                            tracing::debug!("Build output changed — sending reload signal");
+                            let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        } else {
+                            tracing::debug!("Skipping dist/ reload because manual build just finished");
+                        }
                     }
 
                     IS_BUILDING.store(false, Ordering::SeqCst);

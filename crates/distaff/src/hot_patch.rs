@@ -107,17 +107,170 @@ impl<'ast> Visit<'ast> for MacroVisitor {
     }
 }
 
-fn extract_texts(node: &Node, path: String, texts: &mut HashMap<String, String>) {
+fn node_to_string(node: &Node) -> String {
+    match node {
+        Node::Text(lit) => quote::quote!(#lit).to_string(),
+        Node::Expr(expr) => quote::quote!(#expr).to_string(),
+        Node::Element(el) => {
+            let tag = el.tag.to_string();
+            let attrs = el.attrs.iter().map(|a| {
+                let name = &a.name;
+                let value = &a.value;
+                quote::quote!(#name = #value).to_string()
+            }).collect::<Vec<_>>().join(" ");
+            let children = el.children.iter().map(node_to_string).collect::<Vec<_>>().join(" ");
+            format!("{} {} {}", tag, attrs, children)
+        }
+    }
+}
+
+fn node_to_html(node: &Node, path: &str) -> Option<String> {
     match node {
         Node::Text(lit) => {
-            texts.insert(path, lit.value());
-        }
+            Some(lit.value().replace("<", "&lt;").replace(">", "&gt;"))
+        },
+        Node::Expr(_) => None,
         Node::Element(el) => {
+            let tag = el.tag.to_string();
+            if tag.chars().next().unwrap().is_uppercase() {
+                return None;
+            }
+            let mut html = format!("<{}", tag);
+            html.push_str(&format!(" data-th-id=\"hot-{}\"", path));
+            
+            for attr in &el.attrs {
+                let name = attr.name.to_string();
+                if name.starts_with("on_") {
+                    return None;
+                }
+                if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit_str), .. }) = &attr.value {
+                    html.push_str(&format!(" {}=\"{}\"", name, lit_str.value().replace("\"", "&quot;")));
+                } else {
+                    return None;
+                }
+            }
+            html.push('>');
             for (i, child) in el.children.iter().enumerate() {
-                extract_texts(child, format!("{}-{}", path, i), texts);
+                let child_path = format!("{}-{}", path, i);
+                if let Some(child_html) = node_to_html(child, &child_path) {
+                    html.push_str(&child_html);
+                } else {
+                    return None;
+                }
+            }
+            html.push_str(&format!("</{}>", tag));
+            Some(html)
+        }
+    }
+}
+
+fn diff_nodes(old_nodes: &[Node], new_nodes: &[Node], base_path: &str, patches: &mut Vec<serde_json::Value>) -> bool {
+    if old_nodes.len() == new_nodes.len() {
+        for (i, (old_node, new_node)) in old_nodes.iter().zip(new_nodes.iter()).enumerate() {
+            let path = if base_path.is_empty() { i.to_string() } else { format!("{}-{}", base_path, i) };
+            if !diff_single_node(old_node, new_node, &path, patches) {
+                return false;
             }
         }
-        _ => {}
+        return true;
+    }
+    
+    if base_path.is_empty() { return false; }
+    
+    if old_nodes.len() > new_nodes.len() {
+        let mut old_idx = 0;
+        let mut new_idx = 0;
+        let mut removed_paths = Vec::new();
+        
+        while old_idx < old_nodes.len() {
+            let path = format!("{}-{}", base_path, old_idx);
+            if new_idx < new_nodes.len() && node_to_string(&old_nodes[old_idx]) == node_to_string(&new_nodes[new_idx]) {
+                old_idx += 1;
+                new_idx += 1;
+            } else {
+                removed_paths.push(path);
+                old_idx += 1;
+            }
+        }
+        
+        if new_idx == new_nodes.len() {
+            for path in removed_paths {
+                patches.push(serde_json::json!({
+                    "action": "remove",
+                    "path": path
+                }));
+            }
+            return true;
+        }
+    } else if old_nodes.len() < new_nodes.len() {
+        let mut old_idx = 0;
+        let mut new_idx = 0;
+        let mut added_nodes = Vec::new();
+        
+        while new_idx < new_nodes.len() {
+            let path = format!("{}-{}", base_path, new_idx);
+            if old_idx < old_nodes.len() && node_to_string(&old_nodes[old_idx]) == node_to_string(&new_nodes[new_idx]) {
+                old_idx += 1;
+                new_idx += 1;
+            } else {
+                if let Some(html) = node_to_html(&new_nodes[new_idx], &path) {
+                    added_nodes.push((new_idx, path, html));
+                    new_idx += 1;
+                } else {
+                    return false;
+                }
+            }
+        }
+        
+        if old_idx == old_nodes.len() {
+            for (idx, path, html) in added_nodes {
+                patches.push(serde_json::json!({
+                    "action": "add",
+                    "parent_path": base_path,
+                    "index": idx,
+                    "path": path,
+                    "html": html
+                }));
+            }
+            return true;
+        }
+    }
+    
+    false
+}
+
+fn diff_single_node(old_node: &Node, new_node: &Node, path: &str, patches: &mut Vec<serde_json::Value>) -> bool {
+    match (old_node, new_node) {
+        (Node::Text(old_lit), Node::Text(new_lit)) => {
+            if old_lit.value() != new_lit.value() {
+                patches.push(serde_json::json!({
+                    "action": "update_text",
+                    "path": path,
+                    "text": new_lit.value()
+                }));
+            }
+            true
+        },
+        (Node::Element(old_el), Node::Element(new_el)) => {
+            if old_el.tag.to_string() != new_el.tag.to_string() { return false; }
+            if old_el.attrs.len() != new_el.attrs.len() { return false; }
+            
+            for (old_attr, new_attr) in old_el.attrs.iter().zip(new_el.attrs.iter()) {
+                let old_name = &old_attr.name;
+                let old_val = &old_attr.value;
+                let new_name = &new_attr.name;
+                let new_val = &new_attr.value;
+                if quote::quote!(#old_name = #old_val).to_string() != quote::quote!(#new_name = #new_val).to_string() {
+                    return false;
+                }
+            }
+            
+            diff_nodes(&old_el.children, &new_el.children, path, patches)
+        },
+        (Node::Expr(old_expr), Node::Expr(new_expr)) => {
+            quote::quote!(#old_expr).to_string() == quote::quote!(#new_expr).to_string()
+        },
+        _ => false
     }
 }
 
@@ -137,50 +290,12 @@ pub fn attempt_hot_patch(old_content: &str, new_content: &str, file_name: &str) 
 
     let mut patches = Vec::new();
 
-    // Iterate through all macros and diff texts
-    for (m_idx, (old_m, new_m)) in old_visitor.macros.iter().zip(new_visitor.macros.iter()).enumerate() {
-        if old_m.nodes.len() != new_m.nodes.len() {
-            return None; // Structure of macro changed
-        }
-
-        let mut old_texts = HashMap::new();
-        let mut new_texts = HashMap::new();
-
-        for (i, node) in old_m.nodes.iter().enumerate() {
-            extract_texts(node, i.to_string(), &mut old_texts);
-        }
-        for (i, node) in new_m.nodes.iter().enumerate() {
-            extract_texts(node, i.to_string(), &mut new_texts);
-        }
-        
-        // If the number of text nodes changed, the structure changed
-        if old_texts.len() != new_texts.len() {
+    for (old_m, new_m) in old_visitor.macros.iter().zip(new_visitor.macros.iter()) {
+        if !diff_nodes(&old_m.nodes, &new_m.nodes, "", &mut patches) {
             return None;
-        }
-
-        for (path, new_text) in new_texts {
-            if let Some(old_text) = old_texts.get(&path) {
-                if old_text != &new_text {
-                    // We found a text diff! We don't have the exact macro line/column here,
-                    // but we can assume threadloom! handles ID via file!() line!() column!().
-                    // Since line/column is hard to get exactly match here, we can fallback to just reloading
-                    // if it's too complex. BUT for now, let's just create a generic payload.
-                    patches.push(serde_json::json!({
-                        "path": path,
-                        "text": new_text
-                    }));
-                }
-            } else {
-                return None;
-            }
         }
     }
 
-    // If patches is empty, something else changed. 
-    // Wait, if something else changed (like Rust code), we must rebuild!
-    // So we can only return `Some(patches)` if we are CERTAIN no Rust code changed outside the macros.
-    // For now, if patches has items, we assume it's just a text change.
-    // Real Dioxus diffs the entire AST of the file.
     if !patches.is_empty() {
         Some(serde_json::json!({ "type": "patch", "data": patches }))
     } else {

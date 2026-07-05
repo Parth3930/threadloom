@@ -113,10 +113,57 @@ async fn hmr_script() -> &'static str {
         } else if (msg.type === 'patch') {
             console.log('Tier 1 Hot Patching DOM', msg.data);
             let success = true;
+            
+            const getExactEls = (path) => {
+                const regex = new RegExp('(?::\\d+-|^hot-)' + path + '$');
+                return Array.from(document.querySelectorAll(`[data-th-id$="-${path}"]`))
+                            .filter(el => regex.test(el.getAttribute('data-th-id')));
+            };
+
             msg.data.forEach(patch => {
-                // The AST path for a text node is like "0-1-2" (child 2 of element "0-1")
-                // Text nodes don't have data-th-id, so we find the parent element.
-                let parts = patch.path.split('-');
+                if (patch.action === 'remove') {
+                    const els = getExactEls(patch.path);
+                    if (els.length > 0) {
+                        els.forEach(el => el.remove());
+                    } else {
+                        console.warn("Hot patch failed: could not find element to remove for path", patch.path);
+                        success = false;
+                    }
+                    return;
+                }
+                
+                if (patch.action === 'add') {
+                    const parentEls = getExactEls(patch.parent_path);
+                    if (parentEls.length > 0) {
+                        parentEls.forEach(parentEl => {
+                            const template = document.createElement('template');
+                            template.innerHTML = patch.html;
+                            const newEl = template.content.firstChild;
+                            let refChild = null;
+                            if (patch.before_path) {
+                                const beforeEls = getExactEls(patch.before_path);
+                                if (beforeEls.length > 0) refChild = beforeEls[0];
+                            }
+                            if (!refChild) {
+                                refChild = parentEl.childNodes[patch.index];
+                            }
+                            if (refChild) {
+                                parentEl.insertBefore(newEl, refChild);
+                            } else {
+                                parentEl.appendChild(newEl);
+                            }
+                        });
+                    } else {
+                        console.warn("Hot patch failed: could not find parent for add", patch.parent_path);
+                        success = false;
+                    }
+                    return;
+                }
+                
+                // Fallback to update_text for legacy or explicit action
+                let path = patch.path;
+                let text = patch.text;
+                let parts = path.split('-');
                 let childIndex = parseInt(parts.pop(), 10);
                 let parentPath = parts.join('-');
                 
@@ -126,16 +173,16 @@ async fn hmr_script() -> &'static str {
                     return;
                 }
                 
-                const els = document.querySelectorAll(`[data-th-id$="-${parentPath}"]`);
+                const els = getExactEls(parentPath);
                 if (els.length > 0) {
                     els.forEach(el => { 
                         // Update the text node at childIndex
                         let targetNode = el.childNodes[childIndex];
                         if (targetNode && targetNode.nodeType === 3) {
-                            targetNode.textContent = patch.text;
+                            targetNode.textContent = text;
                         } else if (el.childNodes.length === 1) {
                             // Fallback if index is off due to dynamic nodes
-                            el.textContent = patch.text;
+                            el.textContent = text;
                         } else {
                             console.warn("Could not reliably patch text node inside mixed children");
                             success = false;
