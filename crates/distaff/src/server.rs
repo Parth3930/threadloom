@@ -110,14 +110,17 @@ async fn hmr_script() -> &'static str {
 }
 
 async fn api_proxy(req: Request) -> axum::response::Response {
-    let path = req.uri().path();
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
     let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
     let url = format!("http://127.0.0.1:3001{}{}", path, query);
     
     let client = reqwest::Client::new();
-    let mut req_builder = client.request(req.method().clone(), url);
+    let mut req_builder = client.request(method.clone(), url);
     for (name, value) in req.headers() {
-        req_builder = req_builder.header(name.clone(), value.clone());
+        if name != reqwest::header::HOST {
+            req_builder = req_builder.header(name.clone(), value.clone());
+        }
     }
     
     let bytes = axum::body::to_bytes(req.into_body(), usize::MAX).await.unwrap_or_default();
@@ -125,14 +128,23 @@ async fn api_proxy(req: Request) -> axum::response::Response {
 
     match req_builder.send().await {
         Ok(res) => {
-            let mut response = axum::response::Response::builder().status(res.status());
+            let status = res.status();
+            tracing::info!("→ Backend: {} {}{} => {}", method, path, query, status);
+            
+            let mut response = axum::response::Response::builder().status(status);
             for (name, value) in res.headers() {
-                response = response.header(name.clone(), value.clone());
+                if name != reqwest::header::TRANSFER_ENCODING && name != reqwest::header::CONTENT_ENCODING && name != reqwest::header::CONTENT_LENGTH {
+                    response = response.header(name.clone(), value.clone());
+                }
             }
             let bytes = res.bytes().await.unwrap_or_default();
+            // Critical: Since we stripped Content-Length and Transfer-Encoding, we MUST set the new Content-Length
+            response = response.header(reqwest::header::CONTENT_LENGTH, bytes.len().to_string());
+            
             response.body(Body::from(bytes)).unwrap()
         }
         Err(e) => {
+            tracing::error!("→ Backend: {} {}{} => 502 Bad Gateway ({})", method, path, query, e);
             axum::response::Response::builder()
                 .status(502)
                 .body(Body::from(format!("Backend proxy error: {}", e)))

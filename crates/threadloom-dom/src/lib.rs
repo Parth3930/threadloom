@@ -23,7 +23,11 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
     match view {
         View::Text(text) => Ok(document.create_text_node(&text).into()),
         View::Element { tag, attrs, children } => {
-            let el = document.create_element(&tag)?;
+            let el = if tag == "svg" || tag == "path" || tag == "circle" || tag == "rect" || tag == "g" || tag == "line" {
+                document.create_element_ns(Some("http://www.w3.org/2000/svg"), &tag)?
+            } else {
+                document.create_element(&tag)?
+            };
             for (k, v) in attrs {
                 match v {
                     AttributeValue::String(s) => el.set_attribute(&k, &s)?,

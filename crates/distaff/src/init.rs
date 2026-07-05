@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::fs;
+use rust_embed::RustEmbed;
 
 // ANSI colors
 const BOLD: &str = "\x1b[1m";
@@ -7,6 +8,16 @@ const CYAN: &str = "\x1b[36m";
 const GREEN: &str = "\x1b[32m";
 const YELLOW: &str = "\x1b[33m";
 const RESET: &str = "\x1b[0m";
+
+#[derive(RustEmbed)]
+#[folder = "../../template"]
+#[exclude = "target/*"]
+#[exclude = "node_modules/*"]
+#[exclude = "dist/*"]
+#[exclude = ".git/*"]
+#[exclude = "Cargo.lock"]
+#[exclude = "bun.lock"]
+struct Template;
 
 pub fn init_project() -> anyhow::Result<()> {
     println!("\n  {}🚀 Welcome to Distaff! Let's build something amazing.{}", BOLD, RESET);
@@ -38,258 +49,48 @@ pub fn init_project() -> anyhow::Result<()> {
 
     println!("\n  {}Scaffolding full-stack project...{}", YELLOW, RESET);
 
-    // Create directories
-    fs::create_dir_all(format!("{}/src/pages/index/components", name))?;
-    fs::create_dir_all(format!("{}/src/api/hello", name))?;
-    fs::create_dir_all(format!("{}/assets", name))?;
-    
-    // Cargo.toml
-    let cargo_toml = format!(r#"[package]
-name = "{0}"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-threadloom-core = {{ path = "../threadloom/crates/threadloom-core" }}
-threadloom-macro = {{ path = "../threadloom/crates/threadloom-macro" }}
-threadloom-dom = {{ path = "../threadloom/crates/threadloom-dom" }}
-threadloom-ui = {{ path = "../threadloom/crates/threadloom-ui" }}
-web-sys = {{ version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "Location"] }}
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-actix-web = "4"
-actix-files = "0.6"
-"#, name);
-    fs::write(format!("{}/Cargo.toml", name), cargo_toml)?;
-
-    let css_link = if setup_tw {
-        "<link rel=\"stylesheet\" href=\"/assets/tailwind.css\">"
-    } else {
-        "<link data-trunk rel=\"css\" href=\"style.css\">"
-    };
-
-    let index_html = format!(r#"<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>{0}</title>
-    {1}
-</head>
-<body></body>
-</html>"#, name, css_link);
-    fs::write(format!("{}/index.html", name), index_html)?;
-
-    // src/main.rs
-    let main_rs = r#"#![allow(unused_imports)]
-
-#[cfg(target_arch = "wasm32")]
-mod pages;
-#[cfg(target_arch = "wasm32")]
-mod routes;
-
-#[cfg(not(target_arch = "wasm32"))]
-mod api;
-#[cfg(not(target_arch = "wasm32"))]
-mod api_routes;
-
-#[cfg(target_arch = "wasm32")]
-fn main() {
-    let window = web_sys::window().unwrap();
-    let doc = window.document().unwrap();
-    let body = doc.body().unwrap();
-    
-    let path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
-    let view = routes::render_route(&path);
-    
-    threadloom_dom::mount(view, &body).unwrap();
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    use actix_web::{App, HttpServer};
-    use actix_files::Files;
-
-    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
-    println!("Starting Threadloom server on port {}", port);
-
-    HttpServer::new(|| {
-        App::new()
-            .configure(api_routes::configure_api)
-            .service(
-                Files::new("/", "./dist")
-                    .index_file("index.html")
-                    .default_handler(actix_files::NamedFile::open("./dist/index.html").unwrap())
-            )
-    })
-    .bind(format!("0.0.0.0:{}", port))?
-    .run()
-    .await
-}
-"#;
-    fs::write(format!("{}/src/main.rs", name), main_rs)?;
-
-    // src/pages/mod.rs
-    fs::write(format!("{}/src/pages/mod.rs", name), "pub mod index;\n")?;
-    // src/pages/index/mod.rs
-    fs::write(format!("{}/src/pages/index/mod.rs", name), "pub mod page;\npub mod components;\n")?;
-    // src/pages/index/components/mod.rs
-    fs::write(format!("{}/src/pages/index/components/mod.rs", name), "pub mod hero;\npub mod counter;\n")?;
-
-    // src/pages/index/page.rs
-    let page_rs = r#"use threadloom_core::View;
-use threadloom_macro::threadloom;
-use super::components::hero::hero_component;
-use super::components::counter::counter_component;
-
-pub fn page() -> View {
-    threadloom! {
-        div(class="min-h-screen bg-gray-900 text-white font-sans selection:bg-cyan-500 selection:text-white") {
-            div(class="relative overflow-hidden") {
-                // Background decoration
-                div(class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-30 pointer-events-none") {
-                    div(class="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 blur-[100px] rounded-full") {}
-                }
-                
-                div(class="relative container mx-auto px-6 py-24 flex flex-col items-center justify-center text-center") {
-                    { hero_component() }
-                    
-                    div(class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl text-left") {
-                        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-cyan-500/50 transition-colors duration-300 group") {
-                            div(class="text-3xl mb-4") { "📁" }
-                            h2(class="text-2xl font-semibold mb-4 text-cyan-400 group-hover:text-cyan-300 transition-colors") { "File-Based Routing" }
-                            p(class="text-gray-400 leading-relaxed") { 
-                                "Creating routes is as simple as adding files. "
-                                "This page lives at " code(class="bg-black/40 px-2 py-1 rounded text-cyan-300 text-sm") { "src/pages/index/page.rs" } ". "
-                                "Create new directories under " code(class="bg-black/40 px-2 py-1 rounded text-cyan-300 text-sm") { "src/pages/" } " to add more pages!"
-                            }
-                        }
-                        
-                        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-blue-500/50 transition-colors duration-300 group") {
-                            div(class="text-3xl mb-4") { "⚡" }
-                            h2(class="text-2xl font-semibold mb-4 text-blue-400 group-hover:text-blue-300 transition-colors") { "Full-Stack API" }
-                            p(class="text-gray-400 leading-relaxed") { 
-                                "Your backend API is built right in. Check out "
-                                code(class="bg-black/40 px-2 py-1 rounded text-blue-300 text-sm") { "src/api/hello/route.rs" } " to see how to build endpoints. "
-                                "Open your browser dev tools and fetch from " code(class="bg-black/40 px-2 py-1 rounded text-blue-300 text-sm") { "/api/hello" } " to see it in action!"
-                            }
-                        }
-
-                        { counter_component() }
-                    }
-                }
+    // Extract embedded template
+    for file in Template::iter() {
+        if let Some(embedded_file) = Template::get(&file) {
+            let dst_path = std::path::Path::new(name).join(file.as_ref());
+            if let Some(parent) = dst_path.parent() {
+                fs::create_dir_all(parent)?;
             }
+            fs::write(&dst_path, embedded_file.data)?;
         }
     }
-}
-"#;
-    fs::write(format!("{}/src/pages/index/page.rs", name), page_rs)?;
 
-// src/pages/index/components/counter.rs
-    let counter_rs = r#"use threadloom_core::{View, create_signal, IntoView};
-use threadloom_macro::threadloom;
-
-pub fn counter_component() -> View {
-    let (count, set_count) = create_signal(0);
-    let count_text = count.clone();
-
-    threadloom! {
-        div(class="p-8 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 hover:border-purple-500/50 transition-colors duration-300 flex flex-col items-center justify-center group text-center") {
-            div(class="text-3xl mb-4") { "⚛" }
-            h2(class="text-2xl font-semibold mb-4 text-purple-400 group-hover:text-purple-300 transition-colors") { "State Management" }
-            p(class="text-gray-400 leading-relaxed mb-6") { 
-                "Threadloom includes built-in reactive primitives like signals and memos. "
-                "Click the button to see it in action!"
-            }
-            
-            button(
-                class="px-6 py-2 bg-purple-500/20 text-purple-300 rounded-full font-semibold border border-purple-500/30 hover:bg-purple-500/30 transition-colors",
-                on_click=move || { set_count.set(count.get() + 1); }
-            ) {
-                { move || format!("Count is: {}", count_text.get()).into_view() }
-            }
-        }
+    // Patch Cargo.toml
+    let cargo_toml_path = format!("{}/Cargo.toml", name);
+    if let Ok(content) = fs::read_to_string(&cargo_toml_path) {
+        let new_content = content
+            .replace("name = \"demo\"", &format!("name = \"{}\"", name))
+            .replace("../crates/", "../threadloom/crates/");
+        fs::write(cargo_toml_path, new_content)?;
     }
-}
-"#;
-    fs::write(format!("{}/src/pages/index/components/counter.rs", name), counter_rs)?;
 
-    // src/pages/index/components/hero.rs
-    let comp_rs = r#"use threadloom_core::View;
-use threadloom_macro::threadloom;
-
-pub fn hero_component() -> View {
-    threadloom! {
-        div(class="animate-fade-in-up flex flex-col items-center") {
-            div(class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-medium mb-8") {
-                span(class="relative flex h-2 w-2") {
-                    span(class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75") {}
-                    span(class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500") {}
-                }
-                "Distaff Dev Server Ready"
-            }
-            h1(class="text-6xl md:text-7xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400") {
-                "Build modern web apps"
-                br() {}
-                span(class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500") { "in pure Rust." }
-            }
-            p(class="text-xl text-gray-400 max-w-2xl mb-10") {
-                "Threadloom provides a seamless full-stack experience with macro-based UI components, file-system routing, and built-in hot reloading."
-            }
-            button(
-                class="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-105 transition-transform duration-200 shadow-[0_0_40px_rgba(255,255,255,0.3)]",
-                onclick="fetch('/api/hello').then(r=>r.text()).then(t=>alert('API says: ' + t))"
-            ) {
-                "Get Started (Test API)"
-            }
-        }
+    // Patch index.html
+    let index_html_path = format!("{}/index.html", name);
+    if let Ok(content) = fs::read_to_string(&index_html_path) {
+        let new_content = content
+            .replace("<title>demo</title>", &format!("<title>{}</title>", name))
+            .replace("<title>Demo</title>", &format!("<title>{}</title>", name));
+        fs::write(index_html_path, new_content)?;
     }
-}
-"#;
-    fs::write(format!("{}/src/pages/index/components/hero.rs", name), comp_rs)?;
 
-    // src/api/mod.rs
-    fs::write(format!("{}/src/api/mod.rs", name), "pub mod hello;\n")?;
-    // src/api/hello/mod.rs
-    fs::write(format!("{}/src/api/hello/mod.rs", name), "pub mod route;\n")?;
-
-    // src/api/hello/route.rs
-    let route_rs = r#"use actix_web::{get, web, Responder, HttpResponse};
-
-#[get("/api/hello")]
-pub async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello from Actix Backend API!")
-}
-
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(hello);
-}
-"#;
-    fs::write(format!("{}/src/api/hello/route.rs", name), route_rs)?;
+    // Patch tailwind.config.js
+    let tailwind_cfg_path = format!("{}/tailwind.config.js", name);
+    if let Ok(content) = fs::read_to_string(&tailwind_cfg_path) {
+        let new_content = content.replace("../crates/", "../threadloom/crates/");
+        fs::write(tailwind_cfg_path, new_content)?;
+    }
 
     if setup_tw {
-        let package_json = r#"{
-  "devDependencies": {
-    "tailwindcss": "^3.4.0"
-  }
-}"#;
-        fs::write(format!("{}/package.json", name), package_json)?;
-        fs::write(format!("{}/src/input.css", name), "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n")?;
-        fs::write(format!("{}/tailwind.config.js", name), r#"/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: ["./src/**/*.rs", "./index.html"],
-  theme: { extend: {} },
-  plugins: [],
-}
-"#)?;
-        
         println!("  {}Running {} install...{}", CYAN, pm, RESET);
         #[cfg(target_os = "windows")]
         let _ = std::process::Command::new("cmd").args(["/C", pm, "install"]).current_dir(&name).status();
         #[cfg(not(target_os = "windows"))]
         let _ = std::process::Command::new(pm).args(["install"]).current_dir(&name).status();
-    } else {
-        fs::write(format!("{}/style.css", name), "body { font-family: sans-serif; }\n")?;
     }
 
     println!("  {}✔{} Project {} created successfully!", GREEN, RESET, name);
