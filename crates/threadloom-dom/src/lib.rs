@@ -2,7 +2,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use threadloom_core::{AttributeValue, Boundary, NodeId, View, take_pending_boundaries, run_effects};
+use threadloom_core::{AttributeValue, Boundary, NodeId, View, take_pending_boundaries, run_effects, create_effect};
 use wasm_bindgen::prelude::*;
 use web_sys::{Document, Element, Node};
 
@@ -37,11 +37,22 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         }
                     }
                     AttributeValue::Dynamic(f) => {
-                        // For Phase 3, just evaluate once. Reactivity requires tracking.
+                        // Evaluate once initially to set the attr, then register a reactive effect
+                        // that re-runs (and calls set_attribute again) whenever any signal read
+                        // inside the closure changes.
+                        let el_clone = el.clone();
+                        let k_clone = k.clone();
                         let val = f();
-                        if let AttributeValue::String(s) = val {
-                            el.set_attribute(&k, &s)?;
+                        if let AttributeValue::String(s) = &val {
+                            let _ = el.set_attribute(&k, s);
                         }
+                        // Reactive update effect
+                        create_effect(move || {
+                            let val = f();
+                            if let AttributeValue::String(s) = val {
+                                let _ = el_clone.set_attribute(&k_clone, &s);
+                            }
+                        });
                     }
                     AttributeValue::Event(cb) => {
                         use wasm_bindgen::JsCast;
@@ -93,14 +104,14 @@ pub fn tick() -> Result<(), JsValue> {
     let window = web_sys::window().expect("no global `window` exists");
     let document = window.document().expect("should have a document on window");
 
+    // run_effects() re-runs any create_effect closures whose signals changed,
+    // including dynamic attribute effects registered during render.
     run_effects();
     
-    // In a real multi-threaded scheduler, we'd receive DOM patches.
-    // For Phase 3 skeletal routing, we just re-evaluate pending boundaries local to this shard.
     let pending = take_pending_boundaries();
     
-    let mut updates = Vec::new();
-    
+    let mut boundary_updates = Vec::new();
+
     for id in pending {
         let entry = BOUNDARIES.with(|b| b.borrow().get(&id).cloned());
         if let Some((old_node, compute)) = entry {
@@ -111,20 +122,21 @@ pub fn tick() -> Result<(), JsValue> {
             let new_node = render_view(&document, view)?;
             if let Some(parent) = old_node.parent_node() {
                 parent.replace_child(&new_node, &old_node)?;
-                updates.push((id, new_node, compute));
+                boundary_updates.push((id, new_node, compute));
             }
         }
     }
     
     BOUNDARIES.with(|b| {
         let mut boundaries = b.borrow_mut();
-        for (id, new_node, compute) in updates {
+        for (id, new_node, compute) in boundary_updates {
             boundaries.insert(id, (new_node, compute));
         }
     });
 
     Ok(())
 }
+
 
 #[macro_export]
 macro_rules! get_value {

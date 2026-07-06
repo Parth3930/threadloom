@@ -73,7 +73,11 @@ pub fn generate_routes() {
         }
     }
 
-    routes_rs.push_str("        _ => threadloom_macro::threadloom! { div { \"404 Not Found\" } }\n");
+    if pages_dir.join("not_found/page.rs").exists() {
+        routes_rs.push_str("        _ => crate::pages::not_found::page::page(),\n");
+    } else {
+        routes_rs.push_str("        _ => threadloom_macro::threadloom! { div { \"404 Not Found\" } }\n");
+    }
     routes_rs.push_str("    }\n}\n");
 
     let current = fs::read_to_string("src/routes.rs").unwrap_or_default();
@@ -106,7 +110,17 @@ fn collect_routes(dir: &Path, prefix: &str, layouts: &[String], routes: &mut Vec
                 let url_path = if prefix.is_empty() { format!("/{}", name) } else { format!("/{}/{}", prefix.replace("::", "/"), name) };
 
                 if page_file.exists() {
-                    routes.push((url_path, new_prefix.clone(), current_layouts.clone()));
+                    // If the subdir itself has a layout.rs, it applies to its own page too.
+                    let mut page_layouts = current_layouts.clone();
+                    let subdir_layout_name = if prefix.is_empty() {
+                        format!("{}::layout", name)
+                    } else {
+                        format!("{}::{}::layout", prefix, name)
+                    };
+                    if path.join("layout.rs").exists() {
+                        page_layouts.push(subdir_layout_name);
+                    }
+                    routes.push((url_path, new_prefix.clone(), page_layouts));
                 }
 
                 collect_routes(&path, &new_prefix, &current_layouts, routes);

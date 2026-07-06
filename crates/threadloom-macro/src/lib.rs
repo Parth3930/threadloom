@@ -297,6 +297,7 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                     if let Some(w) = ::web_sys::window() {
                         let p = w.location().pathname().unwrap_or_else(|_| "/".to_string());
                         set_path_clone.set(p);
+                        let _ = ::threadloom_dom::tick();
                     }
                 }) as Box<dyn FnMut()>,
             );
