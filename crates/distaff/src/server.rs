@@ -349,13 +349,6 @@ async fn hmr_script() -> &'static str {
                                             el.classList.remove('md:col-span-2');
                                         }
                                     }
-                                    // HACK: Spacing and border props mapping
-                                    const spacingProps = ['p', 'px', 'py', 'm', 'mx', 'my', 'mt', 'mb', 'pt', 'pb', 'pl', 'pr', 'ml', 'mr', 'border'];
-                                    if (spacingProps.includes(key)) {
-                                        const regex = new RegExp('\\b' + key + '-\\w+\\b', 'g');
-                                        el.className = el.className.replace(regex, '') + ' ' + key + '-' + patch.attrs[key];
-                                        el.className = el.className.trim().replace(/\s+/g, ' ');
-                                    }
                                 }
                             });
                         });

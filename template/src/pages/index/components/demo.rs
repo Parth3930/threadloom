@@ -349,7 +349,7 @@ pub fn demo_component() -> View {
                                 set_cookie_val.set(val);
                             }}
                         )
-                        Row(gap=2, mb=30) {
+                        Row(gap=2, mb=10) {
                             Button(label="Save Cookie", primary=true, on_click={move || {
                                 threadloom_dom::set_cookie!("demo_cookie", cookie_val.get(), 3600);
                                 threadloom_dom::alert!("Cookie saved for 1 hour!");
