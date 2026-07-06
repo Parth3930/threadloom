@@ -9,6 +9,8 @@ pub struct ButtonProps {
     pub label: String,
     /// If true, applies primary styling. Otherwise, applies secondary styling.
     pub primary: bool,
+    /// Button variant: "default", "secondary", "destructive", "outline", "ghost"
+    pub variant: OptClass,
     /// Custom class to append or override.
     pub class: OptClass,
     /// Callback triggered when the button is clicked.
@@ -26,13 +28,26 @@ pub struct ButtonProps {
 /// **Props:**
 /// - `label: String`
 /// - `primary: bool`
+/// - `variant: OptClass`
 /// - `class: OptClass`
 /// - `on_click: Callback`
 /// - `on_hover: Callback`
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Button(props: ButtonProps) -> View {
-    let mut class_str = if props.primary { "tl-btn tl-btn-primary".to_string() } else { "tl-btn tl-btn-secondary".to_string() };
+    let mut class_str = if let Some(v) = props.variant.0.as_ref() {
+        match v.as_str() {
+            "secondary" => "tl-btn bg-secondary text-secondary-foreground hover:bg-secondary/80".to_string(),
+            "destructive" => "tl-btn bg-destructive text-destructive-foreground hover:bg-destructive/90".to_string(),
+            "outline" => "tl-btn border border-input bg-background hover:bg-accent hover:text-accent-foreground".to_string(),
+            "ghost" => "tl-btn hover:bg-accent hover:text-accent-foreground".to_string(),
+            _ => "tl-btn bg-primary text-primary-foreground hover:bg-primary/90".to_string(),
+        }
+    } else if props.primary { 
+        "tl-btn tl-btn-primary".to_string() 
+    } else { 
+        "tl-btn tl-btn-secondary".to_string() 
+    };
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -70,6 +85,8 @@ pub struct InputProps {
     pub value: String,
     /// Placeholder text shown when empty.
     pub placeholder: String,
+    /// The type of input (e.g., text, email, password)
+    pub r#type: OptClass,
     /// Callback triggered on input change.
     pub on_input: Callback,
     /// Any additional child elements.
@@ -84,6 +101,7 @@ pub struct InputProps {
 /// - `class: OptClass`
 /// - `value: String`
 /// - `placeholder: String`
+/// - `type: OptClass`
 /// - `on_input: Callback`
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
@@ -93,8 +111,9 @@ pub fn Input(props: InputProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
+    let input_type = props.r#type.0.unwrap_or_else(|| "text".to_string());
     let mut b = element("input")
-        .attr("type", "text")
+        .attr("type", input_type)
         .attr("class", class_str)
         .attr("value", props.value)
         .attr("placeholder", props.placeholder);
