@@ -1,6 +1,7 @@
 use threadloom_core::{element, text, View, IntoView};
 use crate::{Callback, OptClass};
 
+/// Properties for the DataTable component.
 #[derive(Default)]
 pub struct DataTableProps {
     pub headers: Vec<String>,
@@ -8,6 +9,12 @@ pub struct DataTableProps {
     pub children: Vec<View>,
 }
 
+/// Renders a DataTable component.
+///
+/// **Props:**
+/// - `headers: Vec<String>`
+/// - `rows: Vec<Vec<View>>`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn DataTable(props: DataTableProps) -> View {
     let mut thead_tr = element("tr");
@@ -31,6 +38,7 @@ pub fn data_table(headers: Vec<String>, rows: Vec<Vec<View>>) -> View {
     DataTable(DataTableProps { headers, rows, ..Default::default() })
 }
 
+/// Properties for the Accordion component.
 #[derive(Default)]
 pub struct AccordionProps {
     pub title: String,
@@ -40,6 +48,14 @@ pub struct AccordionProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Accordion component.
+///
+/// **Props:**
+/// - `title: String`
+/// - `open: bool`
+/// - `on_toggle: Callback`
+/// - `extra_class: OptClass`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Accordion(props: AccordionProps) -> View {
     let mut base_class = "tl-accordion".to_string();
@@ -79,6 +95,7 @@ pub fn accordion(
     })
 }
 
+/// Properties for the Card component.
 #[derive(Default)]
 pub struct CardProps {
     pub title: String,
@@ -87,6 +104,13 @@ pub struct CardProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Card component.
+///
+/// **Props:**
+/// - `title: String`
+/// - `wide: bool`
+/// - `extra_class: OptClass`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Card(props: CardProps) -> View {
     let mut class_str = if props.wide {

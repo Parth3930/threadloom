@@ -18,6 +18,14 @@ pub struct ButtonProps {
 }
 
 /// A standard button component.
+/// Renders a Button component.
+///
+/// **Props:**
+/// - `label: String`
+/// - `primary: bool`
+/// - `on_click: Callback`
+/// - `on_hover: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Button(props: ButtonProps) -> View {
     let class = if props.primary { "tl-btn tl-btn-primary" } else { "tl-btn tl-btn-secondary" };
@@ -39,6 +47,7 @@ pub fn button(label: impl Into<String>, primary: bool, on_click: impl Into<Callb
     Button(ButtonProps { label: label.into(), primary, on_click: on_click.into(), ..Default::default() })
 }
 
+/// Properties for the Input component.
 #[derive(Default)]
 pub struct InputProps {
     pub value: String,
@@ -47,6 +56,13 @@ pub struct InputProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Input component.
+///
+/// **Props:**
+/// - `value: String`
+/// - `placeholder: String`
+/// - `on_input: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Input(props: InputProps) -> View {
     let mut b = element("input")
@@ -64,6 +80,7 @@ pub fn input(value: impl Into<String>, placeholder: impl Into<String>, on_input:
     Input(InputProps { value: value.into(), placeholder: placeholder.into(), on_input: on_input.into(), ..Default::default() })
 }
 
+/// Properties for the Label component.
 #[derive(Default)]
 pub struct LabelProps {
     pub text: String,
@@ -71,6 +88,12 @@ pub struct LabelProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Label component.
+///
+/// **Props:**
+/// - `text: String`
+/// - `r#for: String`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Label(props: LabelProps) -> View {
     let mut b = element("label")
@@ -85,6 +108,7 @@ pub fn label(text_content: impl Into<String>, r#for: impl Into<String>) -> View 
     Label(LabelProps { text: text_content.into(), r#for: r#for.into(), ..Default::default() })
 }
 
+/// Properties for the Checkbox component.
 #[derive(Default)]
 pub struct CheckboxProps {
     pub checked: bool,
@@ -93,6 +117,13 @@ pub struct CheckboxProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Checkbox component.
+///
+/// **Props:**
+/// - `checked: bool`
+/// - `id: String`
+/// - `on_change: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Checkbox(props: CheckboxProps) -> View {
     let mut b = element("input")
@@ -110,6 +141,7 @@ pub fn checkbox(checked: bool, id: impl Into<String>, on_change: impl Into<Callb
     Checkbox(CheckboxProps { checked, id: id.into(), on_change: on_change.into(), ..Default::default() })
 }
 
+/// Properties for the Radio component.
 #[derive(Default)]
 pub struct RadioProps {
     pub checked: bool,
@@ -119,6 +151,14 @@ pub struct RadioProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Radio component.
+///
+/// **Props:**
+/// - `checked: bool`
+/// - `id: String`
+/// - `name: String`
+/// - `on_change: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Radio(props: RadioProps) -> View {
     let mut b = element("input")
@@ -137,6 +177,7 @@ pub fn radio(checked: bool, id: impl Into<String>, name: impl Into<String>, on_c
     Radio(RadioProps { checked, id: id.into(), name: name.into(), on_change: on_change.into(), ..Default::default() })
 }
 
+/// Properties for the RadioGroup component.
 #[derive(Default)]
 pub struct RadioGroupProps {
     pub options: Vec<(String, String)>,
@@ -146,6 +187,14 @@ pub struct RadioGroupProps {
     pub children: Vec<View>,
 }
 
+/// Renders a RadioGroup component.
+///
+/// **Props:**
+/// - `options: Vec<(String String)>`
+/// - `selected_value: String`
+/// - `name: String`
+/// - `on_change: Callback1<String>`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn RadioGroup(props: RadioGroupProps) -> View {
     let mut container = element("div").attr("class", "tl-radio-group flex gap-4");
@@ -196,6 +245,7 @@ pub fn radio_group(
     })
 }
 
+/// Properties for the Textarea component.
 #[derive(Default)]
 pub struct TextareaProps {
     pub value: String,
@@ -204,6 +254,13 @@ pub struct TextareaProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Textarea component.
+///
+/// **Props:**
+/// - `value: String`
+/// - `placeholder: String`
+/// - `on_input: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Textarea(props: TextareaProps) -> View {
     let mut b = element("textarea")
@@ -220,6 +277,7 @@ pub fn textarea(value: impl Into<String>, placeholder: impl Into<String>, on_inp
     Textarea(TextareaProps { value: value.into(), placeholder: placeholder.into(), on_input: on_input.into(), ..Default::default() })
 }
 
+/// Properties for the Select component.
 #[derive(Default)]
 pub struct SelectProps {
     pub options: Vec<(String, String)>,
@@ -228,6 +286,13 @@ pub struct SelectProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Select component.
+///
+/// **Props:**
+/// - `options: Vec<(String String)>`
+/// - `selected_value: String`
+/// - `on_change: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Select(props: SelectProps) -> View {
     let mut select_el = element("select").attr("class", "tl-input");

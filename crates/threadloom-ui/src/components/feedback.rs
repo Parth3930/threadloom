@@ -3,6 +3,7 @@ use threadloom_core::{element, text, fragment, View, IntoView};
 use crate::Callback;
 use crate::components::form::{Button, ButtonProps};
 
+/// Properties for the Dialog component.
 #[derive(Default)]
 pub struct DialogProps {
     pub open: bool,
@@ -12,6 +13,14 @@ pub struct DialogProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Dialog component.
+///
+/// **Props:**
+/// - `open: bool`
+/// - `title: String`
+/// - `on_close: Callback`
+/// - `footer: Option<View>`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Dialog(props: DialogProps) -> View {
     if !props.open { return View::None; }
@@ -63,12 +72,18 @@ pub fn dialog(
     })
 }
 
+/// Properties for the ToastContainer component.
 #[derive(Default)]
 pub struct ToastContainerProps {
     pub toasts: Vec<View>,
     pub children: Vec<View>,
 }
 
+/// Renders a ToastContainer component.
+///
+/// **Props:**
+/// - `toasts: Vec<View>`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn ToastContainer(props: ToastContainerProps) -> View {
     element("div")
@@ -82,12 +97,18 @@ pub fn toast_container(toasts: Vec<View>) -> View {
     ToastContainer(ToastContainerProps { toasts, ..Default::default() })
 }
 
+/// Properties for the Toast component.
 #[derive(Default)]
 pub struct ToastProps {
     pub message: String,
     pub children: Vec<View>,
 }
 
+/// Renders a Toast component.
+///
+/// **Props:**
+/// - `message: String`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Toast(props: ToastProps) -> View {
     element("div")
@@ -101,12 +122,18 @@ pub fn toast(message: impl Into<String>) -> View {
     Toast(ToastProps { message: message.into(), ..Default::default() })
 }
 
+/// Properties for the Tooltip component.
 #[derive(Default)]
 pub struct TooltipProps {
     pub tooltip_text: String,
     pub children: Vec<View>,
 }
 
+/// Renders a Tooltip component.
+///
+/// **Props:**
+/// - `tooltip_text: String`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Tooltip(props: TooltipProps) -> View {
     let mut b = element("div").attr("class", "tl-tooltip-wrapper");

@@ -2,6 +2,7 @@ use std::rc::Rc;
 use threadloom_core::{element, text, View, IntoView};
 use crate::{Callback, Callback1, OptClass};
 
+/// Properties for the Tabs component.
 #[derive(Default)]
 pub struct TabsProps {
     pub tab_labels: Vec<String>,
@@ -11,6 +12,14 @@ pub struct TabsProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Tabs component.
+///
+/// **Props:**
+/// - `tab_labels: Vec<String>`
+/// - `active_index: usize`
+/// - `on_tab_click: Callback1<usize>`
+/// - `panels: Vec<View>`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Tabs(props: TabsProps) -> View {
     let mut list = element("div").attr("class", "tl-tabs-list").attr("role", "tablist");
@@ -52,6 +61,14 @@ pub struct DropdownProps {
 }
 
 /// A dropdown menu component that toggles a list of items.
+/// Renders a Dropdown component.
+///
+/// **Props:**
+/// - `label: String`
+/// - `open: bool`
+/// - `items: Vec<View>`
+/// - `on_toggle: Callback`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Dropdown(props: DropdownProps) -> View {
     let mut b = element("div").attr("class", "tl-dropdown-container");
@@ -81,6 +98,7 @@ pub fn dropdown(label: impl Into<String>, open: bool, items: Vec<View>, on_toggl
     Dropdown(DropdownProps { label: label.into(), open, items, on_toggle: on_toggle.into(), ..Default::default() })
 }
 
+/// Properties for the Hamburger component.
 #[derive(Default)]
 pub struct HamburgerProps {
     pub open: bool,
@@ -89,6 +107,13 @@ pub struct HamburgerProps {
     pub children: Vec<View>,
 }
 
+/// Renders a Hamburger component.
+///
+/// **Props:**
+/// - `open: bool`
+/// - `on_toggle: Callback`
+/// - `extra_class: OptClass`
+/// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Hamburger(props: HamburgerProps) -> View {
     let mut class_str = "tl-hamburger".to_string();
