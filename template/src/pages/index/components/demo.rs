@@ -39,7 +39,7 @@ pub fn demo_component() -> View {
 
                 // Forms & Inputs
                 Card(title="Forms & Inputs") {
-                    Heading(level=4, mt=2, mb=1, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Buttons" }
+                    Heading(level=4, mt=2, mb=1, weight="light") { "Buttons" }
                     Row(gap=4, items="center") {
                         Button(label="Primary Button", primary=true, on_click={|| {
                             threadloom_dom::alert!("Primary Button Clicked!");
@@ -349,7 +349,7 @@ pub fn demo_component() -> View {
                                 set_cookie_val.set(val);
                             }}
                         )
-                        Row(gap=2) {
+                        Row(gap=2, mb=30) {
                             Button(label="Save Cookie", primary=true, on_click={move || {
                                 threadloom_dom::set_cookie!("demo_cookie", cookie_val.get(), 3600);
                                 threadloom_dom::alert!("Cookie saved for 1 hour!");

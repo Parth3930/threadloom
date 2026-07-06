@@ -87,6 +87,7 @@ impl Parse for Attribute {
 }
 
 struct ViewMacro {
+    line: usize,
     nodes: Vec<Node>,
 }
 
@@ -96,7 +97,7 @@ impl Parse for ViewMacro {
         while !input.is_empty() {
             nodes.push(input.parse()?);
         }
-        Ok(ViewMacro { nodes })
+        Ok(ViewMacro { line: 0, nodes })
     }
 }
 
@@ -108,7 +109,8 @@ impl<'ast> Visit<'ast> for MacroVisitor {
     fn visit_macro(&mut self, node: &'ast Macro) {
         if node.path.segments.last().map(|s| s.ident.to_string()) == Some("threadloom".to_string())
         {
-            if let Ok(parsed) = parse2::<ViewMacro>(node.tokens.clone()) {
+            if let Ok(mut parsed) = parse2::<ViewMacro>(node.tokens.clone()) {
+                parsed.line = node.path.segments.last().unwrap().ident.span().start().line;
                 self.macros.push(parsed);
             }
         }
@@ -298,6 +300,32 @@ fn diff_nodes(
     false
 }
 
+fn extract_literal_value(expr: &syn::Expr) -> Option<serde_json::Value> {
+    if let syn::Expr::Lit(syn::ExprLit { lit, .. }) = expr {
+        match lit {
+            syn::Lit::Str(s) => Some(serde_json::Value::String(s.value())),
+            syn::Lit::Int(i) => {
+                if let Ok(v) = i.base10_parse::<i64>() {
+                    Some(serde_json::json!(v))
+                } else {
+                    None
+                }
+            },
+            syn::Lit::Bool(b) => Some(serde_json::Value::Bool(b.value())),
+            syn::Lit::Float(f) => {
+                if let Ok(v) = f.base10_parse::<f64>() {
+                    Some(serde_json::json!(v))
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
 fn diff_single_node(
     old_node: &Node,
     new_node: &Node,
@@ -349,21 +377,11 @@ fn diff_single_node(
                                     can_patch = false;
                                     break;
                                 }
-                                if let (
-                                    syn::Expr::Lit(syn::ExprLit {
-                                        lit: syn::Lit::Str(new_lit),
-                                        ..
-                                    }),
-                                    syn::Expr::Lit(syn::ExprLit {
-                                        lit: syn::Lit::Str(_),
-                                        ..
-                                    }),
-                                ) = (&new_attr.value, &old_attr.value)
-                                {
-                                    attrs_diff.insert(
-                                        key.clone(),
-                                        serde_json::Value::String(new_lit.value()),
-                                    );
+                                if let (Some(new_val), Some(_old_val)) = (
+                                    extract_literal_value(&new_attr.value),
+                                    extract_literal_value(&old_attr.value),
+                                ) {
+                                    attrs_diff.insert(key.clone(), new_val);
                                 } else {
                                     can_patch = false;
                                     break;
@@ -375,13 +393,8 @@ fn diff_single_node(
                                 can_patch = false;
                                 break;
                             }
-                            if let syn::Expr::Lit(syn::ExprLit {
-                                lit: syn::Lit::Str(new_lit),
-                                ..
-                            }) = &new_attr.value
-                            {
-                                attrs_diff
-                                    .insert(key.clone(), serde_json::Value::String(new_lit.value()));
+                            if let Some(new_val) = extract_literal_value(&new_attr.value) {
+                                attrs_diff.insert(key.clone(), new_val);
                             } else {
                                 can_patch = false;
                                 break;
@@ -397,11 +410,7 @@ fn diff_single_node(
                                 can_patch = false;
                                 break;
                             }
-                            if let syn::Expr::Lit(syn::ExprLit {
-                                lit: syn::Lit::Str(_),
-                                ..
-                            }) = &old_attr.value
-                            {
+                            if extract_literal_value(&old_attr.value).is_some() {
                                 attrs_diff.insert(key.clone(), serde_json::Value::Null);
                             } else {
                                 can_patch = false;
@@ -412,11 +421,33 @@ fn diff_single_node(
                 }
 
                 if can_patch && !attrs_diff.is_empty() {
-                    patches.push(serde_json::json!({
-                        "action": "update_attrs",
-                        "path": path,
-                        "attrs": attrs_diff
-                    }));
+                    let tag_str = old_el.tag.to_string();
+                    let is_component = tag_str.chars().next().unwrap().is_uppercase();
+                    
+                    if is_component {
+                        let safe_props = [
+                            "class", "extra_class", "p", "px", "py", "pt", "pb", "pl", "pr",
+                            "m", "mx", "my", "mt", "mb", "ml", "mr", "border", "border_color", "bg",
+                            "align", "title_align", "weight", "shadow", "wide", "cols", "gap",
+                            "sm_cols", "md_cols", "lg_cols", "xl_cols", "2xl_cols",
+                            "primary", "label", "text", "title", "level", "items", "justify",
+                            "width", "height"
+                        ];
+                        for key in attrs_diff.keys() {
+                            if !safe_props.contains(&key.as_str()) {
+                                can_patch = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if can_patch {
+                        patches.push(serde_json::json!({
+                            "action": "update_attrs",
+                            "path": path,
+                            "attrs": attrs_diff
+                        }));
+                    }
                 }
             }
 
@@ -473,7 +504,8 @@ pub fn attempt_hot_patch(
     let mut patches = Vec::new();
 
     for (old_m, new_m) in old_visitor.macros.iter().zip(new_visitor.macros.iter()) {
-        if !diff_nodes(&old_m.nodes, &new_m.nodes, "", &mut patches) {
+        let base = new_m.line.to_string();
+        if !diff_nodes(&old_m.nodes, &new_m.nodes, &base, &mut patches) {
             return None;
         }
     }

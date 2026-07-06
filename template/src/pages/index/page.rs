@@ -11,13 +11,13 @@ pub fn page() -> View {
     });
 
     threadloom! {
-        Column(class="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50 font-sans transition-colors duration-300") {
-            Row(class="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-4 justify-between items-center transition-colors duration-300 w-full") {
-                Row(class="items-center gap-2") {
-                    Heading(level=1, class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400") { "Threadloom" }
-                    Text(variant="span", class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold") { "UI" }
+        Section(row=false, height="screen", class="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50 font-sans transition-colors duration-300") {
+            Row(p=4, justify="between", items="center", width="full", class="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md transition-colors duration-300") {
+                Row(items="center", gap=2) {
+                    Heading(level=1, weight="bold", class="text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400") { "Threadloom" }
+                    Text(variant="span", weight="semibold", class="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs") { "UI" }
                 }
-                Row(class="gap-4 items-center") {
+                Row(items="center", gap=4) {
                     Text(variant="a", class="hover:text-blue-500 font-medium") { "GitHub" }
                     Text(variant="a", class="hover:text-blue-500 font-medium") { "Get Started" }
                     Button(
@@ -54,22 +54,22 @@ pub fn page() -> View {
                     }
                 }
             }
-            Container(class="mx-auto p-8 max-w-5xl flex flex-col gap-12 w-full") {
-                Column(class="py-16 md:py-24 items-center text-center gap-6") {
-                    Heading(level=2, class="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 dark:text-white") {
+            Section(width="full", p=8, gap=12, class="mx-auto max-w-5xl") {
+                Section(row=false, py=16, items="center", gap=6, class="md:py-24 text-center") {
+                    Heading(level=2, weight="extrabold", class="text-5xl md:text-7xl tracking-tight text-gray-900 dark:text-white") {
                         "Build faster with "
                         Text(variant="span", class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400") { "Threadloom" }
                     }
-                    Text(variant="p", class="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto font-light") {
+                    Text(variant="p", weight="light", class="mx-auto text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-2xl") {
                         "A premium, fast, and ergonomic full-stack UI framework for Rust and WebAssembly."
                     }
-                    Row(class="gap-4 mt-4") {
+                    Row(gap=4, mt=4) {
                         Button(label="Get Started", primary=true, class="px-8 text-lg rounded-full")
                         Button(label="Documentation", primary=false, class="px-8 text-lg rounded-full")
                     }
                 }
-                Column(class="relative") {
-                    Column(class="absolute inset-0 bg-gradient-to-tr from-blue-100/50 to-purple-100/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-3xl blur-3xl -z-10") {}
+                Section(row=false, class="relative") {
+                    Section(row=false, class="absolute inset-0 bg-gradient-to-tr from-blue-100/50 to-purple-100/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-3xl blur-3xl -z-10") {}
                     { demo_component() }
                 }
             }

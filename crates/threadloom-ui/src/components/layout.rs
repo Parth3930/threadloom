@@ -5,7 +5,9 @@ use crate::OptClass;
 /// A horizontal flex container built to easily lay out elements side-by-side.
 #[derive(Default)]
 pub struct RowProps {
-    /// Gap size (e.g. 2, 4, 8)
+    pub width: OptClass,
+    pub height: OptClass,
+    /// Gap size (e.g. 2, 4, 8) (Max: 96)
     pub gap: i32,
     pub p: i32, pub px: i32, pub py: i32,
     pub m: i32, pub mx: i32, pub my: i32, pub mt: i32, pub mb: i32,
@@ -87,6 +89,8 @@ fn apply_spacing_and_borders(class_str: &mut String, p: i32, px: i32, py: i32, m
 ///
 /// **Props:**
 /// - `gap: i32`
+/// - `width: OptClass`
+/// - `height: OptClass`
 /// - `p: i32`
 /// - `px: i32`
 /// - `py: i32`
@@ -110,6 +114,13 @@ pub fn Row(props: RowProps) -> View {
     
     let gap_c = gap_class(props.gap);
     if !gap_c.is_empty() { class_str.push(' '); class_str.push_str(gap_c); }
+    
+    if let Some(w) = &props.width.0 {
+        class_str.push_str(" w-"); class_str.push_str(w);
+    }
+    if let Some(h) = &props.height.0 {
+        class_str.push_str(" h-"); class_str.push_str(h);
+    }
     
     if let Some(it) = &props.items.0 {
         let items_c = flex_items_class(it);
@@ -140,7 +151,9 @@ pub fn Row(props: RowProps) -> View {
 /// A vertical flex container for stacking elements.
 #[derive(Default)]
 pub struct ColumnProps {
-    /// Gap size (e.g. 2, 4, 8)
+    pub width: OptClass,
+    pub height: OptClass,
+    /// Gap size (e.g. 2, 4, 8) (Max: 96)
     pub gap: i32,
     pub p: i32, pub px: i32, pub py: i32,
     pub m: i32, pub mx: i32, pub my: i32, pub mt: i32, pub mb: i32,
@@ -160,6 +173,8 @@ pub struct ColumnProps {
 /// Renders a vertical flex container (`<div class="flex flex-col ...">`).
 ///
 /// **Props:**
+/// - `width: OptClass`
+/// - `height: OptClass`
 /// - `gap: i32`
 /// - `p: i32`
 /// - `px: i32`
@@ -242,6 +257,73 @@ pub fn Container(props: ContainerProps) -> View {
     e.into_view()
 }
 
+/// Properties for `Section` component.
+/// A versatile container with explicit width and height support.
+#[derive(Default)]
+pub struct SectionProps {
+    /// Width class (e.g. "full", "screen", "1/2", "max-content", "96")
+    pub width: OptClass,
+    /// Height class (e.g. "full", "screen", "96", "auto")
+    pub height: OptClass,
+    pub gap: i32,
+    pub p: i32, pub px: i32, pub py: i32,
+    pub m: i32, pub mx: i32, pub my: i32, pub mt: i32, pub mb: i32,
+    pub border: i32,
+    pub border_color: OptClass,
+    pub bg: OptClass,
+    /// Flex align-items (e.g. "center", "start", "end")
+    pub items: OptClass,
+    /// Flex justify-content (e.g. "center", "between", "start")
+    pub justify: OptClass,
+    /// Render as flex column (true by default usually in sections)
+    pub row: bool,
+    /// Element ID
+    pub id: OptClass,
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a structural `<section>` tag.
+#[allow(non_snake_case)]
+pub fn Section(props: SectionProps) -> View {
+    let mut e = element("section");
+    if let Some(id) = props.id.0 { e = e.attr("id", id); }
+    
+    let mut class_str = if props.row { "flex flex-row".to_string() } else { "flex flex-col".to_string() };
+    
+    if let Some(w) = &props.width.0 {
+        class_str.push_str(" w-"); class_str.push_str(w);
+    }
+    if let Some(h) = &props.height.0 {
+        class_str.push_str(" h-"); class_str.push_str(h);
+    }
+    
+    let gap_c = gap_class(props.gap);
+    if !gap_c.is_empty() { class_str.push(' '); class_str.push_str(gap_c); }
+    
+    if let Some(it) = &props.items.0 {
+        let items_c = flex_items_class(it);
+        if !items_c.is_empty() { class_str.push(' '); class_str.push_str(items_c); }
+    }
+    
+    if let Some(ju) = &props.justify.0 {
+        let justify_c = flex_justify_class(ju);
+        if !justify_c.is_empty() { class_str.push(' '); class_str.push_str(justify_c); }
+    }
+
+    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
+
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    e = e.attr("class", class_str);
+    for child in props.children {
+        e = e.child(child);
+    }
+    e.into_view()
+}
+
 /// Properties for `Sidebar` component.
 /// A responsive, collapsible sidebar panel.
 #[derive(Default)]
@@ -286,6 +368,8 @@ pub fn Sidebar(props: SidebarProps) -> View {
 pub struct TextProps {
     /// String representation of the tag (e.g., `"span"`, `"strong"`, `"em"`). Defaults to `"p"`.
     pub variant: OptClass,
+    /// Font weight (e.g., "light", "normal", "medium", "semibold", "bold")
+    pub weight: OptClass,
     /// Tailwind CSS classes.
     pub class: OptClass,
     /// The text or elements inside.
@@ -307,8 +391,21 @@ pub struct TextProps {
 pub fn Text(props: TextProps) -> View {
     let tag = props.variant.0.unwrap_or_else(|| "p".to_string());
     let mut e = element(tag);
+    
+    let mut class_str = String::new();
+    
+    if let Some(w) = props.weight.0 {
+        let wc = weight_class(&w);
+        if !wc.is_empty() { class_str.push_str(wc); }
+    }
+    
     if let Some(c) = props.class.0 {
-        e = e.attr("class", c);
+        if !class_str.is_empty() { class_str.push(' '); }
+        class_str.push_str(&c);
+    }
+    
+    if !class_str.is_empty() {
+        e = e.attr("class", class_str);
     }
     for child in props.children {
         e = e.child(child);
@@ -329,6 +426,8 @@ pub struct HeadingProps {
     pub bg: OptClass,
     /// Text alignment: "left", "center", "right"
     pub align: OptClass,
+    /// Font weight (e.g., "light", "normal", "medium", "semibold", "bold")
+    pub weight: OptClass,
     /// E.g., text sizing and font weights.
     pub class: OptClass,
     /// Text content inside the heading.
@@ -341,6 +440,19 @@ fn align_class(align: &str) -> &'static str {
         "center" => "text-center",
         "right" => "text-right",
         "justify" => "text-justify",
+        _ => "",
+    }
+}
+
+pub fn weight_class(weight: &str) -> &'static str {
+    match weight {
+        "light" => "font-light",
+        "normal" => "font-normal",
+        "medium" => "font-medium",
+        "semibold" | "semi-bold" | "semi bold" => "font-semibold",
+        "bold" => "font-bold",
+        "extrabold" => "font-extrabold",
+        "black" => "font-black",
         _ => "",
     }
 }
@@ -376,9 +488,34 @@ pub fn Heading(props: HeadingProps) -> View {
     
     let mut class_str = String::new();
     
+    let default_size = match level {
+        1 => "text-4xl",
+        2 => "text-3xl",
+        3 => "text-2xl",
+        4 => "text-xl",
+        5 => "text-lg",
+        6 => "text-base",
+        _ => "text-3xl",
+    };
+    class_str.push_str(default_size);
+    
+    // Add default font-bold if no weight is explicitly passed
+    let mut current_weight = "font-bold";
+    if let Some(w) = &props.weight.0 {
+        let wc = weight_class(w);
+        if !wc.is_empty() {
+            current_weight = wc;
+        }
+    }
+    class_str.push(' ');
+    class_str.push_str(current_weight);
+    
     if let Some(al) = &props.align.0 {
         let align_c = align_class(al);
-        if !align_c.is_empty() { class_str.push_str(align_c); }
+        if !align_c.is_empty() { 
+            class_str.push(' ');
+            class_str.push_str(align_c); 
+        }
     }
     
     apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
@@ -402,15 +539,23 @@ pub fn Heading(props: HeadingProps) -> View {
 /// A CSS Grid container with configurable columns and gaps.
 #[derive(Default)]
 pub struct GridProps {
-    /// Number of base columns (default: 1)
+    /// Number of base columns (default: 1) (Max: 12)
     pub cols: i32,
-    /// Number of columns on small screens (sm: prefix, default: 0 meaning unset)
+    /// Number of columns on small screens (sm: prefix, default: 0 meaning unset) (Max: 12)
     pub sm_cols: i32,
-    /// Number of columns on medium screens (md: prefix, default: 0 meaning unset)
+    /// Number of columns on medium screens (md: prefix, default: 0 meaning unset) (Max: 12)
     pub md_cols: i32,
-    /// Number of columns on large screens (lg: prefix, default: 0 meaning unset)
+    /// Number of columns on large screens (lg: prefix, default: 0 meaning unset) (Max: 12)
     pub lg_cols: i32,
-    /// Gap size (e.g., 4, 8) (default: 0 meaning unset)
+    /// Number of base rows (default: 0 meaning unset) (Max: 12)
+    pub rows: i32,
+    /// Number of rows on small screens (sm: prefix, default: 0 meaning unset) (Max: 12)
+    pub sm_rows: i32,
+    /// Number of rows on medium screens (md: prefix, default: 0 meaning unset) (Max: 12)
+    pub md_rows: i32,
+    /// Number of rows on large screens (lg: prefix, default: 0 meaning unset) (Max: 12)
+    pub lg_rows: i32,
+    /// Gap size (e.g., 4, 8) (default: 0 meaning unset) (Max: 96)
     pub gap: i32,
     /// Custom CSS class overrides
     pub class: OptClass,
@@ -421,18 +566,32 @@ pub struct GridProps {
 fn col_class(prefix: &str, cols: i32) -> &'static str {
     if cols <= 0 { return ""; }
     match (prefix, cols) {
-        ("", 1) => "grid-cols-1", ("", 2) => "grid-cols-2", ("", 3) => "grid-cols-3", ("", 4) => "grid-cols-4", ("", 5) => "grid-cols-5", ("", 6) => "grid-cols-6", ("", 12) => "grid-cols-12",
-        ("sm:", 1) => "sm:grid-cols-1", ("sm:", 2) => "sm:grid-cols-2", ("sm:", 3) => "sm:grid-cols-3", ("sm:", 4) => "sm:grid-cols-4", ("sm:", 5) => "sm:grid-cols-5", ("sm:", 6) => "sm:grid-cols-6", ("sm:", 12) => "sm:grid-cols-12",
-        ("md:", 1) => "md:grid-cols-1", ("md:", 2) => "md:grid-cols-2", ("md:", 3) => "md:grid-cols-3", ("md:", 4) => "md:grid-cols-4", ("md:", 5) => "md:grid-cols-5", ("md:", 6) => "md:grid-cols-6", ("md:", 12) => "md:grid-cols-12",
-        ("lg:", 1) => "lg:grid-cols-1", ("lg:", 2) => "lg:grid-cols-2", ("lg:", 3) => "lg:grid-cols-3", ("lg:", 4) => "lg:grid-cols-4", ("lg:", 5) => "lg:grid-cols-5", ("lg:", 6) => "lg:grid-cols-6", ("lg:", 12) => "lg:grid-cols-12",
+        ("", 1) => "grid-cols-1", ("", 2) => "grid-cols-2", ("", 3) => "grid-cols-3", ("", 4) => "grid-cols-4", ("", 5) => "grid-cols-5", ("", 6) => "grid-cols-6", ("", 7) => "grid-cols-7", ("", 8) => "grid-cols-8", ("", 9) => "grid-cols-9", ("", 10) => "grid-cols-10", ("", 11) => "grid-cols-11", ("", 12) => "grid-cols-12",
+        ("sm:", 1) => "sm:grid-cols-1", ("sm:", 2) => "sm:grid-cols-2", ("sm:", 3) => "sm:grid-cols-3", ("sm:", 4) => "sm:grid-cols-4", ("sm:", 5) => "sm:grid-cols-5", ("sm:", 6) => "sm:grid-cols-6", ("sm:", 7) => "sm:grid-cols-7", ("sm:", 8) => "sm:grid-cols-8", ("sm:", 9) => "sm:grid-cols-9", ("sm:", 10) => "sm:grid-cols-10", ("sm:", 11) => "sm:grid-cols-11", ("sm:", 12) => "sm:grid-cols-12",
+        ("md:", 1) => "md:grid-cols-1", ("md:", 2) => "md:grid-cols-2", ("md:", 3) => "md:grid-cols-3", ("md:", 4) => "md:grid-cols-4", ("md:", 5) => "md:grid-cols-5", ("md:", 6) => "md:grid-cols-6", ("md:", 7) => "md:grid-cols-7", ("md:", 8) => "md:grid-cols-8", ("md:", 9) => "md:grid-cols-9", ("md:", 10) => "md:grid-cols-10", ("md:", 11) => "md:grid-cols-11", ("md:", 12) => "md:grid-cols-12",
+        ("lg:", 1) => "lg:grid-cols-1", ("lg:", 2) => "lg:grid-cols-2", ("lg:", 3) => "lg:grid-cols-3", ("lg:", 4) => "lg:grid-cols-4", ("lg:", 5) => "lg:grid-cols-5", ("lg:", 6) => "lg:grid-cols-6", ("lg:", 7) => "lg:grid-cols-7", ("lg:", 8) => "lg:grid-cols-8", ("lg:", 9) => "lg:grid-cols-9", ("lg:", 10) => "lg:grid-cols-10", ("lg:", 11) => "lg:grid-cols-11", ("lg:", 12) => "lg:grid-cols-12",
         _ => ""
     }
 }
 
 fn gap_class(gap: i32) -> &'static str {
     match gap {
-        1 => "gap-1", 2 => "gap-2", 3 => "gap-3", 4 => "gap-4", 5 => "gap-5",
-        6 => "gap-6", 8 => "gap-8", 10 => "gap-10", 12 => "gap-12",
+        0 => "gap-0", 1 => "gap-1", 2 => "gap-2", 3 => "gap-3", 4 => "gap-4", 5 => "gap-5",
+        6 => "gap-6", 7 => "gap-7", 8 => "gap-8", 9 => "gap-9", 10 => "gap-10", 11 => "gap-11", 12 => "gap-12",
+        14 => "gap-14", 16 => "gap-16", 20 => "gap-20", 24 => "gap-24", 28 => "gap-28", 32 => "gap-32",
+        36 => "gap-36", 40 => "gap-40", 44 => "gap-44", 48 => "gap-48", 52 => "gap-52", 56 => "gap-56",
+        60 => "gap-60", 64 => "gap-64", 72 => "gap-72", 80 => "gap-80", 96 => "gap-96",
+        _ => ""
+    }
+}
+
+fn row_class(prefix: &str, rows: i32) -> &'static str {
+    if rows <= 0 { return ""; }
+    match (prefix, rows) {
+        ("", 1) => "grid-rows-1", ("", 2) => "grid-rows-2", ("", 3) => "grid-rows-3", ("", 4) => "grid-rows-4", ("", 5) => "grid-rows-5", ("", 6) => "grid-rows-6", ("", 7) => "grid-rows-7", ("", 8) => "grid-rows-8", ("", 9) => "grid-rows-9", ("", 10) => "grid-rows-10", ("", 11) => "grid-rows-11", ("", 12) => "grid-rows-12",
+        ("sm:", 1) => "sm:grid-rows-1", ("sm:", 2) => "sm:grid-rows-2", ("sm:", 3) => "sm:grid-rows-3", ("sm:", 4) => "sm:grid-rows-4", ("sm:", 5) => "sm:grid-rows-5", ("sm:", 6) => "sm:grid-rows-6", ("sm:", 7) => "sm:grid-rows-7", ("sm:", 8) => "sm:grid-rows-8", ("sm:", 9) => "sm:grid-rows-9", ("sm:", 10) => "sm:grid-rows-10", ("sm:", 11) => "sm:grid-rows-11", ("sm:", 12) => "sm:grid-rows-12",
+        ("md:", 1) => "md:grid-rows-1", ("md:", 2) => "md:grid-rows-2", ("md:", 3) => "md:grid-rows-3", ("md:", 4) => "md:grid-rows-4", ("md:", 5) => "md:grid-rows-5", ("md:", 6) => "md:grid-rows-6", ("md:", 7) => "md:grid-rows-7", ("md:", 8) => "md:grid-rows-8", ("md:", 9) => "md:grid-rows-9", ("md:", 10) => "md:grid-rows-10", ("md:", 11) => "md:grid-rows-11", ("md:", 12) => "md:grid-rows-12",
+        ("lg:", 1) => "lg:grid-rows-1", ("lg:", 2) => "lg:grid-rows-2", ("lg:", 3) => "lg:grid-rows-3", ("lg:", 4) => "lg:grid-rows-4", ("lg:", 5) => "lg:grid-rows-5", ("lg:", 6) => "lg:grid-rows-6", ("lg:", 7) => "lg:grid-rows-7", ("lg:", 8) => "lg:grid-rows-8", ("lg:", 9) => "lg:grid-rows-9", ("lg:", 10) => "lg:grid-rows-10", ("lg:", 11) => "lg:grid-rows-11", ("lg:", 12) => "lg:grid-rows-12",
         _ => ""
     }
 }
@@ -449,6 +608,10 @@ fn gap_class(gap: i32) -> &'static str {
 /// - `sm_cols: i32`
 /// - `md_cols: i32`
 /// - `lg_cols: i32`
+/// - `rows: i32`
+/// - `sm_rows: i32`
+/// - `md_rows: i32`
+/// - `lg_rows: i32`
 /// - `gap: i32`
 /// - `class: OptClass`
 /// - `children: Vec<View>`
@@ -469,6 +632,18 @@ pub fn Grid(props: GridProps) -> View {
     let lg_c = col_class("lg:", props.lg_cols);
     if !lg_c.is_empty() { class_str.push(' '); class_str.push_str(lg_c); }
 
+    let base_r = row_class("", props.rows);
+    if !base_r.is_empty() { class_str.push(' '); class_str.push_str(base_r); }
+
+    let sm_r = row_class("sm:", props.sm_rows);
+    if !sm_r.is_empty() { class_str.push(' '); class_str.push_str(sm_r); }
+
+    let md_r = row_class("md:", props.md_rows);
+    if !md_r.is_empty() { class_str.push(' '); class_str.push_str(md_r); }
+
+    let lg_r = row_class("lg:", props.lg_rows);
+    if !lg_r.is_empty() { class_str.push(' '); class_str.push_str(lg_r); }
+
     let gap_c = gap_class(props.gap);
     if !gap_c.is_empty() { class_str.push(' '); class_str.push_str(gap_c); }
 
@@ -481,38 +656,6 @@ pub fn Grid(props: GridProps) -> View {
     for child in props.children {
         e = e.child(child);
     }
-    e.into_view()
-}
-
-/// Properties for `Section` component.
-/// A semantic section element for defining document regions.
-#[derive(Default)]
-pub struct SectionProps {
-    /// Element ID
-    pub id: OptClass,
-    /// Custom CSS class overrides
-    pub class: OptClass,
-    /// Child elements
-    pub children: Vec<View>,
-}
-
-/// Renders a CSS semantic `<section>` element.
-/// 
-/// # Example
-/// ```rust
-/// Section(id="hero", class="py-16 md:py-24") { ... }
-/// ```
-///
-/// **Props:**
-/// - `id: OptClass`
-/// - `class: OptClass`
-/// - `children: Vec<View>`
-#[allow(non_snake_case)]
-pub fn Section(props: SectionProps) -> View {
-    let mut e = element("section");
-    if let Some(id) = props.id.0 { e = e.attr("id", id); }
-    if let Some(c) = props.class.0 { e = e.attr("class", c); }
-    for child in props.children { e = e.child(child); }
     e.into_view()
 }
 

@@ -115,8 +115,18 @@ async fn hmr_script() -> &'static str {
             let success = true;
             
             const getExactEls = (path) => {
-                const regex = new RegExp('(?::\\d+-|^hot-)' + path + '$');
-                return Array.from(document.querySelectorAll(`[data-th-id$="-${path}"]`))
+                // path is now "line-index-..." or "index" (if no line was found)
+                const parts = path.split('-');
+                let regex;
+                if (parts.length > 1 && !isNaN(parts[0])) {
+                    // e.g. path="36-0-1" -> matches ":36:\\d+-0-1$"
+                    const line = parts[0];
+                    const rest = parts.slice(1).join('-');
+                    regex = new RegExp(':' + line + ':\\d+-' + rest + '$');
+                } else {
+                    regex = new RegExp('(?::\\d+-|^hot-)' + path + '$');
+                }
+                return Array.from(document.querySelectorAll(`[data-th-id$="-${parts.slice(1).join('-')}"]`))
                             .filter(el => regex.test(el.getAttribute('data-th-id')));
             };
 
@@ -206,6 +216,145 @@ async fn hmr_script() -> &'static str {
                                         } else {
                                             el.className = 'tl-btn tl-btn-secondary';
                                         }
+                                    }
+                                    // HACK: map 'gap' integer to flex/grid classes
+                                    if (key === 'gap') {
+                                        el.className = el.className.replace(/\bgap-\d+\b/, '') + ' gap-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // HACK: map 'cols' integer to grid classes
+                                    if (key === 'cols') {
+                                        el.className = el.className.replace(/\bgrid-cols-\d+\b/, '') + ' grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'sm_cols') {
+                                        el.className = el.className.replace(/\bsm:grid-cols-\d+\b/, '') + ' sm:grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'md_cols') {
+                                        el.className = el.className.replace(/\bmd:grid-cols-\d+\b/, '') + ' md:grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'lg_cols') {
+                                        el.className = el.className.replace(/\blg:grid-cols-\d+\b/, '') + ' lg:grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'xl_cols') {
+                                        el.className = el.className.replace(/\bxl:grid-cols-\d+\b/, '') + ' xl:grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === '2xl_cols') {
+                                        el.className = el.className.replace(/\b2xl:grid-cols-\d+\b/, '') + ' 2xl:grid-cols-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'items') {
+                                        el.className = el.className.replace(/\bitems-(center|start|end|stretch|baseline)\b/, '') + ' items-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'justify') {
+                                        el.className = el.className.replace(/\bjustify-(center|start|end|between|around|evenly)\b/, '') + ' justify-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'width') {
+                                        el.className = el.className.replace(/\bw-[^\s]+\b/, '') + ' w-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    if (key === 'height') {
+                                        el.className = el.className.replace(/\bh-[^\s]+\b/, '') + ' h-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // Spacing props
+                                    const spacingProps = ['p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'm', 'mx', 'my', 'mt', 'mb', 'ml', 'mr'];
+                                    if (spacingProps.includes(key)) {
+                                        const regex = new RegExp(`\\b${key}-\\d+\\b`);
+                                        el.className = el.className.replace(regex, '') + ` ${key}-` + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // bg
+                                    if (key === 'bg') {
+                                        el.className = el.className.replace(/\bbg-[a-z]+-\d+\b|\bbg-(white|black|transparent)\b/, '') + ' bg-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // weight
+                                    if (key === 'weight') {
+                                        el.className = el.className.replace(/\bfont-(light|normal|medium|semibold|bold|extrabold)\b/, '') + ' font-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // border
+                                    if (key === 'border') {
+                                        el.className = el.className.replace(/\bborder(?:-\d+)?\b/, '');
+                                        if (patch.attrs[key] > 0) {
+                                            el.className += (patch.attrs[key] === 1 || patch.attrs[key] === '1') ? ' border' : ` border-${patch.attrs[key]}`;
+                                        }
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // HACK: map 'title_align' to Card's inner heading
+                                    if (key === 'title_align' && el.classList.contains('tl-card')) {
+                                        const header = el.querySelector('h3');
+                                        if (header) {
+                                            header.className = header.className.replace(/\btext-(left|center|right|justify)\b/, '') + ' text-' + patch.attrs[key];
+                                            header.className = header.className.trim().replace(/\s+/g, ' ');
+                                        }
+                                    }
+                                    // HACK: map 'level' to Heading tag change
+                                    if (key === 'level' && /^H[1-6]$/.test(el.tagName)) {
+                                        const newLevel = patch.attrs[key];
+                                        if (newLevel >= 1 && newLevel <= 6) {
+                                            const newEl = document.createElement('H' + newLevel);
+                                            Array.from(el.attributes).forEach(a => {
+                                                if (a.name !== 'level') newEl.setAttribute(a.name, a.value);
+                                            });
+                                            
+                                            // Fix Tailwind text size class for hot patch
+                                            const sizes = ['text-4xl', 'text-3xl', 'text-2xl', 'text-xl', 'text-lg', 'text-base'];
+                                            let newClass = newEl.className.replace(/\btext-(4xl|3xl|2xl|xl|lg|base)\b/g, '');
+                                            newClass += ' ' + (sizes[newLevel - 1] || 'text-3xl');
+                                            newEl.className = newClass.trim().replace(/\s+/g, ' ');
+                                            
+                                            while (el.firstChild) newEl.appendChild(el.firstChild);
+                                            el.replaceWith(newEl);
+                                            el = newEl; // so further hacks apply to the new element
+                                        }
+                                    }
+                                    // HACK: map 'align' to Heading
+                                    if (key === 'align' && /^H[1-6]$/.test(el.tagName)) {
+                                        el.className = el.className.replace(/\btext-(left|center|right|justify)\b/, '') + ' text-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // HACK: Card shadow
+                                    if (key === 'shadow' && el.classList.contains('tl-card')) {
+                                        el.className = el.className.replace(/\bshadow-(none|sm|md|lg|xl)\b/, '') + ' shadow-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
+                                    }
+                                    // HACK: font weight
+                                    if (key === 'weight') {
+                                        const val = patch.attrs[key];
+                                        const wc = val === 'light' ? 'font-light' : 
+                                                   val === 'normal' ? 'font-normal' : 
+                                                   val === 'medium' ? 'font-medium' : 
+                                                   (val === 'semibold' || val === 'semi-bold' || val === 'semi bold') ? 'font-semibold' : 
+                                                   val === 'bold' ? 'font-bold' : 
+                                                   val === 'extrabold' ? 'font-extrabold' : 
+                                                   val === 'black' ? 'font-black' : '';
+                                        if (wc) {
+                                            el.className = el.className.replace(/\bfont-(light|normal|medium|semibold|bold|extrabold|black)\b/g, '') + ' ' + wc;
+                                            el.className = el.className.trim().replace(/\s+/g, ' ');
+                                        }
+                                    }
+                                    // HACK: Card wide
+                                    if (key === 'wide' && el.classList.contains('tl-card')) {
+                                        if (patch.attrs[key] === true || patch.attrs[key] === 'true') {
+                                            el.classList.add('md:col-span-2');
+                                        } else {
+                                            el.classList.remove('md:col-span-2');
+                                        }
+                                    }
+                                    // HACK: Spacing and border props mapping
+                                    const spacingProps = ['p', 'px', 'py', 'm', 'mx', 'my', 'mt', 'mb', 'pt', 'pb', 'pl', 'pr', 'ml', 'mr', 'border'];
+                                    if (spacingProps.includes(key)) {
+                                        const regex = new RegExp('\\b' + key + '-\\w+\\b', 'g');
+                                        el.className = el.className.replace(regex, '') + ' ' + key + '-' + patch.attrs[key];
+                                        el.className = el.className.trim().replace(/\s+/g, ' ');
                                     }
                                 }
                             });
