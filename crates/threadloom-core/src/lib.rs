@@ -609,6 +609,23 @@ impl std::fmt::Debug for View {
     }
 }
 
+impl View {
+    pub fn with_attr(mut self, key: &str, value: &str) -> Self {
+        match &mut self {
+            View::Element { attrs, .. } => {
+                attrs.insert(key.to_string(), crate::AttributeValue::String(value.to_string()));
+            }
+            View::Fragment(children) => {
+                if let Some(first) = children.first_mut() {
+                    *first = std::mem::replace(first, View::None).with_attr(key, value);
+                }
+            }
+            _ => {}
+        }
+        self
+    }
+}
+
 pub trait IntoView {
     fn into_view(self) -> View;
 }

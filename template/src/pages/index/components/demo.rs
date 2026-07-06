@@ -1,7 +1,7 @@
-use threadloom_core::{create_signal, GlobalSignal, Action, Signal, View};
+use crate::api::hello::route::{hello, HelloArgs};
+use threadloom_core::{create_signal, Action, GlobalSignal, Signal, View};
 use threadloom_macro::threadloom;
 use threadloom_ui::*;
-use crate::api::hello::route::{hello, HelloArgs};
 
 static USER_SCORE: GlobalSignal<i32> = GlobalSignal::new(|| 0);
 use threadloom_ui::*;
@@ -25,7 +25,9 @@ pub fn demo_component() -> View {
     let doubled = Signal::computed(move || count.get() * 2);
 
     let submit_action = Action::new(|name: String| async move {
-        let _ = reqwasm::http::Request::get("https://httpbin.org/delay/1").send().await;
+        let _ = reqwasm::http::Request::get("https://httpbin.org/delay/1")
+            .send()
+            .await;
         format!("Action response: {}", name)
     });
     let action_clone = submit_action.clone();
@@ -36,8 +38,7 @@ pub fn demo_component() -> View {
             div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
 
                 // Forms & Inputs
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Forms & Inputs" }
+                Card(title="Forms & Inputs") {
                     h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Buttons" }
                     div(class="flex gap-4 items-center") {
                         Button(label="Primary Button", primary=true, on_click={|| {
@@ -50,11 +51,10 @@ pub fn demo_component() -> View {
                 }
 
                 // Text Inputs
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Text Inputs" }
+                Card(title="Text Inputs") {
                     div(class="flex flex-col gap-2") {
                         div(class="flex flex-col gap-1") {
-                            Label(text="Username", r#for="user")
+                            Label(text="Username", for="user")
                             Input(value="", placeholder="Enter your username...", on_input={|| {}})
                         }
                         Textarea(value="", placeholder="Write a message...", on_input={|| {}})
@@ -62,11 +62,10 @@ pub fn demo_component() -> View {
                 }
 
                 // Selections
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Selections" }
+                Card(title="Selections") {
                     div(class="flex items-center gap-2") {
                         { move || threadloom_core::IntoView::into_view(threadloom! { Checkbox(checked={terms_agreed.get()}, id="terms", on_change={move || { set_terms_agreed.set(!terms_agreed.get()); }}) }) }
-                        Label(text="Accept Terms & Conditions", r#for="terms")
+                        Label(text="Accept Terms & Conditions", for="terms")
                     }
                     { move || threadloom_core::IntoView::into_view(threadloom! { RadioGroup(
                         options=vec![
@@ -84,8 +83,7 @@ pub fn demo_component() -> View {
                 }
 
                 // Interactive
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Interactive" }
+                Card(title="Interactive") {
                     { move || threadloom_core::IntoView::into_view(threadloom! {
                         Accordion(
                             title="Click to Expand",
@@ -143,8 +141,7 @@ pub fn demo_component() -> View {
                 }
 
                 // More Interactive
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "More Interactive" }
+                Card(title="More Interactive") {
 
                     h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Select & Tabs" }
                     { move || threadloom_core::IntoView::into_view(threadloom! { Select(
@@ -175,8 +172,7 @@ pub fn demo_component() -> View {
                 }
 
                 // Data & Misc
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Data & Misc" }
+                Card(title="Data & Misc", wide=true) {
 
                     div(class="flex gap-4 items-center mb-4") {
                         { move || threadloom_core::IntoView::into_view(threadloom! { Hamburger(open={hamburger_open.get()}, on_toggle={move || set_hamburger_open.set(!hamburger_open.get())}) }) }
@@ -223,15 +219,14 @@ pub fn demo_component() -> View {
                 }
 
                 // New Features Demo
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "New Reactivity Features" }
+                Card(title="New Reactivity Features", wide=true) {
 
                     div(class="grid grid-cols-1 md:grid-cols-3 gap-8") {
                         // Global Signal
                         div(class="flex flex-col gap-4") {
                             h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Global Signals" }
                             div(class="text-2xl font-bold text-indigo-600 dark:text-indigo-400") { { move || USER_SCORE.get() } }
-                            Button(label="Add 10 to Global", primary=true, on_click={move || USER_SCORE.update(|s| *s += 10)})
+                            Button(label="Add 10 to Global", primary=false, on_click={move || USER_SCORE.update(|s| *s += 10)})
                         }
 
                         // Computed Signal
@@ -264,7 +259,7 @@ pub fn demo_component() -> View {
                                     let a = action_clone.clone();
                                     let s = set_action_result.clone();
                                     threadloom_dom::spawn!(async move {
-                                        let res = a.execute("Caveman".to_string()).await;
+                                        let res = a.execute("Worked".to_string()).await;
                                         s.set(res);
                                     });
                                 }
@@ -280,8 +275,7 @@ pub fn demo_component() -> View {
                 }
 
                 // Counter & API Demo
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "State & API" }
+                Card(title="State & API", wide=true) {
 
                     div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
                         // Counter
@@ -292,7 +286,7 @@ pub fn demo_component() -> View {
                             }
                             div(class="flex gap-2 mt-2") {
                                 Button(label="-1", primary=false, on_click={move || { set_counter.set(counter.get() - 1); }})
-                                    Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
+                                Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
                             }
                         }
 
@@ -323,10 +317,9 @@ pub fn demo_component() -> View {
                 }
 
                 // Global Store Demo
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Global Store Demo" }
+                Card(title="Global Store Demo", wide=true) {
                     div(class="flex flex-col gap-4") {
-                        Label(text="Enter your name to test global state persistence:", r#for="name_input")
+                        Label(text="Enter your name to test global state persistence:", for="name_input")
                         input(
                             id="name_input",
                             class="tl-input border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-transparent text-gray-900 dark:text-gray-100",
@@ -347,8 +340,7 @@ pub fn demo_component() -> View {
                 }
 
                 // Cookie Management Demo
-                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
-                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "Cookie Management" }
+                Card(title="Cookie Management", wide=true) {
                     div(class="flex flex-col gap-4") {
                         div(class="text-sm text-gray-600 dark:text-gray-400") {
                             "Current demo_cookie value: " { move || cookie_val.get() }

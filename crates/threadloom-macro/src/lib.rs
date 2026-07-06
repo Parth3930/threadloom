@@ -122,7 +122,12 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                 
                 let mut prop_assignments = Vec::new();
                 for attr in &el.attrs {
-                    let name = &attr.name;
+                    let name_str = attr.name.to_string();
+                    let name = if name_str == "for" || name_str == "type" {
+                        syn::Ident::new_raw(&name_str, attr.name.span())
+                    } else {
+                        attr.name.clone()
+                    };
                     let value = &attr.value;
                     prop_assignments.push(quote::quote! {
                         #name: (#value).into()
@@ -142,7 +147,7 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                             children: vec![#(#children_tokens),*],
                             ..::std::default::Default::default()
                         })
-                    )
+                    ).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
                 }
             } else {
                 let mut builder = quote! { ::threadloom_core::element(#tag_name_str) };

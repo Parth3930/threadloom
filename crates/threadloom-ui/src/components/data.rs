@@ -81,19 +81,35 @@ pub fn accordion(
 
 #[derive(Default)]
 pub struct CardProps {
+    pub title: String,
+    pub wide: bool,
     pub extra_class: OptClass,
     pub children: Vec<View>,
 }
 
 #[allow(non_snake_case)]
 pub fn Card(props: CardProps) -> View {
-    let mut class_str = "tl-card".to_string();
+    let mut class_str = if props.wide {
+        "flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2".to_string()
+    } else {
+        "flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card".to_string()
+    };
     if let Some(c) = props.extra_class.0 { class_str.push(' '); class_str.push_str(&c); }
+    
     let mut b = element("div").attr("class", class_str);
+    
+    if !props.title.is_empty() {
+        b = b.child(
+            element("h3")
+                .attr("class", "text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2")
+                .child(text(props.title))
+        );
+    }
+    
     for child in props.children { b = b.child(child); }
     b.into_view()
 }
 
 pub fn card(children: View, extra_class: impl Into<OptClass>) -> View {
-    Card(CardProps { children: vec![children], extra_class: extra_class.into() })
+    Card(CardProps { children: vec![children], extra_class: extra_class.into(), ..Default::default() })
 }

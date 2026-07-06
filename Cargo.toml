@@ -9,6 +9,7 @@ members = [
     "crates/distaff",
 
     "benches/threadloom_vs_yew/yew-app", "crates/threadloom-desktop", "crates/threadloom-ui", "benches/threadloom_vs_yew/threadloom-app",
+    "template"
 ]
 
 [profile.dev]

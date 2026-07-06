@@ -192,6 +192,21 @@ async fn hmr_script() -> &'static str {
                                     el.removeAttribute(key);
                                 } else {
                                     el.setAttribute(key, patch.attrs[key]);
+                                    // HACK: for threadloom-ui components, label and text often map to textContent
+                                    if ((key === 'label' || key === 'text' || key === 'title') && patch.attrs[key] !== null) {
+                                        // Button label, Label text, Card title, etc.
+                                        if (el.tagName === 'BUTTON' || el.tagName === 'LABEL') {
+                                            el.textContent = patch.attrs[key];
+                                        }
+                                    }
+                                    // HACK: map 'primary' boolean to Button classes
+                                    if (key === 'primary' && el.tagName === 'BUTTON') {
+                                        if (patch.attrs[key] === 'true' || patch.attrs[key] === true) {
+                                            el.className = 'tl-btn tl-btn-primary';
+                                        } else {
+                                            el.className = 'tl-btn tl-btn-secondary';
+                                        }
+                                    }
                                 }
                             });
                         });
