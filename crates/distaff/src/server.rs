@@ -263,7 +263,12 @@ async fn hmr_script() -> &'static str {
                                         el.className = el.className.replace(/\b2xl:grid-cols-\d+\b/, '') + ' 2xl:grid-cols-' + patch.attrs[key];
                                         el.className = el.className.trim().replace(/\s+/g, ' ');
                                     }
-                                    if (key === 'items') {
+                                     // rounded
+                                     if (key === 'rounded') {
+                                         el.className = el.className.replace(/\brounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?\b/, '') + ' rounded-' + patch.attrs[key];
+                                         el.className = el.className.trim().replace(/\s+/g, ' ');
+                                     }
+                                     if (key === 'items') {
                                         el.className = el.className.replace(/\bitems-(center|start|end|stretch|baseline)\b/, '') + ' items-' + patch.attrs[key];
                                         el.className = el.className.trim().replace(/\s+/g, ' ');
                                     }

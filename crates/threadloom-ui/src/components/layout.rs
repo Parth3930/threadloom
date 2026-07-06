@@ -14,6 +14,7 @@ pub struct RowProps {
     pub border: i32,
     pub border_color: OptClass,
     pub bg: OptClass,
+    pub rounded: OptClass,
     /// Flex align-items (e.g. "center", "start", "end", "stretch")
     pub items: OptClass,
     /// Flex justify-content (e.g. "center", "between", "around", "end")
@@ -65,6 +66,20 @@ fn border_color_class(color: &str) -> &'static str {
     }
 }
 
+fn rounded_class(r: &str) -> &'static str {
+    match r {
+        "none" => "rounded-none",
+        "sm" => "rounded-sm",
+        "md" => "rounded-md",
+        "lg" => "rounded-lg",
+        "xl" => "rounded-xl",
+        "2xl" => "rounded-2xl",
+        "3xl" => "rounded-3xl",
+        "full" => "rounded-full",
+        _ => "",
+    }
+}
+
 fn bg_color_class(color: &str) -> &'static str {
     match color {
         "white" => "bg-white", "black" => "bg-black", "transparent" => "bg-transparent",
@@ -75,7 +90,7 @@ fn bg_color_class(color: &str) -> &'static str {
     }
 }
 
-fn apply_spacing_and_borders(class_str: &mut String, p: i32, px: i32, py: i32, m: i32, mx: i32, my: i32, mt: i32, mb: i32, border: i32, border_color: &OptClass, bg: &OptClass) {
+fn apply_spacing_and_borders(class_str: &mut String, p: i32, px: i32, py: i32, m: i32, mx: i32, my: i32, mt: i32, mb: i32, border: i32, border_color: &OptClass, bg: &OptClass, rounded: &OptClass) {
     let mut add = |s: &str| { if !s.is_empty() { class_str.push(' '); class_str.push_str(s); } };
     add(spacing_class("p", p)); add(spacing_class("px", px)); add(spacing_class("py", py));
     add(spacing_class("m", m)); add(spacing_class("mx", mx)); add(spacing_class("my", my));
@@ -83,6 +98,7 @@ fn apply_spacing_and_borders(class_str: &mut String, p: i32, px: i32, py: i32, m
     add(border_width_class(border));
     if let Some(c) = &border_color.0 { add(border_color_class(c)); }
     if let Some(b) = &bg.0 { add(bg_color_class(b)); }
+    if let Some(r) = &rounded.0 { add(rounded_class(r)); }
 }
 
 /// Renders a horizontal flex container (`<div class="flex flex-row ...">`).
@@ -134,7 +150,7 @@ pub fn Row(props: RowProps) -> View {
     
     if props.wrap { class_str.push_str(" flex-wrap"); }
     
-    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
+    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg, &props.rounded);
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
@@ -160,6 +176,7 @@ pub struct ColumnProps {
     pub border: i32,
     pub border_color: OptClass,
     pub bg: OptClass,
+    pub rounded: OptClass,
     /// Flex align-items (e.g. "center", "start", "end", "stretch")
     pub items: OptClass,
     /// Flex justify-content (e.g. "center", "between", "around", "end")
@@ -209,7 +226,7 @@ pub fn Column(props: ColumnProps) -> View {
         if !justify_c.is_empty() { class_str.push(' '); class_str.push_str(justify_c); }
     }
 
-    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
+    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg, &props.rounded);
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
@@ -271,6 +288,7 @@ pub struct SectionProps {
     pub border: i32,
     pub border_color: OptClass,
     pub bg: OptClass,
+    pub rounded: OptClass,
     /// Flex align-items (e.g. "center", "start", "end")
     pub items: OptClass,
     /// Flex justify-content (e.g. "center", "between", "start")
@@ -311,7 +329,7 @@ pub fn Section(props: SectionProps) -> View {
         if !justify_c.is_empty() { class_str.push(' '); class_str.push_str(justify_c); }
     }
 
-    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
+    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg, &props.rounded);
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
@@ -431,6 +449,7 @@ pub struct HeadingProps {
     pub border: i32,
     pub border_color: OptClass,
     pub bg: OptClass,
+    pub rounded: OptClass,
     /// Text alignment: "left", "center", "right"
     pub align: OptClass,
     /// Font weight (e.g., "light", "normal", "medium", "semibold", "bold")
@@ -525,7 +544,7 @@ pub fn Heading(props: HeadingProps) -> View {
         }
     }
     
-    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg);
+    apply_spacing_and_borders(&mut class_str, props.p, props.px, props.py, props.m, props.mx, props.my, props.mt, props.mb, props.border, &props.border_color, &props.bg, &props.rounded);
     
     if let Some(c) = props.class.0 {
         if !class_str.is_empty() { class_str.push(' '); }
@@ -564,6 +583,7 @@ pub struct GridProps {
     pub lg_rows: i32,
     /// Gap size (e.g., 4, 8) (default: 0 meaning unset) (Max: 96)
     pub gap: i32,
+    pub rounded: OptClass,
     /// Custom CSS class overrides
     pub class: OptClass,
     /// Child elements
@@ -653,6 +673,10 @@ pub fn Grid(props: GridProps) -> View {
 
     let gap_c = gap_class(props.gap);
     if !gap_c.is_empty() { class_str.push(' '); class_str.push_str(gap_c); }
+    if let Some(r) = &props.rounded.0 {
+        let rc = rounded_class(r);
+        if !rc.is_empty() { class_str.push(' '); class_str.push_str(rc); }
+    }
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');

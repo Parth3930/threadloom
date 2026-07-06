@@ -53,7 +53,7 @@ pub fn page() -> View {
                 }
 
                 // Side-by-side Demos
-                Grid(cols=2, gap=6, class="mt-24 w-full max-w-4xl px-4") {
+                Grid(cols=1, md_cols=2, gap=6, class="mt-24 w-full max-w-4xl px-4") {
                     // Box 1: Interactive State
                     Section(row=false, class="w-full h-full border border-border rounded-xl bg-card shadow-sm p-8 flex flex-col items-center justify-between gap-6") {
                         Text(variant="span", class="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]") { "Interactive State" }
@@ -132,7 +132,7 @@ pub fn page() -> View {
                     }
                 }
 
-                Text(variant="p", class="text-xs text-muted-foreground mt-12 font-mono") {
+                Text(variant="p", class="text-xs text-muted-foreground mt-16 font-mono") {
                     "src/pages/index/page.rs"
                 }
             }

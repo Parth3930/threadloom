@@ -60,6 +60,7 @@ impl Parse for Element {
     }
 }
 
+#[derive(Clone)]
 struct Attribute {
     name: Ident,
     value: Expr,
@@ -145,37 +146,128 @@ fn node_to_string(node: &Node) -> String {
     }
 }
 
+fn generate_add_patches(node: &Node, path: &str, patches: &mut Vec<serde_json::Value>) {
+    if let Node::Element(el) = node {
+        if el.tag.to_string().chars().next().unwrap().is_uppercase() {
+            let empty_el = Node::Element(Element {
+                tag: el.tag.clone(),
+                attrs: vec![],
+                children: vec![],
+            });
+            let new_el_no_children = Node::Element(Element {
+                tag: el.tag.clone(),
+                attrs: el.attrs.clone(),
+                children: vec![],
+            });
+            diff_single_node(&empty_el, &new_el_no_children, path, patches);
+        }
+        for (i, child) in el.children.iter().enumerate() {
+            let child_path = format!("{}-{}", path, i);
+            generate_add_patches(child, &child_path, patches);
+        }
+    }
+}
+
 fn node_to_html(node: &Node, path: &str) -> Option<String> {
     match node {
         Node::Text(lit) => Some(lit.value().replace("<", "&lt;").replace(">", "&gt;")),
         Node::Expr(_) => None,
         Node::Element(el) => {
             let tag = el.tag.to_string();
-            if tag.chars().next().unwrap().is_uppercase() {
-                return None;
+            let mut html_tag = tag.clone();
+            let mut base_classes = String::new();
+            let is_component = tag.chars().next().unwrap().is_uppercase();
+
+            if is_component {
+                match tag.as_str() {
+                    "Text" => {
+                        html_tag = "p".to_string();
+                        for attr in &el.attrs {
+                            if attr.name.to_string() == "variant" {
+                                if let Some(serde_json::Value::String(s)) = extract_literal_value(&attr.value) {
+                                    html_tag = s;
+                                }
+                            }
+                        }
+                    }
+                    "Row" => { html_tag = "div".to_string(); base_classes = "flex flex-row".to_string(); },
+                    "Column" => { html_tag = "div".to_string(); base_classes = "flex flex-col".to_string(); },
+                    "Section" => {
+                        html_tag = "section".to_string();
+                        let mut is_row = false;
+                        for attr in &el.attrs {
+                            if attr.name.to_string() == "row" {
+                                if let Some(serde_json::Value::Bool(b)) = extract_literal_value(&attr.value) {
+                                    is_row = b;
+                                }
+                            }
+                        }
+                        base_classes = if is_row { "flex flex-row".to_string() } else { "flex flex-col".to_string() };
+                    }
+                    "Heading" => {
+                        html_tag = "h2".to_string();
+                        for attr in &el.attrs {
+                            if attr.name.to_string() == "level" {
+                                if let Some(serde_json::Value::Number(n)) = extract_literal_value(&attr.value) {
+                                    if let Some(i) = n.as_i64() {
+                                        html_tag = format!("h{}", i.min(6).max(1));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "Button" => {
+                        html_tag = "button".to_string();
+                        let mut is_primary = false;
+                        for attr in &el.attrs {
+                            if attr.name.to_string() == "primary" {
+                                if let Some(serde_json::Value::Bool(b)) = extract_literal_value(&attr.value) {
+                                    is_primary = b;
+                                }
+                            }
+                        }
+                        base_classes = if is_primary { "tl-btn tl-btn-primary".to_string() } else { "tl-btn tl-btn-secondary".to_string() };
+                    }
+                    "Grid" => { html_tag = "div".to_string(); base_classes = "grid".to_string(); },
+                    "Image" => html_tag = "img".to_string(),
+                    "Divider" => { html_tag = "hr".to_string(); base_classes = "w-full border-t dark:border-gray-800".to_string(); },
+                    "Container" => { html_tag = "div".to_string(); base_classes = "container".to_string(); },
+                    _ => return None,
+                }
             }
-            let mut html = format!("<{}", tag);
+
+            let mut html = format!("<{}", html_tag);
             html.push_str(&format!(" data-th-id=\"hot-{}\"", path));
+            if !base_classes.is_empty() {
+                html.push_str(&format!(" class=\"{}\"", base_classes));
+            }
 
             for attr in &el.attrs {
                 let name = attr.name.to_string();
                 if name.starts_with("on_") {
                     return None;
                 }
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = &attr.value
-                {
-                    html.push_str(&format!(
-                        " {}=\"{}\"",
-                        name,
-                        lit_str.value().replace("\"", "&quot;")
-                    ));
+                if is_component {
+                    if extract_literal_value(&attr.value).is_none() {
+                        return None;
+                    }
                 } else {
-                    return None;
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(lit_str),
+                        ..
+                    }) = &attr.value
+                    {
+                        html.push_str(&format!(
+                            " {}=\"{}\"",
+                            name,
+                            lit_str.value().replace("\"", "&quot;")
+                        ));
+                    } else {
+                        return None;
+                    }
                 }
             }
+            
             html.push('>');
             for (i, child) in el.children.iter().enumerate() {
                 let child_path = format!("{}-{}", path, i);
@@ -185,7 +277,7 @@ fn node_to_html(node: &Node, path: &str) -> Option<String> {
                     return None;
                 }
             }
-            html.push_str(&format!("</{}>", tag));
+            html.push_str(&format!("</{}>", html_tag));
             Some(html)
         }
     }
@@ -236,13 +328,8 @@ fn diff_nodes(
         for idx in new_i..new_j {
             let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
             
-            // Cannot hot patch add components or expressions
-            if let Node::Element(el) = &new_nodes[idx] {
-                if el.tag.to_string().chars().next().unwrap().is_uppercase() {
-                    return false;
-                }
-            } else {
-                // Return false for Text and Expr to be perfectly safe with DOM indices
+            // Return false for Expr (closures) to be perfectly safe
+            if let Node::Expr(_) = &new_nodes[idx] {
                 return false;
             }
 
@@ -254,6 +341,8 @@ fn diff_nodes(
                     "path": path,
                     "html": html
                 }));
+                // Recursively generate update_attrs for this node and all its children!
+                generate_add_patches(&new_nodes[idx], &path, &mut temp_patches);
             } else {
                 return false;
             }
@@ -263,18 +352,11 @@ fn diff_nodes(
     }
     
     if new_i == new_j {
+        // Removal: all node types (including components) have data-th-id in the DOM.
+        // We can target them by path regardless of whether they are uppercase components,
+        // lowercase elements, or text nodes rendered by WASM.
         for idx in (old_i..old_j).rev() {
             let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
-            
-            // Cannot reliably remove components, exprs, or text via data-th-id
-            if let Node::Element(el) = &old_nodes[idx] {
-                if el.tag.to_string().chars().next().unwrap().is_uppercase() {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-
             temp_patches.push(serde_json::json!({
                 "action": "remove",
                 "path": path,
@@ -431,7 +513,7 @@ fn diff_single_node(
                             "align", "title_align", "weight", "shadow", "wide", "cols", "gap",
                             "sm_cols", "md_cols", "lg_cols", "xl_cols", "2xl_cols",
                             "primary", "label", "text", "title", "level", "items", "justify",
-                            "width", "height"
+                            "width", "height", "rounded"
                         ];
                         for key in attrs_diff.keys() {
                             if !safe_props.contains(&key.as_str()) {
