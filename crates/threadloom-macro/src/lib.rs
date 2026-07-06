@@ -4,7 +4,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::ext::IdentExt;
-use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result, ItemFn};
+use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result, ItemFn, Block};
 use syn::spanned::Spanned;
 
 enum Node {
@@ -253,5 +253,62 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
     
+    TokenStream::from(expanded)
+}
+
+/// `#[wasm_main]` — replaces a bare `fn main()` with the full wasm32 router boilerplate.
+///
+/// Write your main body as just the route-render expression:
+/// ```rust
+/// #[cfg(target_arch = "wasm32")]
+/// #[threadloom_macro::wasm_main]
+/// fn main() {
+///     routes::render_route(&path_sig.get())
+/// }
+/// ```
+/// The macro wires up window, document, body, path signal, popstate listener,
+/// `crate::store::ROUTER_SETTER`, and calls `threadloom_dom::mount`.
+#[proc_macro_attribute]
+pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let body: &Block = &input.block;
+
+    // Extract the single expression from the body as the render expression.
+    // Users write: routes::render_route(&path_sig.get())
+    let render_expr: TokenStream2 = quote! { #body };
+
+    let expanded = quote! {
+        fn main() {
+            let window = ::web_sys::window().unwrap();
+            let doc = window.document().unwrap();
+            let body = doc.body().unwrap();
+
+            let initial_path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
+            let (path_sig, set_path_sig) = ::threadloom_core::create_signal(initial_path);
+
+            crate::store::ROUTER_SETTER.with(|s| {
+                *s.borrow_mut() = Some(set_path_sig);
+            });
+
+            use ::web_sys::wasm_bindgen::JsCast;
+            let set_path_clone = set_path_sig;
+            let closure = ::web_sys::wasm_bindgen::closure::Closure::wrap(
+                Box::new(move || {
+                    if let Some(w) = ::web_sys::window() {
+                        let p = w.location().pathname().unwrap_or_else(|_| "/".to_string());
+                        set_path_clone.set(p);
+                    }
+                }) as Box<dyn FnMut()>,
+            );
+            window
+                .add_event_listener_with_callback("popstate", closure.as_ref().unchecked_ref())
+                .unwrap();
+            closure.forget();
+
+            let view = ::threadloom_core::dyn_node(move || #render_expr);
+            ::threadloom_dom::mount(view, &body).unwrap();
+        }
+    };
+
     TokenStream::from(expanded)
 }
