@@ -85,6 +85,9 @@ async fn main() -> anyhow::Result<()> {
                 if let Err(e) = p.on_build_start() {
                     tracing::error!("Plugin {} failed on build start: {}", p.name(), e);
                 }
+                if let Err(e) = p.on_dev_start() {
+                    tracing::error!("Plugin {} failed on dev start: {}", p.name(), e);
+                }
             }
 
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));

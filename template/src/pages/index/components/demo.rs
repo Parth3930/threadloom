@@ -34,13 +34,13 @@ pub fn demo_component() -> View {
     let (action_result, set_action_result) = create_signal(String::new());
 
     threadloom! {
-        div(class="flex flex-col gap-8") {
-            div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
+        Column(gap=8) {
+            Grid(cols=1, md_cols=2, gap=8) {
 
                 // Forms & Inputs
                 Card(title="Forms & Inputs") {
-                    h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Buttons" }
-                    div(class="flex gap-4 items-center") {
+                    Heading(level=4, mt=2, mb=1, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Buttons" }
+                    Row(gap=4, items="center") {
                         Button(label="Primary Button", primary=true, on_click={|| {
                             threadloom_dom::alert!("Primary Button Clicked!");
                         }})
@@ -52,8 +52,8 @@ pub fn demo_component() -> View {
 
                 // Text Inputs
                 Card(title="Text Inputs") {
-                    div(class="flex flex-col gap-2") {
-                        div(class="flex flex-col gap-1") {
+                    Column(gap=2) {
+                        Column(gap=1) {
                             Label(text="Username", for="user")
                             Input(value="", placeholder="Enter your username...", on_input={|| {}})
                         }
@@ -63,11 +63,11 @@ pub fn demo_component() -> View {
 
                 // Selections
                 Card(title="Selections") {
-                    div(class="flex items-center gap-2") {
-                        { move || threadloom_core::IntoView::into_view(threadloom! { Checkbox(checked={terms_agreed.get()}, id="terms", on_change={move || { set_terms_agreed.set(!terms_agreed.get()); }}) }) }
+                    Row(items="center", gap=2) {
+                        { move || threadloom! { Checkbox(checked={terms_agreed.get()}, id="terms", on_change={move || { set_terms_agreed.set(!terms_agreed.get()); }}) } }
                         Label(text="Accept Terms & Conditions", for="terms")
                     }
-                    { move || threadloom_core::IntoView::into_view(threadloom! { RadioGroup(
+                    { move || threadloom! { RadioGroup(
                         options=vec![
                             ("1".to_string(), "Option 1".to_string()),
                             ("2".to_string(), "Option 2".to_string()),
@@ -79,72 +79,70 @@ pub fn demo_component() -> View {
                                 set_selected_option.set(num);
                             }
                         }}
-                    ) }) }
+                    ) } }
                 }
 
                 // Interactive
                 Card(title="Interactive") {
-                    { move || threadloom_core::IntoView::into_view(threadloom! {
+                    { move || threadloom! {
                         Accordion(
                             title="Click to Expand",
                             open={accordion_open.get()},
                             on_toggle={move || set_accordion_open.set(!accordion_open.get())}
                         ) {
-                            p(class="text-gray-600 dark:text-gray-400 p-4") {
+                            Text(variant="p", class="text-gray-600 dark:text-gray-400 p-4") {
                                 "This content is revealed with a smooth height transition. It's built into the Accordion component."
                             }
                         }
-                    }) }
-                    div(class="mt-4 flex flex-col gap-4") {
-                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                    } }
+                    Column(mt=4, gap=4) {
+                        { move || threadloom! {
                             Dropdown(
                                 label="Actions",
                                 open={dropdown_open.get()},
                                 on_toggle={move || set_dropdown_open.set(!dropdown_open.get())},
                                 items=vec![
-                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) { "Edit" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) { "Duplicate" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { div(class="tl-dropdown-divider") }),
-                                    threadloom_core::IntoView::into_view(threadloom! { button(class="tl-dropdown-item text-red-600 dark:text-red-400", on_click={move || set_dropdown_open.set(false)}) { "Delete" } }),
+                                    threadloom! { Button(label="Edit", primary=false, class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) },
+                                    threadloom! { Button(label="Duplicate", primary=false, class="tl-dropdown-item", on_click={move || set_dropdown_open.set(false)}) },
+                                    threadloom! { Divider(class="tl-dropdown-divider", my=1) },
+                                    threadloom! { Button(label="Delete", primary=false, class="tl-dropdown-item text-red-600 dark:text-red-400 border-none shadow-none", on_click={move || set_dropdown_open.set(false)}) },
                                 ]
                             )
-                        }) }
+                        } }
 
-                        div(class="mt-2") {
+                        Row(mt=2) {
                             Button(label="Open Modal", primary=false, on_click={move || set_dialog_open.set(true)}) {}
-                            { move || threadloom_core::IntoView::into_view(threadloom! { Tooltip(tooltip_text="This explains the icon") {
-                                button(class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300") {
-                                    "ℹ️"
-                                }
-                            } }) }
+                            { move || threadloom! { Tooltip(tooltip_text="This explains the icon") {
+                                Button(label="ℹ️", primary=false, class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 border-none shadow-none focus-visible:outline-none focus-visible:ring-0", on_click={|| {}})
+                            } } }
                         }
-                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                        { move || threadloom! {
                             Dialog(
                                 open={dialog_open.get()},
                                 title="Example Modal",
                                 on_close={move || set_dialog_open.set(false)},
                                 footer={
-                                    threadloom_core::IntoView::into_view(threadloom! {
-                                        div(class="flex gap-2 mt-4") {
+                                    threadloom! {
+                                        Row(gap=2, mt=4) {
                                             Button(label="Cancel", primary=false, on_click={move || set_dialog_open.set(false)})
                                             Button(label="Confirm Action", primary=true, on_click={move || set_dialog_open.set(false)})
                                         }
-                                    })
+                                    }
                                 }
                             ) {
-                                p(class="text-gray-600 dark:text-gray-400 py-4") {
+                                Text(variant="p", class="text-gray-600 dark:text-gray-400 py-4") {
                                     "This is a premium modal built with Threadloom UI. You can fully customize its footer actions!"
                                 }
                             }
-                        }) }
+                        } }
                     }
                 }
 
                 // More Interactive
                 Card(title="More Interactive") {
 
-                    h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2 mb-1") { "Select & Tabs" }
-                    { move || threadloom_core::IntoView::into_view(threadloom! { Select(
+                    Heading(level=4, mt=2, mb=1, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Select & Tabs" }
+                    { move || threadloom! { Select(
                         options=vec![
                             ("1".to_string(), "Option 1".to_string()),
                             ("2".to_string(), "Option 2".to_string()),
@@ -154,63 +152,62 @@ pub fn demo_component() -> View {
                             let next = if select_val.get() == "1" { "2" } else { "1" };
                             set_select_val.set(next.to_string());
                         }}
-                    ) }) }
-                    div(class="mt-6") {
-                        { move || threadloom_core::IntoView::into_view(threadloom! {
+                    ) } }
+                    Row(mt=6) {
+                        { move || threadloom! {
                             Tabs(
                                 tab_labels=vec!["Profile".to_string(), "Settings".to_string(), "Notifications".to_string()],
                                 active_index={active_tab.get()},
                                 on_tab_click={move |i: usize| set_active_tab.set(i)},
                                 panels=vec![
-                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Your profile information." } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Update your settings here." } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "You have 3 unread messages." } }),
+                                    threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Your profile information." } },
+                                    threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "Update your settings here." } },
+                                    threadloom! { p(class="p-4 text-gray-700 dark:text-gray-300") { "You have 3 unread messages." } },
                                 ]
                             )
-                        }) }
+                        } }
                     }
                 }
 
                 // Data & Misc
                 Card(title="Data & Misc", wide=true) {
 
-                    div(class="flex gap-4 items-center mb-4") {
-                        { move || threadloom_core::IntoView::into_view(threadloom! { Hamburger(open={hamburger_open.get()}, on_toggle={move || set_hamburger_open.set(!hamburger_open.get())}) }) }
-                        { threadloom_core::IntoView::into_view(threadloom! { Tooltip(
+                    Row(gap=4, items="center", mb=4) {
+                        { move || threadloom! { Hamburger(open={hamburger_open.get()}, on_toggle={move || set_hamburger_open.set(!hamburger_open.get())}) } }
+                        { threadloom! { Tooltip(
                             tooltip_text="This is a tooltip!"
                         ) {
-                            span(class="text-blue-500 underline cursor-help dark:text-blue-400 font-medium") { "Hover me" }
-                        } }) }
+                            Text(variant="span", class="text-blue-500 underline cursor-help dark:text-blue-400 font-medium") { "Hover me" }
+                        } } }
                     }
 
                     {
-                        threadloom_core::IntoView::into_view(threadloom! { DataTable(
+                        threadloom! { DataTable(
                             headers=vec!["Name".to_string(), "Status".to_string(), "Role".to_string()],
                             rows=vec![
                                 vec![
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Alice" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200") { "Active" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { "Admin" })
+                                    threadloom! { Text(variant="span", class="font-medium") { "Alice" } },
+                                    threadloom! { Text(variant="span", class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200") { "Active" } },
+                                    threadloom! { "Admin" }
                                 ],
                                 vec![
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Bob" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300") { "Offline" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { "Editor" })
+                                    threadloom! { Text(variant="span", class="font-medium") { "Bob" } },
+                                    threadloom! { Text(variant="span", class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300") { "Offline" } },
+                                    threadloom! { "Editor" }
                                 ],
                                 vec![
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="font-medium") { "Charlie" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { span(class="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200") { "Away" } }),
-                                    threadloom_core::IntoView::into_view(threadloom! { "Viewer" })
+                                    threadloom! { Text(variant="span", class="font-medium") { "Charlie" } },
+                                    threadloom! { Text(variant="span", class="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200") { "Away" } },
+                                    threadloom! { "Viewer" }
                                 ],
                             ]
-                        ) })
+                        ) }
                     }
 
-                    div(class="mt-6 relative") {
-                        h4(class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4") { "Toasts" }
+                    Column(mt=6, class="relative") {
+                        Heading(level=4, mb=4, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Toasts" }
                         {
-                            button("Show Toast", false, move || {
-                            })
+                            threadloom! { Button(label="Show Toast", primary=false, on_click={move || {}}) }
                         }
                         { toast_container(vec![
                             toast("Action completed successfully!")
@@ -221,55 +218,53 @@ pub fn demo_component() -> View {
                 // New Features Demo
                 Card(title="New Reactivity Features", wide=true) {
 
-                    div(class="grid grid-cols-1 md:grid-cols-3 gap-8") {
+                    Grid(cols=1, md_cols=3, gap=8) {
                         // Global Signal
-                        div(class="flex flex-col gap-4") {
-                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Global Signals" }
-                            div(class="text-2xl font-bold text-indigo-600 dark:text-indigo-400") { { move || USER_SCORE.get() } }
+                        Column(gap=4) {
+                            Heading(level=4, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Global Signals" }
+                            Text(variant="div", class="text-2xl font-bold text-indigo-600 dark:text-indigo-400") { { move || USER_SCORE.get() } }
                             Button(label="Add 10 to Global", primary=false, on_click={move || USER_SCORE.update(|s| *s += 10)})
                         }
 
                         // Computed Signal
-                        div(class="flex flex-col gap-4") {
-                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Computed Signals" }
-                            div {
-                                span(class="text-sm") { "Base: " }
-                                strong { { move || count.get() } }
+                        Column(gap=4) {
+                            Heading(level=4, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Computed Signals" }
+                            Row(gap=2, items="center") {
+                                Text(variant="span", class="text-sm") { "Base: " }
+                                Text(variant="strong") { { move || count.get() } }
                             }
-                            div {
-                                span(class="text-sm") { "Doubled: " }
-                                strong(class="text-emerald-600") { { move || doubled.get() } }
+                            Row(gap=2, items="center") {
+                                Text(variant="span", class="text-sm") { "Doubled: " }
+                                Text(variant="strong", class="text-emerald-600") { { move || doubled.get() } }
                             }
                             Button(label="Increment Base", primary=true, on_click={move || set_count.set(count.get() + 1)})
                         }
 
                         // Actions
-                        div(class="flex flex-col gap-4") {
-                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Actions & Loading State" }
-                            button(
-                                class={
-                                    let sa = submit_action.clone();
-                                    move || {
-                                        let base = "px-4 py-2 rounded font-medium text-white transition-all ";
-                                        if sa.is_loading() { format!("{} bg-gray-400 cursor-not-allowed", base) }
-                                        else { format!("{} bg-emerald-600 hover:bg-emerald-700", base) }
+                        Column(gap=4) {
+                            Heading(level=4, class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Actions & Loading State" }
+                            {
+                                let sa = submit_action.clone();
+                                move || {
+                                    if sa.is_loading() {
+                                        threadloom! { Button(label="Loading...", primary=true, class="bg-gray-400 cursor-not-allowed border-gray-400", on_click={|| {}}) }
+                                    } else {
+                                        let a = action_clone.clone();
+                                        let s = set_action_result.clone();
+                                        threadloom! { Button(label="Run Action", primary=true, class="bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white transition-all", on_click={
+                                            move || {
+                                                let a = a.clone();
+                                                let s = s.clone();
+                                                threadloom_dom::spawn!(async move {
+                                                    let res = a.execute("Worked".to_string()).await;
+                                                    s.set(res);
+                                                });
+                                            }
+                                        }) }
                                     }
-                                },
-                                on_click=move || {
-                                    let a = action_clone.clone();
-                                    let s = set_action_result.clone();
-                                    threadloom_dom::spawn!(async move {
-                                        let res = a.execute("Worked".to_string()).await;
-                                        s.set(res);
-                                    });
-                                }
-                            ) {
-                                {
-                                    let sa = submit_action.clone();
-                                    move || if sa.is_loading() { "Loading..." } else { "Run Action" }
                                 }
                             }
-                            div(class="text-sm mt-2 min-h-[1.5rem]") { { move || action_result.get() } }
+                            Text(variant="div", class="text-sm mt-2 min-h-[1.5rem]") { { move || action_result.get() } }
                         }
                     }
                 }
@@ -277,23 +272,23 @@ pub fn demo_component() -> View {
                 // Counter & API Demo
                 Card(title="State & API", wide=true) {
 
-                    div(class="grid grid-cols-1 md:grid-cols-2 gap-8") {
+                    Grid(cols=1, md_cols=2, gap=8) {
                         // Counter
-                        div(class="flex flex-col items-center gap-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800") {
-                            h4(class="text-lg font-medium text-gray-800 dark:text-gray-200") { "Counter Component" }
-                            div(class="text-4xl font-bold text-blue-600 dark:text-blue-400 tabular-nums") {
+                        Column(items="center", gap=4, p=6, border=1, border_color="gray-100", class="bg-gray-50 dark:bg-gray-900 rounded-lg dark:border-gray-800") {
+                            Heading(level=4, align="center", class="text-lg font-medium text-gray-800 dark:text-gray-200") { "Counter Component" }
+                            Text(variant="div", class="text-4xl font-bold text-blue-600 dark:text-blue-400 tabular-nums") {
                                 { move || counter.get() }
                             }
-                            div(class="flex gap-2 mt-2") {
+                            Row(gap=2, mt=2) {
                                 Button(label="-1", primary=false, on_click={move || { set_counter.set(counter.get() - 1); }})
                                 Button(label="+1", primary=true, on_click={move || { set_counter.set(counter.get() + 1); }})
                             }
                         }
 
                         // API Fetch
-                        div(class="flex flex-col items-center gap-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800") {
-                            h4(class="text-lg font-medium text-gray-800 dark:text-gray-200") { "API Integration" }
-                            p(class="text-sm text-gray-600 dark:text-gray-400 text-center min-h-[2.5rem] flex items-center italic") {
+                        Column(items="center", gap=4, p=6, border=1, border_color="gray-100", class="bg-gray-50 dark:bg-gray-900 rounded-lg dark:border-gray-800") {
+                            Heading(level=4, align="center", class="text-lg font-medium text-gray-800 dark:text-gray-200") { "API Integration" }
+                            Text(variant="p", class="text-sm text-gray-600 dark:text-gray-400 text-center min-h-[2.5rem] flex items-center italic") {
                                 { move || api_response.get() }
                             }
                             Button(label="Fetch from Backend", primary=true, on_click={
@@ -318,20 +313,19 @@ pub fn demo_component() -> View {
 
                 // Global Store Demo
                 Card(title="Global Store Demo", wide=true) {
-                    div(class="flex flex-col gap-4") {
-                        Label(text="Enter your name to test global state persistence:", for="name_input")
-                        input(
+                    Column(gap=4) {
+                        Label(text="Enter your name to test global state persistence:", r#for="name_input")
+                        Input(
                             id="name_input",
                             class="tl-input border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-transparent text-gray-900 dark:text-gray-100",
-                            type="text",
                             placeholder="Your Name",
-                            value=move || crate::store::GlobalState::get(),
+                            value="",
                             on_input={move || {
                                 let val = threadloom_dom::get_value!("name_input");
                                 crate::store::GlobalState::set(val);
                             }}
                         )
-                        div(class="flex") {
+                        Row {
                             Button(label="Go to /name", primary=true, on_click={|| {
                                 crate::store::navigate("/name");
                             }})
@@ -341,22 +335,21 @@ pub fn demo_component() -> View {
 
                 // Cookie Management Demo
                 Card(title="Cookie Management", wide=true) {
-                    div(class="flex flex-col gap-4") {
-                        div(class="text-sm text-gray-600 dark:text-gray-400") {
+                    Column(gap=4) {
+                        Text(variant="div", class="text-sm text-gray-600 dark:text-gray-400") {
                             "Current demo_cookie value: " { move || cookie_val.get() }
                         }
-                        input(
+                        Input(
                             id="cookie_input",
                             class="tl-input border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-transparent text-gray-900 dark:text-gray-100",
-                            type="text",
                             placeholder="Set cookie value",
-                            value=move || cookie_val.get(),
+                            value={threadloom_dom::get_cookie!("demo_cookie").unwrap_or_default()},
                             on_input={move || {
                                 let val = threadloom_dom::get_value!("cookie_input");
                                 set_cookie_val.set(val);
                             }}
                         )
-                        div(class="flex gap-2") {
+                        Row(gap=2) {
                             Button(label="Save Cookie", primary=true, on_click={move || {
                                 threadloom_dom::set_cookie!("demo_cookie", cookie_val.get(), 3600);
                                 threadloom_dom::alert!("Cookie saved for 1 hour!");

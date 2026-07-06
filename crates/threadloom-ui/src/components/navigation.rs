@@ -5,14 +5,20 @@ use crate::{Callback, Callback1, OptClass};
 /// Properties for the Tabs component.
 #[derive(Default)]
 pub struct TabsProps {
+    /// The string labels for each tab button.
     pub tab_labels: Vec<String>,
+    /// The index of the currently active tab.
     pub active_index: usize,
+    /// Callback triggered when a tab is clicked, passing its index.
     pub on_tab_click: Callback1<usize>,
+    /// The corresponding content views for each tab label.
     pub panels: Vec<View>,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
 /// Renders a Tabs component.
+///
 ///
 /// **Props:**
 /// - `tab_labels: Vec<String>`
@@ -63,6 +69,7 @@ pub struct DropdownProps {
 /// A dropdown menu component that toggles a list of items.
 /// Renders a Dropdown component.
 ///
+///
 /// **Props:**
 /// - `label: String`
 /// - `open: bool`
@@ -101,13 +108,18 @@ pub fn dropdown(label: impl Into<String>, open: bool, items: Vec<View>, on_toggl
 /// Properties for the Hamburger component.
 #[derive(Default)]
 pub struct HamburgerProps {
+    /// Whether the hamburger menu is currently in the open state (cross).
     pub open: bool,
+    /// Callback triggered when the hamburger button is clicked.
     pub on_toggle: Callback,
+    /// Custom CSS class overrides.
     pub extra_class: OptClass,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
 /// Renders a Hamburger component.
+///
 ///
 /// **Props:**
 /// - `open: bool`

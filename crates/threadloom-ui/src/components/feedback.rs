@@ -6,14 +6,20 @@ use crate::components::form::{Button, ButtonProps};
 /// Properties for the Dialog component.
 #[derive(Default)]
 pub struct DialogProps {
+    /// Controls whether the dialog is open and visible.
     pub open: bool,
+    /// The text displayed in the header of the dialog.
     pub title: String,
+    /// Callback triggered when the dialog is closed.
     pub on_close: Callback,
+    /// Custom view for the dialog footer. If None, a default close button is rendered.
     pub footer: Option<View>,
+    /// The main content inside the dialog.
     pub children: Vec<View>,
 }
 
 /// Renders a Dialog component.
+///
 ///
 /// **Props:**
 /// - `open: bool`
@@ -57,6 +63,15 @@ pub fn Dialog(props: DialogProps) -> View {
         .into_view()
 }
 
+pub type ModalProps = DialogProps;
+
+/// Alias for Dialog component
+#[allow(non_snake_case)]
+pub fn Modal(props: ModalProps) -> View {
+    Dialog(props)
+}
+
+
 pub fn dialog(
     open: bool,
     title: impl Into<String>,
@@ -75,11 +90,14 @@ pub fn dialog(
 /// Properties for the ToastContainer component.
 #[derive(Default)]
 pub struct ToastContainerProps {
+    /// The list of active Toast components to display.
     pub toasts: Vec<View>,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
 /// Renders a ToastContainer component.
+///
 ///
 /// **Props:**
 /// - `toasts: Vec<View>`
@@ -100,11 +118,14 @@ pub fn toast_container(toasts: Vec<View>) -> View {
 /// Properties for the Toast component.
 #[derive(Default)]
 pub struct ToastProps {
+    /// The message to display inside the toast notification.
     pub message: String,
+    /// Any additional child elements.
     pub children: Vec<View>,
 }
 
 /// Renders a Toast component.
+///
 ///
 /// **Props:**
 /// - `message: String`
@@ -125,11 +146,14 @@ pub fn toast(message: impl Into<String>) -> View {
 /// Properties for the Tooltip component.
 #[derive(Default)]
 pub struct TooltipProps {
+    /// The text displayed in the tooltip when hovering.
     pub tooltip_text: String,
+    /// The target elements that trigger the tooltip on hover.
     pub children: Vec<View>,
 }
 
 /// Renders a Tooltip component.
+///
 ///
 /// **Props:**
 /// - `tooltip_text: String`

@@ -6,6 +6,7 @@ use tracing::{info, error};
 pub trait DistaffPlugin: Send {
     fn name(&self) -> &'static str;
     fn on_build_start(&mut self) -> anyhow::Result<()>;
+    fn on_dev_start(&mut self) -> anyhow::Result<()> { Ok(()) }
     fn on_file_change(&mut self, path: &Path) -> anyhow::Result<()>;
 }
 
@@ -29,6 +30,22 @@ impl DistaffPlugin for TailwindPlugin {
             .wait()?;
         Ok(())
     }
+    fn on_dev_start(&mut self) -> anyhow::Result<()> {
+        tracing::debug!("TailwindCSS watch");
+        #[cfg(target_os = "windows")]
+        Command::new("cmd")
+            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
+            .args(["/C", "npx", "tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"])
+            .spawn()?;
+        
+        #[cfg(not(target_os = "windows"))]
+        Command::new("npx")
+            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
+            .args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"])
+            .spawn()?;
+        Ok(())
+    }
+    
     fn on_file_change(&mut self, _path: &Path) -> anyhow::Result<()> {
         // Do nothing in dev watcher, handled by background `--watch` process.
         Ok(())
