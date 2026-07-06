@@ -741,6 +741,113 @@ macro_rules! create_store {
     };
 }
 
+// ---------------------------------------------------------
+// NEW FEATURES
+// ---------------------------------------------------------
+
+pub struct Signal;
+impl Signal {
+    pub fn computed<T, F>(f: F) -> Memo<T>
+    where
+        F: FnMut() -> T + 'static,
+        T: Clone + PartialEq + 'static,
+    {
+        create_memo(f)
+    }
+}
+
+pub struct GlobalSignal<T: 'static> {
+    init: fn() -> T,
+}
+impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
+    pub const fn new(init: fn() -> T) -> Self {
+        Self { init }
+    }
+    
+    fn get_signals(&self) -> (ReadSignal<T>, WriteSignal<T>) {
+        thread_local! {
+            static GLOBALS: RefCell<HashMap<usize, (NodeId, NodeId)>> = RefCell::new(HashMap::new());
+        }
+        let addr = self as *const _ as usize;
+        GLOBALS.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(&(r, w)) = g.get(&addr) {
+                (ReadSignal { id: r, _marker: std::marker::PhantomData }, WriteSignal { id: w, _marker: std::marker::PhantomData })
+            } else {
+                let (read, write) = create_signal((self.init)());
+                g.insert(addr, (read.id, write.id));
+                (read, write)
+            }
+        })
+    }
+
+    pub fn get(&self) -> T {
+        self.get_signals().0.get()
+    }
+    
+    pub fn set(&self, value: T) {
+        self.get_signals().1.set(value)
+    }
+
+    pub fn update(&self, f: impl FnOnce(&mut T)) {
+        let mut val = self.get();
+        f(&mut val);
+        self.set(val);
+    }
+}
+
+pub struct Action<I, O> {
+    is_loading: ReadSignal<bool>,
+    set_loading: WriteSignal<bool>,
+    func: std::rc::Rc<dyn Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = O>>>>,
+}
+
+impl<I: 'static, O: 'static> Clone for Action<I, O> {
+    fn clone(&self) -> Self {
+        Self {
+            is_loading: self.is_loading,
+            set_loading: self.set_loading,
+            func: self.func.clone(),
+        }
+    }
+}
+
+impl<I: 'static, O: 'static> Action<I, O> {
+    pub fn new<F, Fut>(f: F) -> Self 
+    where 
+        F: Fn(I) -> Fut + 'static,
+        Fut: std::future::Future<Output = O> + 'static
+    {
+        let (is_loading, set_loading) = create_signal(false);
+        let func = std::rc::Rc::new(move |i| Box::pin(f(i)) as std::pin::Pin<Box<dyn std::future::Future<Output = O>>>);
+        Self { is_loading, set_loading, func }
+    }
+    
+    pub fn is_loading(&self) -> bool {
+        self.is_loading.get()
+    }
+    
+    pub async fn execute(&self, input: I) -> O {
+        self.set_loading.set(true);
+        let res = (self.func)(input).await;
+        self.set_loading.set(false);
+        res
+    }
+}
+
+// ---------------------------------------------------------
+// HYDRATION (Feature 5)
+// ---------------------------------------------------------
+pub fn serialize_signal_graph() -> String {
+    // In a real Zero-JS scenario, we'd walk GRAPH and serialize nodes to JSON.
+    // For now, return empty state.
+    "{}".to_string()
+}
+
+pub fn hydrate_signal_graph(_json: &str) {
+    // Restore signal state from serialized graph.
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -848,8 +955,11 @@ pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: se
     let js_body = wasm_bindgen::JsValue::from_str(&body.to_string());
     opts.body(Some(&js_body));
 
+    let headers = web_sys::Headers::new().unwrap();
+    headers.set("Content-Type", "application/json").unwrap();
+    opts.headers(&headers);
+
     let request = web_sys::Request::new_with_str_and_init(url, &opts).unwrap();
-    request.headers().set("Content-Type", "application/json").unwrap();
     
     let window = web_sys::window().unwrap();
     let resp_value = wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await.unwrap();

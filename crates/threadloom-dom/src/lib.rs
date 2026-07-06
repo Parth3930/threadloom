@@ -163,7 +163,7 @@ macro_rules! fetch {
     // With body
     ($method:ident $url:expr, $body:expr => |$text:ident| $success:block) => {
         wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(resp) = reqwasm::http::Request::$method($url).body($body).send().await {
+            if let Ok(resp) = reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
                 if let Ok($text) = resp.text().await {
                     $success
                     let _ = $crate::tick();
@@ -173,7 +173,7 @@ macro_rules! fetch {
     };
     ($method:ident $url:expr, $body:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
         wasm_bindgen_futures::spawn_local(async move {
-            match reqwasm::http::Request::$method($url).body($body).send().await {
+            match reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
                 Ok(resp) => {
                     match resp.text().await {
                         Ok($text) => {
@@ -238,6 +238,25 @@ macro_rules! fetch {
     };
     ($url:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
         $crate::fetch!(get $url => |$text| $success, |$err| $error)
+    };
+}
+
+#[macro_export]
+macro_rules! rpc {
+    ($call:expr => |$ok:ident| $success:block) => {
+        $crate::spawn!(async move {
+            if let Ok($ok) = $call.await {
+                $success
+            }
+        });
+    };
+    ($call:expr => |$ok:ident| $success:block, |$err:ident| $error:block) => {
+        $crate::spawn!(async move {
+            match $call.await {
+                Ok($ok) => $success,
+                Err($err) => $error,
+            }
+        });
     };
 }
 

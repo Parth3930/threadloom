@@ -51,21 +51,25 @@ pub fn generate_routes() {
     }
 
     let mut routes = Vec::new();
-    collect_routes(pages_dir, "", &mut routes);
+    collect_routes(pages_dir, "", &[], &mut routes);
 
     let mut routes_rs = String::new();
     routes_rs.push_str("use threadloom_core::View;\n\n");
     routes_rs.push_str("pub fn render_route(path: &str) -> View {\n");
     routes_rs.push_str("    match path {\n");
 
-    for (url_path, module_path) in routes {
+    for (url_path, module_path, layouts) in routes {
+        let mut page_expr = format!("crate::pages::{}::page::page()", module_path);
+        for layout_mod in layouts.iter().rev() {
+            page_expr = format!("crate::pages::{}::layout(threadloom_core::IntoView::into_view({}))", layout_mod, page_expr);
+        }
         if url_path == "/index" {
-            routes_rs.push_str(&format!("        \"/\" | \"/index\" | \"/index/\" => crate::pages::{}::page::page(),\n", module_path));
+            routes_rs.push_str(&format!("        \"/\" | \"/index\" | \"/index/\" => {},\n", page_expr));
         } else if url_path.ends_with("/index") {
             let base_path = url_path.strip_suffix("/index").unwrap();
-            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" | \"{}\" | \"{}/\" => crate::pages::{}::page::page(),\n", base_path, base_path, url_path, url_path, module_path));
+            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" | \"{}\" | \"{}/\" => {},\n", base_path, base_path, url_path, url_path, page_expr));
         } else {
-            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" => crate::pages::{}::page::page(),\n", url_path, url_path, module_path));
+            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" => {},\n", url_path, url_path, page_expr));
         }
     }
 
@@ -78,7 +82,16 @@ pub fn generate_routes() {
     }
 }
 
-fn collect_routes(dir: &Path, prefix: &str, routes: &mut Vec<(String, String)>) {
+fn collect_routes(dir: &Path, prefix: &str, layouts: &[String], routes: &mut Vec<(String, String, Vec<String>)>) {
+    let mut current_layouts = layouts.to_vec();
+    if dir.join("layout.rs").exists() {
+        if prefix.is_empty() {
+            current_layouts.push("layout".to_string());
+        } else {
+            current_layouts.push(format!("{}::layout", prefix));
+        }
+    }
+
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -93,10 +106,10 @@ fn collect_routes(dir: &Path, prefix: &str, routes: &mut Vec<(String, String)>) 
                 let url_path = if prefix.is_empty() { format!("/{}", name) } else { format!("/{}/{}", prefix.replace("::", "/"), name) };
 
                 if page_file.exists() {
-                    routes.push((url_path, new_prefix.clone()));
+                    routes.push((url_path, new_prefix.clone(), current_layouts.clone()));
                 }
 
-                collect_routes(&path, &new_prefix, routes);
+                collect_routes(&path, &new_prefix, &current_layouts, routes);
             }
         }
     }

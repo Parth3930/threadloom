@@ -1,5 +1,9 @@
-use threadloom_core::{create_signal, View};
+use threadloom_core::{create_signal, GlobalSignal, Action, Signal, View};
 use threadloom_macro::threadloom;
+use threadloom_ui::*;
+use crate::api::hello::route::{hello, HelloArgs};
+
+static USER_SCORE: GlobalSignal<i32> = GlobalSignal::new(|| 0);
 use threadloom_ui::*;
 
 pub fn demo_component() -> View {
@@ -16,6 +20,16 @@ pub fn demo_component() -> View {
     let (counter, set_counter) = create_signal(0);
     let (cookie_val, set_cookie_val) =
         create_signal(threadloom_dom::get_cookie!("demo_cookie").unwrap_or_default());
+
+    let (count, set_count) = create_signal(1);
+    let doubled = Signal::computed(move || count.get() * 2);
+
+    let submit_action = Action::new(|name: String| async move {
+        let _ = reqwasm::http::Request::get("https://httpbin.org/delay/1").send().await;
+        format!("Action response: {}", name)
+    });
+    let action_clone = submit_action.clone();
+    let (action_result, set_action_result) = create_signal(String::new());
 
     threadloom! {
         div(class="flex flex-col gap-8") {
@@ -208,6 +222,63 @@ pub fn demo_component() -> View {
                     }
                 }
 
+                // New Features Demo
+                div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
+                    h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "New Reactivity Features" }
+
+                    div(class="grid grid-cols-1 md:grid-cols-3 gap-8") {
+                        // Global Signal
+                        div(class="flex flex-col gap-4") {
+                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Global Signals" }
+                            div(class="text-2xl font-bold text-indigo-600 dark:text-indigo-400") { { move || USER_SCORE.get() } }
+                            Button(label="Add 10 to Global", primary=true, on_click={move || USER_SCORE.update(|s| *s += 10)})
+                        }
+
+                        // Computed Signal
+                        div(class="flex flex-col gap-4") {
+                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Computed Signals" }
+                            div {
+                                span(class="text-sm") { "Base: " }
+                                strong { { move || count.get() } }
+                            }
+                            div {
+                                span(class="text-sm") { "Doubled: " }
+                                strong(class="text-emerald-600") { { move || doubled.get() } }
+                            }
+                            Button(label="Increment Base", primary=true, on_click={move || set_count.set(count.get() + 1)})
+                        }
+
+                        // Actions
+                        div(class="flex flex-col gap-4") {
+                            h4(class="text-sm font-medium text-gray-700 dark:text-gray-300") { "Actions & Loading State" }
+                            button(
+                                class={
+                                    let sa = submit_action.clone();
+                                    move || {
+                                        let base = "px-4 py-2 rounded font-medium text-white transition-all ";
+                                        if sa.is_loading() { format!("{} bg-gray-400 cursor-not-allowed", base) }
+                                        else { format!("{} bg-emerald-600 hover:bg-emerald-700", base) }
+                                    }
+                                },
+                                on_click=move || {
+                                    let a = action_clone.clone();
+                                    let s = set_action_result.clone();
+                                    threadloom_dom::spawn!(async move {
+                                        let res = a.execute("Caveman".to_string()).await;
+                                        s.set(res);
+                                    });
+                                }
+                            ) {
+                                {
+                                    let sa = submit_action.clone();
+                                    move || if sa.is_loading() { "Loading..." } else { "Run Action" }
+                                }
+                            }
+                            div(class="text-sm mt-2 min-h-[1.5rem]") { { move || action_result.get() } }
+                        }
+                    }
+                }
+
                 // Counter & API Demo
                 div(class="flex flex-col gap-6 bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-800 rounded-xl transition-colors duration-300 tl-card md:col-span-2") {
                     h3(class="text-xl font-medium text-gray-800 dark:text-gray-100 border-b dark:border-gray-800 pb-2") { "State & API" }
@@ -231,18 +302,22 @@ pub fn demo_component() -> View {
                             p(class="text-sm text-gray-600 dark:text-gray-400 text-center min-h-[2.5rem] flex items-center italic") {
                                 { move || api_response.get() }
                             }
-                            Button(label="Fetch from Backend", primary=true, on_click={move || {
-                                set_api_response.set("Fetching...".to_string());
-                                wasm_bindgen_futures::spawn_local(async move {
-                                    let res = crate::api::hello::route::hello(crate::api::hello::route::HelloArgs {
+                            Button(label="Fetch from Backend", primary=true, on_click={
+                                let s1 = set_api_response.clone();
+                                let s2 = set_api_response.clone();
+                                move || {
+                                    s1.set("Fetching...".to_string());
+                                    let s_ok = s1.clone();
+                                    let s_err = s2.clone();
+                                    threadloom_dom::rpc!(hello(HelloArgs {
                                         name: "Developer".to_string(),
-                                    }).await;
-                                    match res {
-                                        Ok(msg) => set_api_response.set(msg),
-                                        Err(err) => set_api_response.set(format!("Error: {}", err)),
-                                    }
-                                });
-                            }})
+                                    }) => |msg| {
+                                        s_ok.set(msg);
+                                    }, |err| {
+                                        s_err.set(format!("Error: {}", err));
+                                    });
+                                }
+                            })
                         }
                     }
                 }

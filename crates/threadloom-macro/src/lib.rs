@@ -70,13 +70,16 @@ impl Parse for Attribute {
         let name_str = name.to_string();
         let is_event = name_str.starts_with("on_");
         
-        if input.peek(Token![=]) {
+        let value = if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
-            let value: Expr = input.parse()?;
-            Ok(Attribute { name, value, is_event })
+            input.parse::<Expr>()?
         } else {
-            Err(input.error(format!("Expected '=' after attribute '{}'", name_str)))
-        }
+            // IDE Recovery: if user is typing an attribute but hasn't finished,
+            // pretend the value is `()` so parsing continues and AST is built.
+            syn::parse_quote!(())
+        };
+
+        Ok(Attribute { name, value, is_event })
     }
 }
 
@@ -134,7 +137,7 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                 
                 quote::quote! {
                     ::threadloom_core::IntoView::into_view(
-                        #tag(::threadloom_ui::#props_name {
+                        #tag(#props_name {
                             #(#prop_assignments,)*
                             children: vec![#(#children_tokens),*],
                             ..::std::default::Default::default()
@@ -240,9 +243,7 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #asyncness fn #name(#inputs) #return_type {
             ::threadloom_core::client_rpc_call(
                 #url, 
-                ::threadloom_core::serde_json::json!({
-                    #(stringify!(#args_names): #args_names),*
-                })
+                ::threadloom_core::serde_json::json!(#(#args_names)*)
             ).await
         }
     };
