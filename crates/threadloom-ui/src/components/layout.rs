@@ -372,6 +372,8 @@ pub struct TextProps {
     pub weight: OptClass,
     /// Tailwind CSS classes.
     pub class: OptClass,
+    /// Optional click handler
+    pub on_click: crate::Callback,
     /// The text or elements inside.
     pub children: Vec<View>,
 }
@@ -407,6 +409,11 @@ pub fn Text(props: TextProps) -> View {
     if !class_str.is_empty() {
         e = e.attr("class", class_str);
     }
+    
+    if let Some(f) = props.on_click.0 {
+        e = e.on("click", move || f());
+    }
+    
     for child in props.children {
         e = e.child(child);
     }
@@ -694,4 +701,43 @@ pub fn Divider(props: DividerProps) -> View {
     if let Some(c) = props.class.0 { class_str.push(' '); class_str.push_str(&c); }
     
     element("hr").attr("class", class_str).into_view()
+}
+
+/// Properties for `Image` component.
+#[derive(Default)]
+pub struct ImageProps {
+    /// URL of the image
+    pub src: String,
+    /// Alternate text for the image
+    pub alt: OptClass,
+    /// Tailwind CSS classes.
+    pub class: OptClass,
+    /// Width attribute (not class)
+    pub width: OptClass,
+    /// Height attribute (not class)
+    pub height: OptClass,
+    /// Ignore children
+    pub children: Vec<View>,
+}
+
+/// Renders an `<img>` element.
+#[allow(non_snake_case)]
+pub fn Image(props: ImageProps) -> View {
+    let mut e = element("img")
+        .attr("src", props.src);
+        
+    if let Some(a) = props.alt.0 {
+        e = e.attr("alt", a);
+    }
+    if let Some(c) = props.class.0 {
+        e = e.attr("class", c);
+    }
+    if let Some(w) = props.width.0 {
+        e = e.attr("width", w);
+    }
+    if let Some(h) = props.height.0 {
+        e = e.attr("height", h);
+    }
+    
+    e.into_view()
 }

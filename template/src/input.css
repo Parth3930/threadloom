@@ -3,70 +3,141 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.148 0.004 228.8);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.148 0.004 228.8);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.148 0.004 228.8);
+    --primary: oklch(0.218 0.008 223.9);
+    --primary-foreground: oklch(0.987 0.002 197.1);
+    --secondary: oklch(0.963 0.002 197.1);
+    --secondary-foreground: oklch(0.218 0.008 223.9);
+    --muted: oklch(0.963 0.002 197.1);
+    --muted-foreground: oklch(0.56 0.021 213.5);
+    --accent: oklch(0.963 0.002 197.1);
+    --accent-foreground: oklch(0.218 0.008 223.9);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.987 0.002 197.1);
+    --border: oklch(0.925 0.005 214.3);
+    --input: oklch(0.925 0.005 214.3);
+    --ring: oklch(0.723 0.014 214.4);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --radius: 0;
+    --sidebar: oklch(0.987 0.002 197.1);
+    --sidebar-foreground: oklch(0.148 0.004 228.8);
+    --sidebar-primary: oklch(0.218 0.008 223.9);
+    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.963 0.002 197.1);
+    --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+    --sidebar-border: oklch(0.925 0.005 214.3);
+    --sidebar-ring: oklch(0.723 0.014 214.4);
+  }
+
+  .dark {
+    --background: oklch(0.148 0.004 228.8);
+    --foreground: oklch(0.987 0.002 197.1);
+    --card: oklch(0.218 0.008 223.9);
+    --card-foreground: oklch(0.987 0.002 197.1);
+    --popover: oklch(0.218 0.008 223.9);
+    --popover-foreground: oklch(0.987 0.002 197.1);
+    --primary: oklch(0.925 0.005 214.3);
+    --primary-foreground: oklch(0.218 0.008 223.9);
+    --secondary: oklch(0.275 0.011 216.9);
+    --secondary-foreground: oklch(0.987 0.002 197.1);
+    --muted: oklch(0.275 0.011 216.9);
+    --muted-foreground: oklch(0.723 0.014 214.4);
+    --accent: oklch(0.275 0.011 216.9);
+    --accent-foreground: oklch(0.987 0.002 197.1);
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.987 0.002 197.1);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.56 0.021 213.5);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --sidebar: oklch(0.218 0.008 223.9);
+    --sidebar-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.275 0.011 216.9);
+    --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.56 0.021 213.5);
+  }
+
   body {
-    @apply bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+    @apply bg-background text-foreground;
   }
 }
 
 @layer components {
   /* Button */
-  .tl-btn { @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-gray-950 dark:focus-visible:ring-gray-300; height: 2.5rem; padding: 0 1rem; }
-  .tl-btn-primary { @apply bg-gray-900 text-gray-50 hover:bg-gray-900/90 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-50/90 shadow-sm; }
-  .tl-btn-secondary { @apply border border-gray-200 bg-white hover:bg-gray-100 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 shadow-sm; }
+  .tl-btn { @apply inline-flex items-center justify-center whitespace-nowrap rounded-none text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50; height: 2.5rem; padding: 0 1rem; }
+  .tl-btn-primary { @apply bg-primary text-primary-foreground hover:opacity-90 shadow-sm; }
+  .tl-btn-secondary { @apply border border-input bg-secondary hover:bg-accent hover:text-accent-foreground shadow-sm; }
 
   /* Input, Textarea, Select */
-  .tl-input { @apply flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:placeholder:text-gray-400 dark:focus-visible:ring-gray-300 dark:text-white; min-height: 2.5rem; }
+  .tl-input { @apply flex w-full rounded-none border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground; min-height: 2.5rem; }
   textarea.tl-input { @apply min-h-[80px]; }
-  select.tl-input { @apply appearance-none bg-white dark:bg-gray-950; }
+  select.tl-input { @apply appearance-none bg-transparent; }
 
   /* Label */
-  .tl-label { @apply text-sm font-medium leading-none text-gray-900 dark:text-gray-100 mb-1.5 block peer-disabled:cursor-not-allowed peer-disabled:opacity-70; }
+  .tl-label { @apply text-sm font-medium leading-none text-foreground mb-1.5 block peer-disabled:cursor-not-allowed peer-disabled:opacity-70; }
 
   /* Checkbox / Radio */
-  .tl-checkbox, .tl-radio { @apply h-4 w-4 shrink-0 rounded-sm border border-gray-900 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-50 dark:ring-offset-gray-950 dark:focus-visible:ring-gray-300 bg-transparent; accent-color: currentColor; margin-right: 0.5rem; }
+  .tl-checkbox, .tl-radio { @apply h-4 w-4 shrink-0 rounded-none border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-transparent; accent-color: var(--primary); margin-right: 0.5rem; }
   .tl-radio { @apply rounded-full; }
 
   /* Accordion */
-  .tl-accordion { @apply border border-gray-200 dark:border-gray-800 rounded-lg mb-2 overflow-hidden shadow-sm; }
-  .tl-accordion-header { @apply flex flex-1 w-full items-center justify-between px-4 py-3 font-semibold transition-all hover:bg-gray-50 dark:hover:bg-gray-800/50 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100; }
-  .tl-accordion-content { @apply overflow-hidden text-sm text-gray-600 dark:text-gray-400 px-4 pb-4 pt-1 bg-white dark:bg-gray-900; }
+  .tl-accordion { @apply border border-border mb-2 overflow-hidden shadow-sm rounded-none; }
+  .tl-accordion-header { @apply flex flex-1 w-full items-center justify-between px-4 py-3 font-semibold transition-all hover:bg-muted bg-transparent text-foreground; }
+  .tl-accordion-content { @apply overflow-hidden text-sm text-muted-foreground px-4 pb-4 pt-1 bg-transparent; }
 
   /* Dropdown */
   .tl-dropdown-container { @apply relative inline-block text-left; }
   .tl-dropdown-backdrop { @apply fixed inset-0 z-40 bg-transparent; }
-  .tl-dropdown-menu { @apply absolute left-0 top-full z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-200 bg-white p-1 text-gray-950 shadow-md dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50 mt-1 transition-all duration-200 origin-top-left; }
-  .tl-dropdown-menu > * { @apply relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors bg-transparent border-none; }
+  .tl-dropdown-menu { @apply absolute left-0 top-full z-50 min-w-[8rem] overflow-hidden rounded-none border border-border bg-popover p-1 text-popover-foreground shadow-md mt-1 transition-all duration-200 origin-top-left; }
+  .tl-dropdown-menu > * { @apply relative flex w-full cursor-default select-none items-center rounded-none px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-colors bg-transparent border-none; }
 
   /* Card */
-  .tl-card { @apply rounded-xl border border-gray-200 bg-white text-gray-950 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50; }
+  .tl-card { @apply rounded-none border border-border bg-card text-card-foreground shadow-sm; }
 
   /* Dialog / Modal */
   .tl-dialog-backdrop { @apply fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4; }
-  .tl-dialog { @apply w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-950; }
-  .tl-dialog h2 { @apply text-lg font-semibold leading-none tracking-tight text-gray-900 dark:text-gray-50 mb-4; }
+  .tl-dialog { @apply w-full max-w-lg rounded-none border border-border bg-background p-6 shadow-lg; }
+  .tl-dialog h2 { @apply text-lg font-semibold leading-none tracking-tight text-foreground mb-4; }
 
   /* Toast */
   .tl-toast-container { @apply fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2 pointer-events-none; }
-  .tl-toast { @apply flex items-center w-full justify-between space-x-4 overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-xl transition-all dark:border-gray-800 dark:bg-gray-950 text-gray-900 dark:text-gray-50 pointer-events-auto; }
+  .tl-toast { @apply flex items-center w-full justify-between space-x-4 overflow-hidden rounded-none border border-border bg-background p-4 shadow-xl transition-all text-foreground pointer-events-auto; }
 
   /* Tabs */
-  .tl-tabs-list { @apply inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500 dark:bg-gray-800 dark:text-gray-400; }
-  .tl-tab { @apply inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-gray-950 dark:focus-visible:ring-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 bg-transparent border-none text-current h-auto shadow-none; }
-  .tl-tab[aria-selected="true"] { @apply bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-gray-50 hover:bg-white dark:hover:bg-gray-950; }
+  .tl-tabs-list { @apply inline-flex h-10 items-center justify-center rounded-none bg-muted p-1 text-muted-foreground; }
+  .tl-tab { @apply inline-flex items-center justify-center whitespace-nowrap rounded-none px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-muted bg-transparent border-none text-current h-auto shadow-none; }
+  .tl-tab[aria-selected="true"] { @apply bg-background text-foreground shadow-sm; }
 
   /* Tooltip */
   .tl-tooltip-wrapper { @apply relative inline-flex; }
-  .tl-tooltip { @apply invisible absolute z-[100] overflow-hidden rounded-md bg-gray-900 px-3 py-2 text-xs font-medium text-gray-50 shadow-md dark:bg-gray-100 dark:text-gray-900 opacity-0 transition-opacity duration-200 bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none; }
+  .tl-tooltip { @apply invisible absolute z-[100] overflow-hidden rounded-none bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md opacity-0 transition-opacity duration-200 bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none; }
   .tl-tooltip-wrapper:hover .tl-tooltip { @apply visible opacity-100; }
 
   /* Table */
   .tl-table { @apply w-full caption-bottom text-sm; }
-  .tl-table th { @apply h-12 px-4 text-left align-middle font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800; }
-  .tl-table td { @apply p-4 align-middle border-b border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-50; }
+  .tl-table th { @apply h-12 px-4 text-left align-middle font-medium text-muted-foreground border-b border-border; }
+  .tl-table td { @apply p-4 align-middle border-b border-border text-foreground; }
 
   /* Hamburger */
   .tl-hamburger { @apply flex flex-col justify-around w-6 h-6 bg-transparent border-none cursor-pointer p-0 z-10; }
-  .tl-hamburger-line { @apply w-6 h-0.5 bg-gray-900 dark:bg-gray-50 rounded-full transition-all duration-300 relative origin-[1px]; }
+  .tl-hamburger-line { @apply w-6 h-0.5 bg-foreground rounded-full transition-all duration-300 relative origin-[1px]; }
   .tl-hamburger-open .tl-hamburger-line:first-child { @apply rotate-45; }
   .tl-hamburger-open .tl-hamburger-line:nth-child(2) { @apply opacity-0 translate-x-[20px]; }
   .tl-hamburger-open .tl-hamburger-line:nth-child(3) { @apply -rotate-45; }

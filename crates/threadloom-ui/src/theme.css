@@ -1,47 +1,73 @@
 :root {
-  --tl-background: 0 0% 100%;
-  --tl-foreground: 240 10% 3.9%;
-  --tl-card: 0 0% 100%;
-  --tl-card-foreground: 240 10% 3.9%;
-  --tl-popover: 0 0% 100%;
-  --tl-popover-foreground: 240 10% 3.9%;
-  --tl-primary: 240 5.9% 10%;
-  --tl-primary-foreground: 0 0% 98%;
-  --tl-secondary: 240 4.8% 95.9%;
-  --tl-secondary-foreground: 240 5.9% 10%;
-  --tl-muted: 240 4.8% 95.9%;
-  --tl-muted-foreground: 240 3.8% 46.1%;
-  --tl-accent: 240 4.8% 95.9%;
-  --tl-accent-foreground: 240 5.9% 10%;
-  --tl-destructive: 0 84.2% 60.2%;
-  --tl-destructive-foreground: 0 0% 98%;
-  --tl-border: 240 5.9% 90%;
-  --tl-input: 240 5.9% 90%;
-  --tl-ring: 240 5.9% 10%;
-  --tl-radius: 0.5rem;
-  --tl-font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.148 0.004 228.8);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.148 0.004 228.8);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.148 0.004 228.8);
+  --primary: oklch(0.218 0.008 223.9);
+  --primary-foreground: oklch(0.987 0.002 197.1);
+  --secondary: oklch(0.963 0.002 197.1);
+  --secondary-foreground: oklch(0.218 0.008 223.9);
+  --muted: oklch(0.963 0.002 197.1);
+  --muted-foreground: oklch(0.56 0.021 213.5);
+  --accent: oklch(0.963 0.002 197.1);
+  --accent-foreground: oklch(0.218 0.008 223.9);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.987 0.002 197.1);
+  --border: oklch(0.925 0.005 214.3);
+  --input: oklch(0.925 0.005 214.3);
+  --ring: oklch(0.723 0.014 214.4);
+  --chart-1: oklch(0.872 0.007 219.6);
+  --chart-2: oklch(0.56 0.021 213.5);
+  --chart-3: oklch(0.45 0.017 213.2);
+  --chart-4: oklch(0.378 0.015 216);
+  --chart-5: oklch(0.275 0.011 216.9);
+  --radius: 0;
+  --sidebar: oklch(0.987 0.002 197.1);
+  --sidebar-foreground: oklch(0.148 0.004 228.8);
+  --sidebar-primary: oklch(0.218 0.008 223.9);
+  --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-accent: oklch(0.963 0.002 197.1);
+  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+  --sidebar-border: oklch(0.925 0.005 214.3);
+  --sidebar-ring: oklch(0.723 0.014 214.4);
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 .dark {
-  --tl-background: 240 10% 3.9%;
-  --tl-foreground: 0 0% 98%;
-  --tl-card: 240 10% 3.9%;
-  --tl-card-foreground: 0 0% 98%;
-  --tl-popover: 240 10% 3.9%;
-  --tl-popover-foreground: 0 0% 98%;
-  --tl-primary: 0 0% 98%;
-  --tl-primary-foreground: 240 5.9% 10%;
-  --tl-secondary: 240 3.7% 15.9%;
-  --tl-secondary-foreground: 0 0% 98%;
-  --tl-muted: 240 3.7% 15.9%;
-  --tl-muted-foreground: 240 5% 64.9%;
-  --tl-accent: 240 3.7% 15.9%;
-  --tl-accent-foreground: 0 0% 98%;
-  --tl-destructive: 0 62.8% 30.6%;
-  --tl-destructive-foreground: 0 0% 98%;
-  --tl-border: 240 3.7% 15.9%;
-  --tl-input: 240 3.7% 15.9%;
-  --tl-ring: 240 4.9% 83.9%;
+  --background: oklch(0.148 0.004 228.8);
+  --foreground: oklch(0.987 0.002 197.1);
+  --card: oklch(0.218 0.008 223.9);
+  --card-foreground: oklch(0.987 0.002 197.1);
+  --popover: oklch(0.218 0.008 223.9);
+  --popover-foreground: oklch(0.987 0.002 197.1);
+  --primary: oklch(0.925 0.005 214.3);
+  --primary-foreground: oklch(0.218 0.008 223.9);
+  --secondary: oklch(0.275 0.011 216.9);
+  --secondary-foreground: oklch(0.987 0.002 197.1);
+  --muted: oklch(0.275 0.011 216.9);
+  --muted-foreground: oklch(0.723 0.014 214.4);
+  --accent: oklch(0.275 0.011 216.9);
+  --accent-foreground: oklch(0.987 0.002 197.1);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.987 0.002 197.1);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.56 0.021 213.5);
+  --chart-1: oklch(0.872 0.007 219.6);
+  --chart-2: oklch(0.56 0.021 213.5);
+  --chart-3: oklch(0.45 0.017 213.2);
+  --chart-4: oklch(0.378 0.015 216);
+  --chart-5: oklch(0.275 0.011 216.9);
+  --sidebar: oklch(0.218 0.008 223.9);
+  --sidebar-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-accent: oklch(0.275 0.011 216.9);
+  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.56 0.021 213.5);
 }
 
 * {
@@ -50,7 +76,7 @@
 
 /* Base styles */
 .tl-btn, .tl-input, .tl-label, .tl-checkbox, .tl-radio, .tl-accordion-header, .tl-dropdown-menu > *, .tl-toast {
-  font-family: var(--tl-font-sans);
+  font-family: var(--font-sans);
 }
 
 /* Button */
@@ -59,7 +85,7 @@
   align-items: center;
   justify-content: center;
   white-space: nowrap;
-  border-radius: var(--tl-radius);
+  border-radius: var(--radius);
   font-size: 0.875rem;
   font-weight: 500;
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
@@ -77,38 +103,38 @@
   opacity: 0.5;
 }
 .tl-btn:focus-visible {
-  outline: 2px solid hsl(var(--tl-ring));
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 .tl-btn-primary {
-  background-color: hsl(var(--tl-primary));
-  color: hsl(var(--tl-primary-foreground));
+  background-color: var(--primary);
+  color: var(--primary-foreground);
   box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 }
 .tl-btn-primary:hover {
-  background-color: hsl(var(--tl-primary) / 0.9);
+  background-color: var(--primary); opacity: 0.9;
 }
 .tl-btn-secondary {
-  background-color: hsl(var(--tl-secondary));
-  color: hsl(var(--tl-secondary-foreground));
-  border: 1px solid hsl(var(--tl-border));
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
   box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 }
 .tl-btn-secondary:hover {
-  background-color: hsl(var(--tl-accent));
-  color: hsl(var(--tl-accent-foreground));
+  background-color: var(--accent);
+  color: var(--accent-foreground);
 }
 
 /* Input & Textarea */
 .tl-input {
   display: flex;
   width: 100%;
-  border-radius: var(--tl-radius);
-  border: 1px solid hsl(var(--tl-input));
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
   background-color: transparent;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  color: hsl(var(--tl-foreground));
+  color: var(--foreground);
   transition-property: border-color, box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
@@ -116,12 +142,12 @@
   outline: none;
 }
 .tl-input::placeholder {
-  color: hsl(var(--tl-muted-foreground));
+  color: var(--muted-foreground);
 }
 .tl-input:focus-visible {
   outline: none;
   border-color: transparent;
-  box-shadow: 0 0 0 1px hsl(var(--tl-background)), 0 0 0 3px hsl(var(--tl-ring));
+  box-shadow: 0 0 0 1px var(--background), 0 0 0 3px var(--ring);
 }
 .tl-input:disabled {
   cursor: not-allowed;
@@ -136,7 +162,7 @@ textarea.tl-input {
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1;
-  color: hsl(var(--tl-foreground));
+  color: var(--foreground);
   margin-bottom: 0.5rem;
   display: block;
 }
@@ -147,9 +173,9 @@ textarea.tl-input {
   width: 1rem;
   flex-shrink: 0;
   border-radius: 0.25rem;
-  border: 1px solid hsl(var(--tl-primary));
+  border: 1px solid var(--primary);
   background-color: transparent;
-  accent-color: hsl(var(--tl-primary));
+  accent-color: var(--primary);
   margin-right: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -158,7 +184,7 @@ textarea.tl-input {
   border-radius: 9999px;
 }
 .tl-checkbox:focus-visible, .tl-radio:focus-visible {
-  outline: 2px solid hsl(var(--tl-ring));
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 .tl-checkbox:disabled, .tl-radio:disabled {
@@ -168,7 +194,7 @@ textarea.tl-input {
 
 /* Accordion */
 .tl-accordion {
-  border-bottom: 1px solid hsl(var(--tl-border));
+  border-bottom: 1px solid var(--border);
 }
 .tl-accordion-header {
   display: flex;
@@ -179,7 +205,7 @@ textarea.tl-input {
   padding: 1rem 0;
   font-weight: 500;
   background-color: transparent;
-  color: hsl(var(--tl-foreground));
+  color: var(--foreground);
   border: none;
   cursor: pointer;
   transition: all 0.2s;
@@ -190,7 +216,7 @@ textarea.tl-input {
 .tl-accordion-content {
   overflow: hidden;
   font-size: 0.875rem;
-  color: hsl(var(--tl-muted-foreground));
+  color: var(--muted-foreground);
   padding-bottom: 1rem;
 }
 
@@ -213,11 +239,11 @@ textarea.tl-input {
   z-index: 50;
   min-width: 8rem;
   overflow: hidden;
-  border-radius: var(--tl-radius);
-  border: 1px solid hsl(var(--tl-border));
-  background-color: hsl(var(--tl-popover));
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--popover);
   padding: 0.25rem;
-  color: hsl(var(--tl-popover-foreground));
+  color: var(--popover-foreground);
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
   margin-top: 0.25rem;
   transform-origin: top left;
@@ -236,19 +262,19 @@ textarea.tl-input {
   transition: background-color 0.2s;
   background-color: transparent;
   border: none;
-  color: hsl(var(--tl-popover-foreground));
+  color: var(--popover-foreground);
 }
 .tl-dropdown-menu > *:hover {
-  background-color: hsl(var(--tl-accent));
-  color: hsl(var(--tl-accent-foreground));
+  background-color: var(--accent);
+  color: var(--accent-foreground);
 }
 
 /* Card */
 .tl-card {
-  border-radius: var(--tl-radius);
-  border: 1px solid hsl(var(--tl-border));
-  background-color: hsl(var(--tl-card));
-  color: hsl(var(--tl-card-foreground));
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--card-foreground);
   box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
 }
 
@@ -258,17 +284,17 @@ textarea.tl-input {
   height: 2.25rem;
   align-items: center;
   justify-content: center;
-  border-radius: var(--tl-radius);
-  background-color: hsl(var(--tl-muted));
+  border-radius: var(--radius);
+  background-color: var(--muted);
   padding: 0.25rem;
-  color: hsl(var(--tl-muted-foreground));
+  color: var(--muted-foreground);
 }
 .tl-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
-  border-radius: calc(var(--tl-radius) - 2px);
+  border-radius: calc(var(--radius) - 2px);
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
@@ -281,8 +307,8 @@ textarea.tl-input {
   height: 100%;
 }
 .tl-tab[aria-selected="true"] {
-  background-color: hsl(var(--tl-background));
-  color: hsl(var(--tl-foreground));
+  background-color: var(--background);
+  color: var(--foreground);
   box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 }
 
@@ -298,10 +324,10 @@ textarea.tl-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: var(--tl-radius);
-  border: 1px solid hsl(var(--tl-border));
-  background-color: hsl(var(--tl-background));
-  color: hsl(var(--tl-foreground));
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  color: var(--foreground);
   padding: 1rem;
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
   font-size: 0.875rem;
@@ -314,10 +340,10 @@ textarea.tl-input {
 }
 .tl-tooltip {
   visibility: hidden;
-  background-color: hsl(var(--tl-primary));
-  color: hsl(var(--tl-primary-foreground));
+  background-color: var(--primary);
+  color: var(--primary-foreground);
   text-align: center;
-  border-radius: var(--tl-radius);
+  border-radius: var(--radius);
   padding: 0.25rem 0.5rem;
   position: absolute;
   z-index: 10;
@@ -348,14 +374,14 @@ textarea.tl-input {
   text-align: left;
   vertical-align: middle;
   font-weight: 500;
-  color: hsl(var(--tl-muted-foreground));
-  border-bottom: 1px solid hsl(var(--tl-border));
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
 }
 .tl-table td {
   padding: 1rem;
   vertical-align: middle;
-  border-bottom: 1px solid hsl(var(--tl-border));
-  color: hsl(var(--tl-foreground));
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
 }
 
 /* Dialog/Modal */
@@ -370,22 +396,22 @@ textarea.tl-input {
   justify-content: center;
 }
 .tl-dialog {
-  background-color: hsl(var(--tl-background));
-  border: 1px solid hsl(var(--tl-border));
-  border-radius: var(--tl-radius);
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
   padding: 1.5rem;
   width: 100%;
   max-width: 32rem;
   position: relative;
-  color: hsl(var(--tl-foreground));
+  color: var(--foreground);
 }
 .tl-dialog h2 {
   margin-top: 0;
   margin-bottom: 1rem;
   font-size: 1.125rem;
   font-weight: 600;
-  font-family: var(--tl-font-sans);
+  font-family: var(--font-sans);
 }
 
 /* Hamburger */
@@ -404,7 +430,7 @@ textarea.tl-input {
 .tl-hamburger-line {
   width: 2rem;
   height: 0.25rem;
-  background-color: hsl(var(--tl-foreground));
+  background-color: var(--foreground);
   border-radius: 10px;
   transition: all 0.3s linear;
   position: relative;

@@ -178,6 +178,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
         tracing::debug!("Started hot reloader for {:?}", path);
         
         let mut last_build_time = std::time::Instant::now().checked_sub(std::time::Duration::from_secs(10)).unwrap_or_else(std::time::Instant::now);
+        let mut last_was_hot_patch = false;
 
         for res in notify_rx {
             match res {
@@ -290,6 +291,11 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                                     let short = clean.split("/./").last().unwrap_or(&clean);
                                     println!("{} {}", "[💫] hot reload:".cyan(), short);
                                     let _ = tx.send(patch.to_string());
+                                    // Bump last_build_time so the tailwind.css write that follows
+                                    // (triggered by this same .rs save) doesn't fire a css_refresh
+                                    // immediately — wait for tailwind to finish first. ponytail: root cause fix
+                                    last_build_time = std::time::Instant::now();
+                                    last_was_hot_patch = true;
                                 } else {
                                     tracing::debug!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
                                     handled_via_patch = false;
@@ -323,9 +329,18 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                     }
 
                     if needs_reload {
-                        if last_build_time.elapsed().as_secs() > 2 {
+                        let elapsed = last_build_time.elapsed().as_secs();
+                        if elapsed > 5 {
+                            // Cold change: full reload
                             tracing::debug!("Build output changed — sending reload signal");
+                            last_was_hot_patch = false;
                             let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        } else if last_was_hot_patch {
+                            // Hot patch already applied to DOM — just refresh CSS so new arbitrary-value
+                            // classes (e.g. mt-[10rem]) get their rules without blowing away the page.
+                            tracing::debug!("Hot patch CSS refresh — sending css_refresh signal");
+                            last_was_hot_patch = false;
+                            let _ = tx.send(r#"{"type": "css_refresh"}"#.to_string());
                         } else {
                             tracing::debug!("Skipping dist/ reload because manual build just finished");
                         }

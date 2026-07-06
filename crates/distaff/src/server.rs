@@ -110,6 +110,16 @@ async fn hmr_script() -> &'static str {
         const msg = JSON.parse(event.data);
         if (msg.type === 'reload') {
             window.location.reload();
+        } else if (msg.type === 'css_refresh') {
+            // Hot patch already updated the DOM — just re-fetch tailwind.css so new
+            // arbitrary-value classes (e.g. mt-[10rem]) get their CSS rules compiled in.
+            const existing = document.querySelector('link[href*="tailwind.css"]');
+            if (existing) {
+                const newLink = existing.cloneNode();
+                newLink.href = existing.href.split('?')[0] + '?t=' + Date.now();
+                existing.parentNode.insertBefore(newLink, existing.nextSibling);
+                newLink.onload = () => existing.remove();
+            }
         } else if (msg.type === 'patch') {
             console.log('Tier 1 Hot Patching DOM', msg.data);
             let success = true;
@@ -202,6 +212,12 @@ async fn hmr_script() -> &'static str {
                                     el.removeAttribute(key);
                                 } else {
                                     el.setAttribute(key, patch.attrs[key]);
+                                    // Direct className swap for class/extra_class — WASM-rendered elements
+                                    // ignore setAttribute('class') since WASM controls className.
+                                    // We must set el.className directly so Tailwind classes apply instantly.
+                                    if (key === 'class' || key === 'extra_class') {
+                                        el.className = patch.attrs[key];
+                                    }
                                     // HACK: for threadloom-ui components, label and text often map to textContent
                                     if ((key === 'label' || key === 'text' || key === 'title') && patch.attrs[key] !== null) {
                                         // Button label, Label text, Card title, etc.

@@ -247,9 +247,9 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(target_arch = "wasm32")]
         #vis #asyncness fn #name(#inputs) #return_type {
             ::threadloom_core::client_rpc_call(
-                #url, 
+                #url,
                 ::threadloom_core::serde_json::json!(#(#args_names)*)
-            ).await
+            ).await.unwrap_or_else(|e| Err(e))
         }
     };
     

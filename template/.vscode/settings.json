@@ -1,0 +1,10 @@
+{
+  "tailwindCSS.experimental.classRegex": [
+    "class\\s*=\\s*\"([^\"]*)\"",
+    "class\\s*=\\s*\\{?\"([^\"]*)\"\\}?",
+    "(?:class|className)\\s*=\\s*\"([^\"]*)\""
+  ],
+  "tailwindCSS.includeLanguages": {
+    "rust": "html"
+  }
+}

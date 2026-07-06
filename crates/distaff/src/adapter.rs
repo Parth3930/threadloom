@@ -58,21 +58,10 @@ impl FrameworkAdapter {
     }
 
     pub fn watch_commands(&self) -> Vec<std::process::Command> {
-        match self.framework {
-            SupportedFramework::Dioxus => {
-                vec![]
-            }
-            SupportedFramework::Leptos => {
-                vec![]
-            }
-            SupportedFramework::Yew | SupportedFramework::Threadloom => {
-                // Spawn tailwind watch alongside distaff for instant CSS
-                let mut tailwind = std::process::Command::new("npx");
-                tailwind.args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"]);
-                
-                vec![tailwind]
-            }
-        }
+        // ponytail: TailwindPlugin::on_dev_start already spawns tailwind --watch (with correct cmd /C on Windows).
+        // Returning nothing here avoids the duplicate watcher that caused double tailwind.css rewrites
+        // and spurious reload signals that stomped hot patches.
+        vec![]
     }
 }
 
