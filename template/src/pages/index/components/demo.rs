@@ -233,10 +233,14 @@ pub fn demo_component() -> View {
                             }
                             Button(label="Fetch from Backend", primary=true, on_click={move || {
                                 set_api_response.set("Fetching...".to_string());
-                                threadloom_dom::fetch!("/api/hello" => |text| {
-                                    set_api_response.set(text);
-                                }, |e| {
-                                    set_api_response.set(e);
+                                wasm_bindgen_futures::spawn_local(async move {
+                                    let res = crate::api::hello::route::hello(crate::api::hello::route::HelloArgs {
+                                        name: "Developer".to_string(),
+                                    }).await;
+                                    match res {
+                                        Ok(msg) => set_api_response.set(msg),
+                                        Err(err) => set_api_response.set(format!("Error: {}", err)),
+                                    }
                                 });
                             }})
                         }

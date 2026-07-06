@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+threadloom = { path = "../crates/threadloom" }
+serde = { version = "1.0", features = ["derive"] }
 threadloom-core = { path = "../crates/threadloom-core" }
 threadloom-macro = { path = "../crates/threadloom-macro" }
 threadloom-dom = { path = "../crates/threadloom-dom" }

@@ -456,6 +456,10 @@ pub fn attempt_hot_patch(
     let old_ast = parse_file(old_content).ok()?;
     let new_ast = parse_file(new_content).ok()?;
 
+    if quote::quote!(#old_ast).to_string() == quote::quote!(#new_ast).to_string() {
+        return Some(serde_json::json!({ "type": "patch", "data": [] }));
+    }
+
     let mut old_visitor = MacroVisitor { macros: Vec::new() };
     old_visitor.visit_file(&old_ast);
 

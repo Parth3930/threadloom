@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+pub use serde_json;
+
 static NEXT_RUNTIME_ID: AtomicUsize = AtomicUsize::new(1);
 
 thread_local! {
@@ -833,4 +835,28 @@ mod tests {
         // Prove that NodeId can safely cross thread boundaries
         assert_send::<NodeId>();
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: serde_json::Value) -> T {
+    use wasm_bindgen::JsCast;
+    
+    let mut opts = web_sys::RequestInit::new();
+    opts.method("POST");
+    opts.mode(web_sys::RequestMode::Cors);
+    
+    let js_body = wasm_bindgen::JsValue::from_str(&body.to_string());
+    opts.body(Some(&js_body));
+
+    let request = web_sys::Request::new_with_str_and_init(url, &opts).unwrap();
+    request.headers().set("Content-Type", "application/json").unwrap();
+    
+    let window = web_sys::window().unwrap();
+    let resp_value = wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await.unwrap();
+    let resp: web_sys::Response = resp_value.dyn_into().unwrap();
+    
+    let text_val = wasm_bindgen_futures::JsFuture::from(resp.text().unwrap()).await.unwrap();
+    let text = text_val.as_string().unwrap();
+    
+    serde_json::from_str(&text).unwrap()
 }

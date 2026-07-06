@@ -4,7 +4,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::ext::IdentExt;
-use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result};
+use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result, ItemFn};
 use syn::spanned::Spanned;
 
 enum Node {
@@ -192,6 +192,58 @@ pub fn threadloom(input: TokenStream) -> TokenStream {
             ::threadloom_core::fragment(vec![
                 #(#tokens),*
             ])
+        }
+    };
+    
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as ItemFn);
+    let name = &input.sig.ident;
+    let vis = &input.vis;
+    let asyncness = &input.sig.asyncness;
+    let return_type = &input.sig.output;
+    let inputs = &input.sig.inputs;
+    
+    let args_names = inputs.iter().filter_map(|arg| {
+        if let syn::FnArg::Typed(pat_type) = arg {
+            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                Some(pat_ident.ident.clone())
+            } else { None }
+        } else { None }
+    }).collect::<Vec<_>>();
+
+    let url = format!("/api/{}", name);
+
+    let first_arg_type = if let Some(syn::FnArg::Typed(pat_type)) = inputs.first() {
+        &pat_type.ty
+    } else {
+        panic!("#[server] requires exactly one argument (a struct) for now");
+    };
+
+    let expanded = quote::quote! {
+        #[cfg(not(target_arch = "wasm32"))]
+        #input
+
+        #[cfg(not(target_arch = "wasm32"))]
+        pub fn config(cfg: &mut ::actix_web::web::ServiceConfig) {
+            async fn __handler(body: ::actix_web::web::Json<#first_arg_type>) -> ::actix_web::HttpResponse {
+                let res = #name(body.into_inner()).await;
+                ::actix_web::HttpResponse::Ok().json(res)
+            }
+            cfg.route(#url, ::actix_web::web::post().to(__handler));
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        #vis #asyncness fn #name(#inputs) #return_type {
+            ::threadloom_core::client_rpc_call(
+                #url, 
+                ::threadloom_core::serde_json::json!({
+                    #(stringify!(#args_names): #args_names),*
+                })
+            ).await
         }
     };
     

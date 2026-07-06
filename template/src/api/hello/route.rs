@@ -1,10 +1,15 @@
-use actix_web::{get, web, Responder, HttpResponse};
+use serde::{Deserialize, Serialize};
+use threadloom::server;
 
-#[get("/api/hello")]
-pub async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello from Actix Backend API!")
+#[derive(Serialize, Deserialize)]
+pub struct HelloArgs {
+    pub name: String,
 }
 
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(hello);
+#[server]
+pub async fn hello(args: HelloArgs) -> Result<String, String> {
+    if args.name.is_empty() {
+        return Err("Name cannot be empty".to_string());
+    }
+    Ok(format!("Hello {} from Type-Safe RPC!", args.name))
 }

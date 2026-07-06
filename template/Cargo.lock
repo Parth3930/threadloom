@@ -485,6 +485,8 @@ dependencies = [
  "env_logger",
  "log",
  "reqwasm",
+ "serde",
+ "threadloom",
  "threadloom-core",
  "threadloom-dom",
  "threadloom-macro",
@@ -1566,8 +1568,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "threadloom"
+version = "0.1.0"
+dependencies = [
+ "threadloom-core",
+ "threadloom-macro",
+]
+
+[[package]]
 name = "threadloom-core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
 
 [[package]]
 name = "threadloom-dom"

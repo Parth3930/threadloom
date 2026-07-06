@@ -1,5 +1,4 @@
 #![allow(unused_imports)]
-
 #[cfg(target_arch = "wasm32")]
 mod pages;
 #[cfg(target_arch = "wasm32")]
@@ -7,7 +6,6 @@ mod routes;
 #[cfg(target_arch = "wasm32")]
 mod store;
 
-#[cfg(not(target_arch = "wasm32"))]
 mod api;
 #[cfg(not(target_arch = "wasm32"))]
 mod api_routes;
