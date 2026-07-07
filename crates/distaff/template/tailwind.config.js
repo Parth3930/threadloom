@@ -23,6 +23,17 @@ module.exports = {
     'justify-center','justify-start','justify-end','justify-between','justify-around','justify-evenly',
     // Misc layout
     'flex-wrap',
+    // AppLayout sidebar variant classes (built dynamically via format!() — scanner can't see them)
+    'translate-x-0','-translate-x-full','translate-x-full',
+    'translate-y-0','-translate-y-full','translate-y-full',
+    'inset-y-0','inset-x-0','inset-0',
+    'left-0','right-0','top-0',
+    'fixed','sticky',
+    'shadow-2xl','shadow-xl',
+    'backdrop-blur-md','backdrop-blur-sm',
+    'transition-all','ease-in-out','duration-300',
+    'max-h-[70vh]',
+    'border-l','border-r','border-b',
   ],
 
   content: {
@@ -39,12 +50,13 @@ module.exports = {
       rs: (content) => {
         const matches = content.match(/class\s*=\s*"([^"]+)"/g) || [];
         // Emit as HTML class attributes so Tailwind's HTML parser picks up arbitrary values
-        return matches
+        const divs = matches
           .map(m => {
             const cls = m.replace(/^class\s*=\s*"/, '').replace(/"$/, '');
             return `<div class="${cls}"></div>`;
           })
           .join('\n');
+        return content + '\n' + divs;
       },
     },
   },
