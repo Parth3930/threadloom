@@ -1,63 +1,98 @@
-<div align="center">
-  <h1>🚀 Threadloom</h1>
-  <p><strong>A meticulously crafted Rust full-stack framework. Zero configuration. Maximum performance. Beautiful by default.</strong></p>
-  <p>
-    <a href="https://distaff.vercel.app/docs">Documentation</a>
-    ·
-    <a href="https://distaff.vercel.app/components">UI Components</a>
-    ·
-    <a href="https://distaff.vercel.app">Website</a>
-  </p>
-</div>
+# Threadloom ⚡
 
-<hr />
+> Full-stack Rust. One language, one codebase.
 
-## Overview
-Threadloom provides a seamless developer experience by unifying the frontend and backend in a single, robust language: **Rust**. 
-By leveraging high-performance backend delivery and Wasm-bindgen for frontend interactivity, it bridges the gap between systems programming and modern UI development. Threadloom makes it easy to build React-like SPAs in Rust with zero boilerplate.
+[![GitHub Stars](https://img.shields.io/github/stars/Parth3930/threadloom?style=flat-square)](https://github.com/Parth3930/threadloom/stargazers)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square)](https://www.rust-lang.org)
 
-## ✨ Features
-- **Rust Full-Stack**: Write your entire application in Rust. Share data types and logic between client and server effortlessly.
-- **Vite-Like DX with `distaff`**: Experience lightning-fast recompilation, hot-reloading, and an interactive scaffolding CLI out of the box using our official tool, `distaff`.
-- **Built-in UI Components**: A rich set of accessible, beautifully crafted UI components (Buttons, Inputs, Cards, etc.) heavily inspired by shadcn/ui.
-- **Tailwind CSS Support**: First-class support for Tailwind CSS utility classes.
-- **Type-Safe Routing**: Server and client routing made easy.
-- **Serverless Ready**: Build for traditional servers or deploy as serverless functions (Vercel/AWS Lambda) with a single feature flag.
-- **Desktop Apps**: Ship to native desktop platforms seamlessly via Tauri integrations under the hood.
+Threadloom lets you build full-stack web applications entirely in Rust. Your UI is written using a JSX-like `view!` macro and compiled to WASM. Your API runs as a native binary on Actix Web or deployed serverlessly to Vercel. No JavaScript, no TypeScript, no context-switching.
 
-## 📚 Documentation
-Comprehensive guides, tutorials, and API references are available at [distaff.vercel.app/docs](https://distaff.vercel.app/docs).
+---
 
-## 🧩 Components
-Explore the interactive built-in UI components at [distaff.vercel.app/components](https://distaff.vercel.app/components).
+## Features
 
-## 🚀 Quick Start
+- ⚡ **Rust everywhere** — no JS/TS in your codebase
+- 🕸️ **WASM-first frontend** — compile your UI to WebAssembly
+- 🛠️ **`distaff` CLI** — hot reload, dev server, production builds
+- 🚀 **One-command Vercel deployment** — `distaff build --vercel`
+- 🔄 **Reactive state with signals** — fine-grained reactivity, no virtual DOM overhead
 
-Get started instantly with the `distaff` CLI tool:
+---
+
+## Getting Started
 
 ```bash
-# Install the CLI tool
+# Install the CLI
 cargo install distaff
 
-# Initialize a new Threadloom project interactively
-distaff
+# Create a new project
+distaff new my-app
+cd my-app
 
-# Start the development server (with hot-reloading)
-distaff run
+# Start dev server
+distaff dev
 ```
 
-## 📦 Crates Overview
-Threadloom is split into several micro-packages for optimal compile times and features:
-- `threadloom`: The main framework re-export crate.
-- `threadloom-core`: Core primitives, signals, and shared types.
-- `threadloom-dom`: WebAssembly DOM rendering and reactivity engine.
-- `threadloom-macro`: Procedural macros (e.g. `#[component]`).
-- `threadloom-ui`: The beautiful, built-in standard component library.
-- `threadloom-server`: Actix/Lambda integration for server-side rendering and API routes.
-- `distaff`: The official CLI dev-tool.
+---
 
-## 🤝 Contributing
-Contributions are extremely welcome! Whether it's adding new UI components, improving documentation, or fixing bugs, please feel free to open an issue or submit a pull request.
+## Example
+
+A reactive counter component:
+
+```rust
+use threadloom::prelude::*;
+
+#[component]
+fn Counter() -> View {
+    let count = signal(0);
+
+    let increment = move |_| count.set(count.get() + 1);
+
+    view! {
+        <div class="counter">
+            <h1>{ count }</h1>
+            <button onclick={increment}>"Click me"</button>
+        </div>
+    }
+}
+```
+
+---
+
+## Deploy to Vercel
+
+```bash
+distaff build --vercel
+vercel deploy
+```
+
+Your API routes are automatically wrapped in Vercel's serverless runtime. No configuration needed.
+
+---
+
+## Crate Structure
+
+| Crate | Purpose |
+|---|---|
+| [`threadloom`](./crates/threadloom) | Main re-export crate (start here) |
+| [`threadloom-core`](./crates/threadloom-core) | Shared types, signal primitives, HTTP client |
+| [`threadloom-dom`](./crates/threadloom-dom) | WASM DOM diffing and rendering engine |
+| [`threadloom-macro`](./crates/threadloom-macro) | `view!` proc macro for JSX-like templates |
+| [`threadloom-ui`](./crates/threadloom-ui) | Built-in UI components |
+| [`threadloom-scheduler`](./crates/threadloom-scheduler) | Async task scheduler |
+| [`threadloom-server`](./crates/threadloom-server) | Server abstraction (Actix + Vercel runtime) |
+| [`threadloom-desktop`](./crates/threadloom-desktop) | Desktop app wrapper (coming soon) |
+| [`distaff`](./crates/distaff) | CLI tool: new, dev, build, hot-reload |
+
+---
+
+## Contributing
+
+PRs are welcome. For significant changes, please open an issue first to discuss what you'd like to change.
+
+---
 
 ## License
-MIT License
+
+[MIT](./LICENSE)
