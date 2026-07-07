@@ -119,9 +119,15 @@ pub mod lambda_adapter {
                     let portable_req = http::Request::from_parts(parts, bytes);
                     let res = h.handle(portable_req).await;
                     let (parts, res_bytes) = res.into_parts();
+                    
+                    let body = match String::from_utf8(res_bytes.clone()) {
+                        Ok(text) => Body::Text(text),
+                        Err(_) => Body::Binary(res_bytes),
+                    };
+                    
                     Ok::<Response<Body>, Error>(Response::from_parts(
                         parts,
-                        Body::Binary(res_bytes),
+                        body,
                     ))
                 } else {
                     Ok(Response::builder().status(404).body(Body::Empty).unwrap())
