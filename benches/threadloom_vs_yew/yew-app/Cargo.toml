@@ -2,7 +2,7 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "yew-app"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]

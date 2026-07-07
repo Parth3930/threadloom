@@ -2,7 +2,7 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
