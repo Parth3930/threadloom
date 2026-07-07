@@ -4,7 +4,6 @@ name = "distaff"
 version = "0.1.0"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
-publish = false # Prevent accidental publish until ready
 
 [[bin]]
 name = "distaff"
