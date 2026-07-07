@@ -53,12 +53,22 @@ fn check_update() {
     if let Ok(output) = std::process::Command::new("cargo").args(["search", "distaff", "--limit", "1"]).output() {
         let out = String::from_utf8_lossy(&output.stdout);
         let version = env!("CARGO_PKG_VERSION");
-        if out.contains("distaff =") && !out.contains(&format!("\"{}\"", version)) {
-            println!("New version found! Updating...");
-            let _ = std::process::Command::new("cargo").args(["install", "distaff"]).status();
-        } else {
-            println!("Distaff is up to date.");
+        if let Some(line) = out.lines().find(|l| l.starts_with("distaff = ")) {
+            if let Some(start) = line.find('"') {
+                if let Some(end) = line[start + 1..].find('"') {
+                    let remote_version = &line[start + 1..start + 1 + end];
+                    let parse = |v: &str| -> Vec<u32> {
+                        v.split('.').filter_map(|s| s.parse().ok()).collect()
+                    };
+                    if parse(remote_version) > parse(version) {
+                        println!("New version found (v{})! Updating from v{}...", remote_version, version);
+                        let _ = std::process::Command::new("cargo").args(["install", "distaff"]).status();
+                        return;
+                    }
+                }
+            }
         }
+        println!("Distaff is up to date (v{}).", version);
     }
 }
 
@@ -137,7 +147,13 @@ async fn main() -> anyhow::Result<()> {
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
             println!("{} initial WASM build", "[🏗️] build:".yellow());
             let mut build_cmd = adapter.build_command();
-            let _ = build_cmd.status();
+            match build_cmd.status() {
+                Ok(status) if status.success() => {}
+                _ => {
+                    tracing::error!("Build failed. Are you in the right directory?");
+                    std::process::exit(1);
+                }
+            }
 
             let plugins = std::sync::Arc::new(std::sync::Mutex::new(plugins));
 
@@ -428,7 +444,13 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
             }
             let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
             let mut build_cmd = adapter.build_command();
-            let _ = build_cmd.status();
+            match build_cmd.status() {
+                Ok(status) if status.success() => {}
+                _ => {
+                    tracing::error!("Build failed. Are you in the right directory?");
+                    std::process::exit(1);
+                }
+            }
 
             if *desktop {
                 println!("{} building desktop app", "[💻] desktop:".blue());

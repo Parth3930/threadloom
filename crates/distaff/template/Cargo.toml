@@ -18,12 +18,12 @@ resources = ["dist"]
 icons = ["assets/icon.png", "assets/icon.ico"]
 
 [dependencies]
-threadloom = "0.1.0"
+threadloom = "0.1.1"
 serde = { version = "1.0", features = ["derive"] }
-threadloom-core = "0.1.0"
-threadloom-macro = "0.1.0"
-threadloom-dom = "0.1.0"
-threadloom-ui = "0.1.0"
+threadloom-core = "0.1.1"
+threadloom-macro = "0.1.1"
+threadloom-dom = "0.1.1"
+threadloom-ui = "0.1.1"
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History"] }
 wasm-bindgen-futures = "0.4"
 reqwasm = "0.5"
@@ -36,4 +36,4 @@ actix-files = "0.6"
 env_logger = "0.11"
 log = "0.4"
 threadloom-desktop = { optional = true, version = "0.1.0" }
-threadloom = { features = ["actix"], version = "0.1.0" }
+threadloom = { features = ["actix"], version = "0.1.1" }

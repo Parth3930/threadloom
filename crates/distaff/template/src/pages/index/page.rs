@@ -42,13 +42,13 @@ pub fn page() -> View {
                         label="Get Started",
                         primary=true,
                         class="px-8 py-6 rounded-md text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity bg-foreground text-background w-full sm:w-auto border-0",
-                        on_click=move || { let _ = threadloom_dom::window().location().set_href("https://distaff.vercel.app/docs/installation"); }
+                        on_click=move || { threadloom_dom::redirect!("https://distaff.vercel.app/docs/installation"); }
                     )
                     Button(
                         label="Read the Docs",
                         primary=false,
                         class="px-8 py-6 rounded-md text-sm font-medium bg-transparent border border-border hover:bg-muted text-foreground transition-colors w-full sm:w-auto shadow-sm",
-                        on_click=move || { let _ = threadloom_dom::window().location().set_href("https://distaff.vercel.app/docs"); }
+                        on_click=move || { threadloom_dom::redirect!("https://distaff.vercel.app/docs"); }
                     )
                 }
 

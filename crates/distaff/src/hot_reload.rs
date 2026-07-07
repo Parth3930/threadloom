@@ -356,9 +356,15 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         let adapter =
                             crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
                         let mut build_cmd = adapter.build_command();
-                        let _ = build_cmd.status();
-                        println!("{} frontend", "[🔄] reload:".green());
-                        let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        match build_cmd.status() {
+                            Ok(status) if status.success() => {
+                                println!("{} frontend", "[🔄] reload:".green());
+                                let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                            }
+                            _ => {
+                                tracing::error!("WASM rebuild failed!");
+                            }
+                        }
                         last_build_time = std::time::Instant::now();
                     }
 
