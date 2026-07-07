@@ -12,7 +12,7 @@ pub(crate) mod sync {
     // loom::sync::mpsc doesn't exist, loom uses loom::sync::atomic etc.
     // Actually, loom supports std::sync::mpsc or crossbeam. We will just use loom's primitives where possible.
     pub use loom::thread;
-    pub use std::sync::mpsc; // We might need to be careful with mpsc in loom, maybe use loom::sync::atomic instead for queues.
+    pub use std::sync::mpsc;
 }
 
 use std::collections::{HashMap, HashSet};

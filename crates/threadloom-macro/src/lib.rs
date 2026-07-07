@@ -236,12 +236,24 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         #[cfg(not(target_arch = "wasm32"))]
-        pub fn config(cfg: &mut ::actix_web::web::ServiceConfig) {
-            async fn __handler(body: ::actix_web::web::Json<#first_arg_type>) -> ::actix_web::HttpResponse {
-                let res = #name(body.into_inner()).await;
-                ::actix_web::HttpResponse::Ok().json(res)
+        pub fn config(cfg: &mut ::threadloom::server_types::Server) {
+            struct GeneratedHandler;
+            impl ::threadloom::server_types::Handler for GeneratedHandler {
+                fn handle(&self, req: ::threadloom::server_types::PortableRequest) -> ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ::threadloom::server_types::PortableResponse> + Send + '_>> {
+                    Box::pin(async move {
+                        let (_parts, body) = req.into_parts();
+                        let args: #first_arg_type = ::threadloom_core::serde_json::from_slice(&body).unwrap();
+                        let res = #name(args).await;
+                        let res_bytes = ::threadloom_core::serde_json::to_vec(&res).unwrap();
+                        ::threadloom::server_types::http::Response::builder()
+                            .status(200)
+                            .header("content-type", "application/json")
+                            .body(res_bytes)
+                            .unwrap()
+                    })
+                }
             }
-            cfg.route(#url, ::actix_web::web::post().to(__handler));
+            cfg.route(#url, GeneratedHandler);
         }
 
         #[cfg(target_arch = "wasm32")]

@@ -6,9 +6,15 @@ edition = "2021"
 [dependencies]
 threadloom-core = { path = "../threadloom-core" }
 threadloom-macro = { path = "../threadloom-macro" }
+threadloom-server = { path = "../threadloom-server" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 threadloom-dom = { path = "../threadloom-dom" }
 
 [dev-dependencies]
 trybuild = "1.0"
+
+[features]
+default = []
+actix = ["threadloom-server/actix"]
+lambda = ["threadloom-server/lambda"]

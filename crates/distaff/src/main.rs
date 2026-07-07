@@ -43,6 +43,8 @@ enum Commands {
     Init,
     /// Update distaff to the latest version
     Update,
+    /// Setup project for Vercel serverless deployment
+    Vercel,
 }
 
 fn check_update() {
@@ -63,7 +65,7 @@ fn convert_svg_to_icons() {
     let svg_path = std::path::Path::new("assets/favicon.svg");
     let png_path = std::path::Path::new("assets/icon.png");
     let ico_path = std::path::Path::new("assets/icon.ico");
-    
+
     if svg_path.exists() && (!png_path.exists() || !ico_path.exists()) {
         use colored::Colorize;
         println!("{} auto-converting SVG to PNG/ICO", "[🖼️] icon:".blue());
@@ -114,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
                 check_update();
             }
             println!("{} starting on port {}", "[🚀] distaff:".green(), port);
-            
+
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
                 Box::new(plugins::AutoModPlugin),
@@ -137,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
             let _ = build_cmd.status();
 
             let plugins = std::sync::Arc::new(std::sync::Mutex::new(plugins));
-            
+
             if *desktop {
                 let port_clone = *port;
                 tokio::spawn(async move {
@@ -145,16 +147,16 @@ async fn main() -> anyhow::Result<()> {
                         tracing::error!("Dev server error: {}", e);
                     }
                 });
-                
+
                 println!("{} building desktop window", "[💻] desktop:".blue());
                 let build_status = std::process::Command::new("cargo")
-                    .args(["build", "--bin", "desktop"])
+                    .args(["build", "--bin", "desktop", "--features", "desktop"])
                     .status()?;
                 if !build_status.success() {
                     tracing::error!("Failed to build desktop app");
                     std::process::exit(1);
                 }
-                
+
                 println!("{} starting desktop window", "[💻] desktop:".blue());
                 let mut bin_path = std::path::PathBuf::from("target/debug/desktop");
                 if cfg!(windows) { bin_path.set_extension("exe"); }
@@ -238,7 +240,7 @@ async fn main() -> anyhow::Result<()> {
             if *desktop {
                 println!("{} building desktop app", "[💻] desktop:".blue());
                 let status = std::process::Command::new("cargo")
-                    .args(["build", "--release", "--bin", "desktop"])
+                    .args(["build", "--release", "--bin", "desktop", "--features", "desktop"])
                     .status()?;
                 if status.success() {
                     println!("{} Desktop app built in target/release/", "[✅] desktop:".green());
@@ -284,7 +286,112 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Commands::Vercel => {
+            use colored::Colorize;
+            println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
+
+            // 1. Create api/ directory
+            let api_dir = std::path::Path::new("api");
+            if !api_dir.exists() {
+                std::fs::create_dir(api_dir)?;
+            }
+
+            // Read Cargo.toml to get package name
+            let cargo_toml = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
+            let pkg_name = if let Some(name_line) = cargo_toml.lines().find(|l| l.starts_with("name = ")) {
+                name_line.replace("name = ", "").replace("\"", "").trim().to_string()
+            } else {
+                "distaff_landing".to_string()
+            };
+            let safe_pkg_name = pkg_name.replace("-", "_");
+
+            // 2. Write api/index.rs
+            let index_content = format!(r#"use threadloom::server_types::lambda_adapter;
+use threadloom::server_types::lambda_http;
+
+use {}::api_routes;
+
+fn main() -> Result<(), lambda_http::Error> {{
+    threadloom::server_types::tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {{
+            let mut server = threadloom::server_types::Server::new();
+            api_routes::configure_api(&mut server);
+            lambda_adapter::run(server).await
+        }})
+}}
+"#, safe_pkg_name);
+            std::fs::write("api/index.rs", index_content)?;
+            println!("{} Created api/index.rs", "[+]".green());
+
+            // 3. Write vercel.json
+            let vercel_json = r#"{
+  "builds": [
+    { "src": "api/index.rs", "use": "@vercel/rust" }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" }
+  ]
+}"#;
+            if !std::path::Path::new("vercel.json").exists() {
+                std::fs::write("vercel.json", vercel_json)?;
+                println!("{} Created vercel.json", "[+]".green());
+            }
+
+            // 4. Update Cargo.toml
+            if !cargo_toml.is_empty() {
+                let mut updated_toml = cargo_toml.clone();
+
+                // Add lambda feature
+                if updated_toml.contains("features = [\"actix\"]") {
+                    updated_toml = updated_toml.replace("features = [\"actix\"]", "features = [\"actix\", \"lambda\"]");
+                } else if !updated_toml.contains("lambda") {
+                    // Fallback
+                    updated_toml = updated_toml.replace(
+                        "threadloom = { path = \"../crates/threadloom\" }",
+                        "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
+                    );
+                }
+
+                // Add [lib]
+                if !updated_toml.contains("[lib]") {
+                    updated_toml.push_str("\n\n[lib]\npath = \"src/lib.rs\"\n");
+                }
+
+                // Add [[bin]]
+                if !updated_toml.contains("[[bin]]\nname = \"index\"") {
+                    updated_toml.push_str("\n[[bin]]\nname = \"index\"\npath = \"api/index.rs\"\n");
+                }
+
+                if updated_toml != cargo_toml {
+                    std::fs::write("Cargo.toml", updated_toml)?;
+                    println!("{} Updated Cargo.toml with Vercel targets and lambda feature", "[+]".green());
+                }
+            }
+
+            // 5. Ensure src/lib.rs exists
+            let lib_rs = std::path::Path::new("src/lib.rs");
+            if !lib_rs.exists() {
+                let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
+                let mut lib_content = String::new();
+                for line in main_rs.lines() {
+                    if line.starts_with("pub mod ") || line.starts_with("mod ") {
+                        lib_content.push_str(&line.replace("mod ", "pub mod "));
+                        lib_content.push('\n');
+                    }
+                }
+                if lib_content.is_empty() {
+                    lib_content.push_str("pub mod api;\npub mod api_routes;\n");
+                }
+                std::fs::write(lib_rs, lib_content)?;
+                println!("{} Generated src/lib.rs for serverless compilation", "[+]".green());
+            }
+
+            println!("{} Vercel setup complete! Run `vercel deploy` to push.", "[✅] vercel:".green());
+        }
     }
-    
+
     Ok(())
 }

@@ -138,7 +138,8 @@ pub fn generate_api_routes() {
     collect_api_routes(api_dir, "api", &mut api_configs);
 
     let mut out = String::new();
-    out.push_str("pub fn configure_api(cfg: &mut actix_web::web::ServiceConfig) {\n");
+    out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
+    out.push_str("pub fn configure_api(cfg: &mut threadloom::server_types::Server) {\n");
     for path in api_configs {
         out.push_str(&format!("    crate::{}::config(cfg);\n", path));
     }

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/threadloom-server",
     "crates/threadloom-core",
     "crates/threadloom-macro",
     "crates/threadloom-scheduler",

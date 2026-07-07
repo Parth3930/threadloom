@@ -32,9 +32,12 @@ async fn main() -> std::io::Result<()> {
     log::info!("Starting Threadloom server on port {}", port);
 
     HttpServer::new(|| {
+        let mut server = threadloom::server_types::Server::new();
+        api_routes::configure_api(&mut server);
+
         App::new()
             .wrap(Logger::default())
-            .configure(api_routes::configure_api)
+            .configure(|cfg| threadloom::server_types::actix_adapter::configure(&server, cfg))
             .service(
                 Files::new("/", "./dist")
                     .index_file("index.html")
