@@ -306,6 +306,32 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                 .unwrap();
             closure.forget();
 
+            let click_closure = ::web_sys::wasm_bindgen::closure::Closure::wrap(
+                Box::new(move |e: ::web_sys::Event| {
+                    if let Some(target) = e.target() {
+                        use ::web_sys::wasm_bindgen::JsCast;
+                        if let Some(el) = target.dyn_ref::<::web_sys::Element>() {
+                            if let Some(anchor) = el.closest("a[href]").unwrap_or(None) {
+                                if let Some(href) = anchor.get_attribute("href") {
+                                    // Only intercept internal relative links
+                                    if href.starts_with("/") && !href.starts_with("//") {
+                                        e.prevent_default();
+                                        if let Some(w) = ::web_sys::window() {
+                                            let _ = w.history().unwrap().push_state_with_url(&::web_sys::wasm_bindgen::JsValue::NULL, "", Some(&href));
+                                            set_path_sig.set(href);
+                                            let _ = ::threadloom_dom::tick();
+                                            w.scroll_to_with_x_and_y(0.0, 0.0);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }) as Box<dyn FnMut(::web_sys::Event)>,
+            );
+            doc.add_event_listener_with_callback("click", click_closure.as_ref().unchecked_ref()).unwrap();
+            click_closure.forget();
+
             let view = ::threadloom_core::dyn_node(move || #render_expr);
             ::threadloom_dom::mount(view, &body).unwrap();
         }

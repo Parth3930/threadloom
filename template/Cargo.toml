@@ -10,7 +10,7 @@ threadloom-core = { path = "../crates/threadloom-core" }
 threadloom-macro = { path = "../crates/threadloom-macro" }
 threadloom-dom = { path = "../crates/threadloom-dom" }
 threadloom-ui = { path = "../crates/threadloom-ui" }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History"] }
 wasm-bindgen-futures = "0.4"
 reqwasm = "0.5"
 
@@ -19,4 +19,5 @@ actix-web = "4"
 actix-files = "0.6"
 env_logger = "0.11"
 log = "0.4"
+
 
