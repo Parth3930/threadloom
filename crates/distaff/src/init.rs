@@ -10,7 +10,7 @@ const YELLOW: &str = "\x1b[33m";
 const RESET: &str = "\x1b[0m";
 
 #[derive(RustEmbed)]
-#[folder = "../../template"]
+#[folder = "template"]
 #[exclude = "target/*"]
 #[exclude = "node_modules/*"]
 #[exclude = "dist/*"]
