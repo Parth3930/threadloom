@@ -283,7 +283,7 @@ if ! command -v rustup &> /dev/null; then
 fi
 
 rustup target add wasm32-unknown-unknown
-curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_64-unknown-linux-musl.tar.gz | tar -xz
 ./trunk build --release"#;
                 std::fs::write("build_vercel.sh", build_script)?;
                 println!("{} Created build_vercel.sh", "[+]".green());
