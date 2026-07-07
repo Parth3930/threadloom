@@ -992,7 +992,17 @@ pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: se
         .map_err(|e| format!("cast to Response failed: {:?}", e))?;
 
     if !resp.ok() {
-        return Err(format!("server returned HTTP {}", resp.status()));
+        let status = resp.status();
+        let err_text = match resp.text() {
+            Ok(promise) => {
+                match wasm_bindgen_futures::JsFuture::from(promise).await {
+                    Ok(js_val) => js_val.as_string().unwrap_or_default(),
+                    Err(_) => "Could not read response text".to_string()
+                }
+            },
+            Err(_) => "Could not read response text promise".to_string()
+        };
+        return Err(format!("server returned HTTP {}: {}", status, err_text));
     }
 
     let text_promise = resp.text().map_err(|e| format!("resp.text() failed: {:?}", e))?;

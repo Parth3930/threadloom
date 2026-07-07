@@ -1232,7 +1232,7 @@ dependencies = [
 
 [[package]]
 name = "distaff"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -4879,7 +4879,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "threadloom-core",
  "threadloom-dom",
@@ -4890,7 +4890,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4901,7 +4901,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "image",
  "mime_guess",
@@ -4914,7 +4914,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-dom"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "js-sys",
  "reqwasm",
@@ -4928,7 +4928,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-macro"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4937,7 +4937,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-scheduler"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "loom",
  "threadloom-core",
@@ -4945,7 +4945,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "actix-rt",
  "actix-web",
@@ -4956,7 +4956,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "js-sys",
  "threadloom-core",
