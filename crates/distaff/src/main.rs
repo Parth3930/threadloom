@@ -275,7 +275,6 @@ fn main() -> Result<(), lambda_http::Error> {{
                 // 3.5 Write build_vercel.sh
                 let build_script = r#"#!/bin/bash
 set -e
-npm run build:css
 
 if ! command -v rustup &> /dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -283,6 +282,8 @@ if ! command -v rustup &> /dev/null; then
 fi
 
 rustup target add wasm32-unknown-unknown
+cargo fetch
+npm run build:css
 curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_64-unknown-linux-musl.tar.gz | tar -xz
 ./trunk build --release"#;
                 std::fs::write("build_vercel.sh", build_script)?;

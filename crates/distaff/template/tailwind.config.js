@@ -26,7 +26,13 @@ module.exports = {
   ],
 
   content: {
-    files: ["./src/**/*.rs", "../crates/**/*.rs", "./index.html"],
+    files: [
+      "./src/**/*.rs", 
+      "../threadloom/crates/**/*.rs",
+      (process.env.HOME || process.env.USERPROFILE) + "/.cargo/git/checkouts/threadloom-*/**/*.rs",
+      (process.env.HOME || process.env.USERPROFILE) + "/.cargo/registry/src/**/threadloom-*/**/*.rs",
+      "./index.html"
+    ],
     // Transform Rust source so Tailwind's JIT scanner can extract arbitrary-value classes
     // e.g. mt-[25rem], w-[220px], tracking-[0.2em] inside class="..." strings
     transform: {
