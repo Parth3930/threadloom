@@ -242,9 +242,27 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
                 fn handle(&self, req: ::threadloom::server_types::PortableRequest) -> ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ::threadloom::server_types::PortableResponse> + Send + '_>> {
                     Box::pin(async move {
                         let (_parts, body) = req.into_parts();
-                        let args: #first_arg_type = ::threadloom_core::serde_json::from_slice(&body).unwrap();
+                        let args: #first_arg_type = match ::threadloom_core::serde_json::from_slice(&body) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                return ::threadloom::server_types::http::Response::builder()
+                                    .status(400)
+                                    .header("content-type", "application/json")
+                                    .body(::threadloom_core::serde_json::to_vec(&format!("Bad Request: {}", e)).unwrap())
+                                    .unwrap()
+                            }
+                        };
                         let res = #name(args).await;
-                        let res_bytes = ::threadloom_core::serde_json::to_vec(&res).unwrap();
+                        let res_bytes = match ::threadloom_core::serde_json::to_vec(&res) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                return ::threadloom::server_types::http::Response::builder()
+                                    .status(500)
+                                    .header("content-type", "application/json")
+                                    .body(::threadloom_core::serde_json::to_vec(&format!("Serialization Error: {}", e)).unwrap())
+                                    .unwrap()
+                            }
+                        };
                         ::threadloom::server_types::http::Response::builder()
                             .status(200)
                             .header("content-type", "application/json")

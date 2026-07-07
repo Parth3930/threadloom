@@ -96,7 +96,11 @@ pub mod lambda_adapter {
         let handler = service_fn(move |req: Request| {
             let server_clone = Arc::clone(&server);
             async move {
-                let path = req.uri().path().to_string();
+                let path = if let Some(route) = req.headers().get("x-threadloom-route") {
+                    route.to_str().unwrap_or(req.uri().path()).to_string()
+                } else {
+                    req.uri().path().to_string()
+                };
                 let mut found_handler = None;
                 for (route_path, handler) in &server_clone.routes {
                     if route_path == &path {

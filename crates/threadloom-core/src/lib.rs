@@ -976,6 +976,8 @@ pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: se
         .map_err(|e| format!("Headers::new failed: {:?}", e))?;
     headers.set("Content-Type", "application/json")
         .map_err(|e| format!("set Content-Type failed: {:?}", e))?;
+    headers.set("x-threadloom-route", url)
+        .map_err(|e| format!("set x-threadloom-route failed: {:?}", e))?;
     opts.headers(&headers);
 
     let request = web_sys::Request::new_with_str_and_init(url, &opts)
