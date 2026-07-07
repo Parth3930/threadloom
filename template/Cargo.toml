@@ -1,4 +1,6 @@
 [package]
+license = "MIT"
+description = "A meticulously crafted Rust full-stack framework."
 name = "demo"
 version = "0.1.0"
 edition = "2021"
