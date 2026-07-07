@@ -11,14 +11,7 @@ exclude = [
     "template/dist/**",
     "template/.vercel/**",
 ]
-include = [
-    "src/**",
-    "template/**",
-    "template/.vscode/**",
-    "template/.zed/**",
-    "Cargo.toml",
-    "README.md",
-]
+
 
 
 [[bin]]
