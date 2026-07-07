@@ -7,7 +7,7 @@ pub use threadloom_server as server_types;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! spawn { ($($t:tt)*) => {} }
+macro_rules! spawn { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
@@ -18,7 +18,7 @@ macro_rules! get_cookie {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! set_cookie { ($($t:tt)*) => {} }
+macro_rules! set_cookie { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
@@ -26,15 +26,15 @@ macro_rules! get_value { ($($t:tt)*) => { String::new() } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! redirect { ($($t:tt)*) => {} }
+macro_rules! redirect { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! back { ($($t:tt)*) => {} }
+macro_rules! back { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! animate { ($($t:tt)*) => {} }
+macro_rules! animate { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
@@ -46,8 +46,8 @@ macro_rules! alert { ($($t:tt)*) => { println!("ALERT: {}", $($t)*) } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! fetch { ($($t:tt)*) => {} }
+macro_rules! fetch { ($($t:tt)*) => { () } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
-macro_rules! rpc { ($($t:tt)*) => {} }
+macro_rules! rpc { ($($t:tt)*) => { () } }
