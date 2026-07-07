@@ -5,12 +5,14 @@ version = "0.1.2"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
 include = [
-    "src/**/*",
-    "template/**/*",
-    "template/.vscode/**/*",
-    "template/.zed/**/*",
+    "src/**",
+    "template/**",
+    "template/.vscode/**",
+    "template/.zed/**",
     "Cargo.toml",
+    "README.md",
 ]
+
 
 [[bin]]
 name = "distaff"
