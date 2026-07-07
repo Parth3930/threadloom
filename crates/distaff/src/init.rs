@@ -52,7 +52,11 @@ pub fn init_project() -> anyhow::Result<()> {
     // Extract embedded template
     for file in Template::iter() {
         if let Some(embedded_file) = Template::get(&file) {
-            let dst_path = std::path::Path::new(name).join(file.as_ref());
+            let mut filename = file.as_ref().to_string();
+            if filename == "Cargo.toml.tmpl" {
+                filename = "Cargo.toml".to_string();
+            }
+            let dst_path = std::path::Path::new(name).join(&filename);
             if let Some(parent) = dst_path.parent() {
                 fs::create_dir_all(parent)?;
             }
