@@ -166,12 +166,21 @@ async fn main() -> anyhow::Result<()> {
                     bin_path = std::path::PathBuf::from("../../target/debug/desktop");
                     if cfg!(windows) { bin_path.set_extension("exe"); }
                 }
-                let mut child = tokio::process::Command::new(bin_path)
-                    .env("THREADLOOM_DEV_PORT", port.to_string())
-                    .spawn()?;
-                    
+                let mut cmd = tokio::process::Command::new(bin_path);
+                cmd.env("THREADLOOM_DEV_PORT", port.to_string());
+                // ponytail: isolate child from parent console so Ctrl+C doesn't propagate
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    // CREATE_NEW_PROCESS_GROUP (0x00000200) prevents Ctrl+C forwarding
+                    cmd.creation_flags(0x00000200);
+                }
+                let mut child = cmd.spawn()?;
+                let child_pid = child.id();
+
                 tokio::select! {
                     status = child.wait() => {
+                        // Window closed by user (X button) — clean exit
                         if let Ok(s) = status {
                             if !s.success() {
                                 tracing::error!("Desktop window exited with error");
@@ -180,6 +189,15 @@ async fn main() -> anyhow::Result<()> {
                     }
                     _ = tokio::signal::ctrl_c() => {
                         println!("{} shutting down...", "[👋] exit:".yellow());
+                        #[cfg(windows)]
+                        if let Some(pid) = child_pid {
+                            let _ = std::process::Command::new("taskkill")
+                                .args(["/F", "/T", "/PID", &pid.to_string()])
+                                .stdout(std::process::Stdio::null())
+                                .stderr(std::process::Stdio::null())
+                                .status();
+                        }
+                        #[cfg(not(windows))]
                         let _ = child.kill().await;
                     }
                 }

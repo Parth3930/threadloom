@@ -98,12 +98,14 @@ pub fn restart_backend() {
     if has_cargo_hot {
         if child_guard.is_none() {
             println!("{} via cargo-hot port 3001", "[⚡] backend:".cyan());
-            *child_guard = Command::new("cargo")
-                .args(["hot", "run"])
-                .env("PORT", "3001")
-                .env("RUST_LOG", &rust_log)
-                .spawn()
-                .ok();
+            let mut cmd = Command::new("cargo");
+            cmd.args(["hot", "run"])
+               .env("PORT", "3001")
+               .env("RUST_LOG", &rust_log);
+            // ponytail: isolate from console so Ctrl+C doesn't hit the child
+            #[cfg(windows)]
+            { use std::os::windows::process::CommandExt; cmd.creation_flags(0x00000200); }
+            *child_guard = cmd.spawn().ok();
         }
     } else {
         // Old kill-and-restart fallback
@@ -112,12 +114,14 @@ pub fn restart_backend() {
             let _ = child.wait();
         }
         println!("{} port 3001", "[⚡] backend:".cyan());
-        *child_guard = Command::new("cargo")
-            .args(["run"])
-            .env("PORT", "3001")
-            .env("RUST_LOG", &rust_log)
-            .spawn()
-            .ok();
+        let mut cmd = Command::new("cargo");
+        cmd.args(["run"])
+           .env("PORT", "3001")
+           .env("RUST_LOG", &rust_log);
+        // ponytail: isolate from console so Ctrl+C doesn't hit the child
+        #[cfg(windows)]
+        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x00000200); }
+        *child_guard = cmd.spawn().ok();
     }
 }
 
@@ -127,6 +131,9 @@ pub fn start_frontend_watcher() {
         tracing::debug!("Starting frontend watchers in background...");
         let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
         for mut cmd in adapter.watch_commands() {
+            // ponytail: isolate from console so Ctrl+C doesn't hit the child
+            #[cfg(windows)]
+            { use std::os::windows::process::CommandExt; cmd.creation_flags(0x00000200); }
             if let Ok(child) = cmd.spawn() {
                 child_guard.push(child);
             }
