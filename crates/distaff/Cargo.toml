@@ -4,6 +4,13 @@ name = "distaff"
 version = "0.1.2"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
+
+exclude = [
+    "template/target/**",
+    "template/node_modules/**",
+    "template/dist/**",
+    "template/.vercel/**",
+]
 include = [
     "src/**",
     "template/**",
