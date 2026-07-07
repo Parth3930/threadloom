@@ -112,6 +112,23 @@ pub fn init_project() -> anyhow::Result<()> {
 
     println!("  {}✔{} Project {} created successfully!", GREEN, RESET, name);
     println!("\n  Next steps:");
+    
+    // Check if trunk is installed
+    if std::process::Command::new("trunk").arg("--version").output().is_err() {
+        println!("    {}cargo install trunk{} (required for building WASM)", CYAN, RESET);
+    }
+    
+    // Check if wasm target is installed
+    let target_installed = std::process::Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("wasm32-unknown-unknown"))
+        .unwrap_or(false);
+
+    if !target_installed {
+        println!("    {}rustup target add wasm32-unknown-unknown{} (required for building WASM)", CYAN, RESET);
+    }
+    
     println!("    {}cd {}{}", CYAN, name, RESET);
     println!("    {}distaff run{}\n", CYAN, RESET);
     Ok(())

@@ -149,8 +149,12 @@ async fn main() -> anyhow::Result<()> {
             let mut build_cmd = adapter.build_command();
             match build_cmd.status() {
                 Ok(status) if status.success() => {}
-                _ => {
-                    tracing::error!("Build failed. Are you in the right directory?");
+                Ok(_) => {
+                    tracing::error!("Build failed. Please check the errors above.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to execute build command ({:?}). Is it installed? Error: {}", build_cmd.get_program(), e);
                     std::process::exit(1);
                 }
             }
@@ -446,8 +450,12 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
             let mut build_cmd = adapter.build_command();
             match build_cmd.status() {
                 Ok(status) if status.success() => {}
-                _ => {
-                    tracing::error!("Build failed. Are you in the right directory?");
+                Ok(_) => {
+                    tracing::error!("Build failed. Please check the errors above.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to execute build command ({:?}). Is it installed? Error: {}", build_cmd.get_program(), e);
                     std::process::exit(1);
                 }
             }

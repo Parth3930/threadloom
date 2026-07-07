@@ -7,6 +7,9 @@
         },
         "cargo": {
           "allFeatures": true
+        },
+        "procMacro": {
+          "enable": true
         }
       }
     }
