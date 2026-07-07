@@ -1,5 +1,5 @@
 #[cfg(feature = "lambda")]
-pub use lambda_http;
+pub use vercel_runtime;
 #[cfg(feature = "lambda")]
 pub use tokio;
 
@@ -88,12 +88,12 @@ pub mod actix_adapter {
 #[cfg(feature = "lambda")]
 pub mod lambda_adapter {
     use super::Server;
-    use lambda_http::{service_fn, Body, Error, Request, Response};
+    use vercel_runtime::{run as vercel_run, Body, Error, Request, Response};
     use std::sync::Arc;
 
     pub async fn run(server: Server) -> Result<(), Error> {
         let server = Arc::new(server);
-        let handler = service_fn(move |req: Request| {
+        let handler = move |req: Request| {
             let server_clone = Arc::clone(&server);
             async move {
                 let path = if let Some(route) = req.headers().get("x-threadloom-route") {
@@ -133,8 +133,8 @@ pub mod lambda_adapter {
                     Ok(Response::builder().status(404).body(Body::Empty).unwrap())
                 }
             }
-        });
-        lambda_http::run(handler).await
+        };
+        vercel_run(handler).await
     }
 }
 
@@ -163,7 +163,7 @@ pub mod tokio {
 #[cfg(not(feature = "lambda"))]
 pub mod lambda_adapter {
     use super::Server;
-    pub async fn run(_server: Server) -> Result<(), crate::lambda_http::Error> {
+    pub async fn run(_server: Server) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 }
