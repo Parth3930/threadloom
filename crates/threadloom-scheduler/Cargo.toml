@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core" }
+threadloom-core = { path = "../threadloom-core", version = "0.1.0" }
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"

@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core" }
-threadloom-macro = { path = "../threadloom-macro" }
-threadloom-server = { path = "../threadloom-server" }
+threadloom-core = { path = "../threadloom-core", version = "0.1.0" }
+threadloom-macro = { path = "../threadloom-macro", version = "0.1.0" }
+threadloom-server = { path = "../threadloom-server", version = "0.1.0" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-threadloom-dom = { path = "../threadloom-dom" }
+threadloom-dom = { path = "../threadloom-dom", version = "0.1.0" }
 
 [dev-dependencies]
 trybuild = "1.0"

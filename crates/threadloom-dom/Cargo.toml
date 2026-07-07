@@ -12,7 +12,7 @@ js-sys = "0.3"
 reqwasm = "0.5"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Document", "Element", "HtmlDocument", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Window", "Node", "Text", "History"] }
-threadloom-core = { path = "../threadloom-core" }
-threadloom-scheduler = { path = "../threadloom-scheduler" }
+threadloom-core = { path = "../threadloom-core", version = "0.1.0" }
+threadloom-scheduler = { path = "../threadloom-scheduler", version = "0.1.0" }
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

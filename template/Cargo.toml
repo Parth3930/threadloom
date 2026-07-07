@@ -16,12 +16,12 @@ resources = ["dist"]
 icons = ["assets/icon.png", "assets/icon.ico"]
 
 [dependencies]
-threadloom = { path = "../crates/threadloom" }
+threadloom = { path = "../crates/threadloom", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
-threadloom-core = { path = "../crates/threadloom-core" }
-threadloom-macro = { path = "../crates/threadloom-macro" }
-threadloom-dom = { path = "../crates/threadloom-dom" }
-threadloom-ui = { path = "../crates/threadloom-ui" }
+threadloom-core = { path = "../crates/threadloom-core", version = "0.1.0" }
+threadloom-macro = { path = "../crates/threadloom-macro", version = "0.1.0" }
+threadloom-dom = { path = "../crates/threadloom-dom", version = "0.1.0" }
+threadloom-ui = { path = "../crates/threadloom-ui", version = "0.1.0" }
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History"] }
 wasm-bindgen-futures = "0.4"
 reqwasm = "0.5"

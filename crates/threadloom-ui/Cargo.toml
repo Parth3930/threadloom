@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core" }
-threadloom-macro = { path = "../threadloom-macro" }
+threadloom-core = { path = "../threadloom-core", version = "0.1.0" }
+threadloom-macro = { path = "../threadloom-macro", version = "0.1.0" }
 
 [target.wasm32-unknown-unknown.dependencies]
 js-sys = "0.3.103"

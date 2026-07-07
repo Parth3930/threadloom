@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-threadloom-core = { path = "../../../crates/threadloom-core" }
-threadloom-dom = { path = "../../../crates/threadloom-dom" }
-threadloom-macro = { path = "../../../crates/threadloom-macro" }
+threadloom-core = { path = "../../../crates/threadloom-core", version = "0.1.0" }
+threadloom-dom = { path = "../../../crates/threadloom-dom", version = "0.1.0" }
+threadloom-macro = { path = "../../../crates/threadloom-macro", version = "0.1.0" }
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement"] }
