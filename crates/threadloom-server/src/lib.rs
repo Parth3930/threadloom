@@ -88,55 +88,75 @@ pub mod actix_adapter {
 #[cfg(feature = "lambda")]
 pub mod lambda_adapter {
     use super::Server;
-    use vercel_runtime::{run as vercel_run, Body, Error, Request, Response};
+    use vercel_runtime::{run as vercel_run, AppState, Error, ResponseBody};
+    use std::future::Future;
+    use std::pin::Pin;
     use std::sync::Arc;
+    use std::task::{Context, Poll};
 
-    pub async fn run(server: Server) -> Result<(), Error> {
-        let server = Arc::new(server);
-        let handler = move |req: Request| {
-            let server_clone = Arc::clone(&server);
-            async move {
+    type HyperRequest = hyper::Request<hyper::body::Incoming>;
+    type HyperResponse = hyper::Response<ResponseBody>;
+
+    struct ThreadloomService {
+        server: Arc<Server>,
+    }
+
+    impl Clone for ThreadloomService {
+        fn clone(&self) -> Self {
+            Self { server: Arc::clone(&self.server) }
+        }
+    }
+
+    impl tower::Service<(AppState, HyperRequest)> for ThreadloomService {
+        type Response = HyperResponse;
+        type Error = Error;
+        type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, (_, req): (AppState, HyperRequest)) -> Self::Future {
+            let server = Arc::clone(&self.server);
+            Box::pin(async move {
+                use http_body_util::BodyExt;
+
                 let path = if let Some(route) = req.headers().get("x-threadloom-route") {
                     route.to_str().unwrap_or(req.uri().path()).to_string()
                 } else {
                     req.uri().path().to_string()
                 };
-                let mut found_handler = None;
-                for (route_path, handler) in &server_clone.routes {
-                    if route_path == &path {
-                        found_handler = Some(Arc::clone(handler));
-                        break;
-                    }
-                }
+
+                let (parts, body) = req.into_parts();
+                let bytes = body.collect().await
+                    .map(|c| c.to_bytes().to_vec())
+                    .unwrap_or_default();
+
+                let found_handler = server.routes.iter()
+                    .find(|(route_path, _)| route_path == &path)
+                    .map(|(_, h)| Arc::clone(h));
 
                 if let Some(h) = found_handler {
-                    let (parts, body) = req.into_parts();
-                    let bytes = match body {
-                        Body::Text(t) => t.into_bytes(),
-                        Body::Binary(b) => b,
-                        Body::Empty => vec![],
-                    };
                     let portable_req = http::Request::from_parts(parts, bytes);
                     let res = h.handle(portable_req).await;
-                    let (parts, res_bytes) = res.into_parts();
-                    
-                    let body = match String::from_utf8(res_bytes.clone()) {
-                        Ok(text) => Body::Text(text),
-                        Err(_) => Body::Binary(res_bytes),
-                    };
-                    
-                    Ok::<Response<Body>, Error>(Response::from_parts(
-                        parts,
-                        body,
-                    ))
+                    let (res_parts, res_bytes) = res.into_parts();
+                    Ok(hyper::Response::from_parts(res_parts, ResponseBody::from(res_bytes)))
                 } else {
-                    Ok(Response::builder().status(404).body(Body::Empty).unwrap())
+                    Ok(hyper::Response::builder()
+                        .status(404)
+                        .body(ResponseBody::from("Not Found"))
+                        .unwrap())
                 }
-            }
-        };
-        vercel_run(handler).await
+            })
+        }
+    }
+
+    pub async fn run(server: Server) -> Result<(), Error> {
+        let service = ThreadloomService { server: Arc::new(server) };
+        vercel_run(service).await
     }
 }
+
 
 #[cfg(not(feature = "lambda"))]
 pub mod lambda_http {
