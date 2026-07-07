@@ -264,16 +264,39 @@ fn main() -> Result<(), lambda_http::Error> {{
 
                 // 3. Write vercel.json
                 let vercel_json = r#"{
-  "builds": [
-    { "src": "api/index.rs", "use": "@vercel/rust" }
-  ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }"#;
-                if !std::path::Path::new("vercel.json").exists() {
-                    std::fs::write("vercel.json", vercel_json)?;
-                    println!("{} Created vercel.json", "[+]".green());
+                std::fs::write("vercel.json", vercel_json)?;
+                println!("{} Created vercel.json", "[+]".green());
+
+                // 3.5 Write build_vercel.sh
+                let build_script = r#"#!/bin/bash
+set -e
+npm run build:css
+
+if ! command -v rustup &> /dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source $HOME/.cargo/env
+fi
+
+rustup target add wasm32-unknown-unknown
+curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+./trunk build --release"#;
+                std::fs::write("build_vercel.sh", build_script)?;
+                println!("{} Created build_vercel.sh", "[+]".green());
+                
+                // Update package.json if it exists
+                if let Ok(pkg_json) = std::fs::read_to_string("package.json") {
+                    if pkg_json.contains("\"build:css\"") && !pkg_json.contains("\"build\":") {
+                        let updated = pkg_json.replace(
+                            "\"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\",",
+                            "\"build\": \"bash build_vercel.sh\",\n    \"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\","
+                        );
+                        std::fs::write("package.json", updated)?;
+                    }
                 }
 
                 // 4. Update Cargo.toml
