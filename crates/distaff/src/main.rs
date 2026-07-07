@@ -38,13 +38,14 @@ enum Commands {
     Build {
         #[arg(long)]
         desktop: bool,
+        /// Setup project for Vercel serverless deployment
+        #[arg(long)]
+        vercel: bool,
     },
     /// Initialize a new project
     Init,
     /// Update distaff to the latest version
     Update,
-    /// Setup project for Vercel serverless deployment
-    Vercel,
 }
 
 fn check_update() {
@@ -220,7 +221,169 @@ async fn main() -> anyhow::Result<()> {
                 std::process::exit(0);
             }
         }
-        Commands::Build { desktop } => {
+        Commands::Build { desktop, vercel } => {
+            if *vercel {
+                use colored::Colorize;
+                println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
+
+                // 1. Create api/ directory
+                let api_dir = std::path::Path::new("api");
+                if !api_dir.exists() {
+                    std::fs::create_dir(api_dir)?;
+                }
+
+                // Read Cargo.toml to get package name
+                let cargo_toml = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
+                let pkg_name = if let Some(name_line) = cargo_toml.lines().find(|l| l.starts_with("name = ")) {
+                    name_line.replace("name = ", "").replace("\"", "").trim().to_string()
+                } else {
+                    "distaff_landing".to_string()
+                };
+                let safe_pkg_name = pkg_name.replace("-", "_");
+
+                // 2. Write api/index.rs (uses direct imports — always compiled with lambda feature)
+                let index_content = format!(r#"use threadloom::server_types::lambda_adapter;
+use threadloom::server_types::lambda_http;
+
+use {}::api_routes;
+
+fn main() -> Result<(), lambda_http::Error> {{
+    threadloom::server_types::tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {{
+            let mut server = threadloom::server_types::Server::new();
+            api_routes::configure_api(&mut server);
+            lambda_adapter::run(server).await
+        }})
+}}
+"#, safe_pkg_name);
+                std::fs::write("api/index.rs", index_content)?;
+                println!("{} Created api/index.rs", "[+]".green());
+
+                // 3. Write vercel.json
+                let vercel_json = r#"{
+  "builds": [
+    { "src": "api/index.rs", "use": "@vercel/rust" }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" }
+  ]
+}"#;
+                if !std::path::Path::new("vercel.json").exists() {
+                    std::fs::write("vercel.json", vercel_json)?;
+                    println!("{} Created vercel.json", "[+]".green());
+                }
+
+                // 4. Update Cargo.toml
+                if !cargo_toml.is_empty() {
+                    let mut updated_toml = cargo_toml.clone();
+
+                    // Add lambda feature to top-level [features]
+                    if !updated_toml.contains("lambda = [\"threadloom/lambda\"]") {
+                        if let Some(features_idx) = updated_toml.find("[features]") {
+                            updated_toml.insert_str(features_idx + 10, "\nlambda = [\"threadloom/lambda\"]");
+                        }
+                    }
+
+                    // Enable lambda in threadloom cfg dependency
+                    if updated_toml.contains("features = [\"actix\"]") {
+                        updated_toml = updated_toml.replace("features = [\"actix\"]", "features = [\"actix\", \"lambda\"]");
+                    } else if !updated_toml.contains("lambda") {
+                        updated_toml = updated_toml.replace(
+                            "threadloom = { path = \"../crates/threadloom\" }",
+                            "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
+                        );
+                    }
+
+                    // Add [lib]
+                    if !updated_toml.contains("[lib]") {
+                        updated_toml.push_str("\n\n[lib]\npath = \"src/lib.rs\"\n");
+                    }
+
+                    // Add [[bin]] index
+                    if !updated_toml.contains("[[bin]]\nname = \"index\"") {
+                        updated_toml.push_str("\n[[bin]]\nname = \"index\"\npath = \"api/index.rs\"\n");
+                    }
+
+                    if updated_toml != cargo_toml {
+                        std::fs::write("Cargo.toml", &updated_toml)?;
+                        println!("{} Updated Cargo.toml with Vercel targets and lambda feature", "[+]".green());
+                    }
+                }
+
+                // 5. Ensure src/lib.rs exists
+                let lib_rs = std::path::Path::new("src/lib.rs");
+                if !lib_rs.exists() {
+                    let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
+                    let mut lib_content = String::new();
+                    for line in main_rs.lines() {
+                        if line.starts_with("pub mod ") || line.starts_with("mod ") {
+                            lib_content.push_str(&line.replace("mod ", "pub mod "));
+                            lib_content.push('\n');
+                        }
+                    }
+                    if lib_content.is_empty() {
+                        lib_content.push_str("pub mod api;\npub mod api_routes;\n");
+                    }
+                    std::fs::write(lib_rs, lib_content)?;
+                    println!("{} Generated src/lib.rs for serverless compilation", "[+]".green());
+                }
+
+                // 6. Write IDE settings to make rust-analyzer aware of lambda feature
+                // VS Code
+                let vscode_dir = std::path::Path::new(".vscode");
+                if !vscode_dir.exists() {
+                    std::fs::create_dir(vscode_dir)?;
+                }
+                let settings_path = vscode_dir.join("settings.json");
+                let existing = std::fs::read_to_string(&settings_path).unwrap_or_default();
+                if !existing.contains("rust-analyzer.cargo.features") {
+                    let new_settings = if existing.trim().is_empty() || existing.trim() == "{}" {
+                        r#"{
+  "rust-analyzer.cargo.features": ["lambda"],
+  "tailwindCSS.experimental.classRegex": [
+    "class\\s*=\\s*\"([^\"]*)\""
+  ],
+  "tailwindCSS.includeLanguages": {
+    "rust": "html"
+  }
+}"#.to_string()
+                    } else {
+                        existing.replacen("{", "{\n  \"rust-analyzer.cargo.features\": [\"lambda\"],", 1)
+                    };
+                    std::fs::write(&settings_path, new_settings)?;
+                    println!("{} Updated .vscode/settings.json for rust-analyzer", "[+]".green());
+                }
+
+                // Zed IDE
+                let zed_dir = std::path::Path::new(".zed");
+                if !zed_dir.exists() {
+                    std::fs::create_dir(zed_dir)?;
+                }
+                let zed_settings_path = zed_dir.join("settings.json");
+                if !zed_settings_path.exists() || !std::fs::read_to_string(&zed_settings_path).unwrap_or_default().contains("lambda") {
+                    let zed_settings = r#"{
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "cargo": {
+          "features": ["lambda"]
+        }
+      }
+    }
+  }
+}
+"#;
+                    std::fs::write(&zed_settings_path, zed_settings)?;
+                    println!("{} Updated .zed/settings.json for rust-analyzer (Zed IDE)", "[+]".green());
+                }
+
+                println!("{} Vercel setup complete! Run `vercel deploy` to push.", "[✅] vercel:".green());
+                return Ok(());
+            }
+
             println!("{} production", "[🏗️] build:".yellow());
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),
@@ -285,111 +448,6 @@ async fn main() -> anyhow::Result<()> {
                     eprintln!("Failed to update distaff.");
                 }
             }
-        }
-        Commands::Vercel => {
-            use colored::Colorize;
-            println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
-
-            // 1. Create api/ directory
-            let api_dir = std::path::Path::new("api");
-            if !api_dir.exists() {
-                std::fs::create_dir(api_dir)?;
-            }
-
-            // Read Cargo.toml to get package name
-            let cargo_toml = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
-            let pkg_name = if let Some(name_line) = cargo_toml.lines().find(|l| l.starts_with("name = ")) {
-                name_line.replace("name = ", "").replace("\"", "").trim().to_string()
-            } else {
-                "distaff_landing".to_string()
-            };
-            let safe_pkg_name = pkg_name.replace("-", "_");
-
-            // 2. Write api/index.rs
-            let index_content = format!(r#"use threadloom::server_types::lambda_adapter;
-use threadloom::server_types::lambda_http;
-
-use {}::api_routes;
-
-fn main() -> Result<(), lambda_http::Error> {{
-    threadloom::server_types::tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {{
-            let mut server = threadloom::server_types::Server::new();
-            api_routes::configure_api(&mut server);
-            lambda_adapter::run(server).await
-        }})
-}}
-"#, safe_pkg_name);
-            std::fs::write("api/index.rs", index_content)?;
-            println!("{} Created api/index.rs", "[+]".green());
-
-            // 3. Write vercel.json
-            let vercel_json = r#"{
-  "builds": [
-    { "src": "api/index.rs", "use": "@vercel/rust" }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
-  ]
-}"#;
-            if !std::path::Path::new("vercel.json").exists() {
-                std::fs::write("vercel.json", vercel_json)?;
-                println!("{} Created vercel.json", "[+]".green());
-            }
-
-            // 4. Update Cargo.toml
-            if !cargo_toml.is_empty() {
-                let mut updated_toml = cargo_toml.clone();
-
-                // Add lambda feature
-                if updated_toml.contains("features = [\"actix\"]") {
-                    updated_toml = updated_toml.replace("features = [\"actix\"]", "features = [\"actix\", \"lambda\"]");
-                } else if !updated_toml.contains("lambda") {
-                    // Fallback
-                    updated_toml = updated_toml.replace(
-                        "threadloom = { path = \"../crates/threadloom\" }",
-                        "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
-                    );
-                }
-
-                // Add [lib]
-                if !updated_toml.contains("[lib]") {
-                    updated_toml.push_str("\n\n[lib]\npath = \"src/lib.rs\"\n");
-                }
-
-                // Add [[bin]]
-                if !updated_toml.contains("[[bin]]\nname = \"index\"") {
-                    updated_toml.push_str("\n[[bin]]\nname = \"index\"\npath = \"api/index.rs\"\n");
-                }
-
-                if updated_toml != cargo_toml {
-                    std::fs::write("Cargo.toml", updated_toml)?;
-                    println!("{} Updated Cargo.toml with Vercel targets and lambda feature", "[+]".green());
-                }
-            }
-
-            // 5. Ensure src/lib.rs exists
-            let lib_rs = std::path::Path::new("src/lib.rs");
-            if !lib_rs.exists() {
-                let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
-                let mut lib_content = String::new();
-                for line in main_rs.lines() {
-                    if line.starts_with("pub mod ") || line.starts_with("mod ") {
-                        lib_content.push_str(&line.replace("mod ", "pub mod "));
-                        lib_content.push('\n');
-                    }
-                }
-                if lib_content.is_empty() {
-                    lib_content.push_str("pub mod api;\npub mod api_routes;\n");
-                }
-                std::fs::write(lib_rs, lib_content)?;
-                println!("{} Generated src/lib.rs for serverless compilation", "[+]".green());
-            }
-
-            println!("{} Vercel setup complete! Run `vercel deploy` to push.", "[✅] vercel:".green());
         }
     }
 

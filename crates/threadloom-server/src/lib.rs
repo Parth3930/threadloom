@@ -127,3 +127,33 @@ pub mod lambda_adapter {
         lambda_http::run(handler).await
     }
 }
+
+#[cfg(not(feature = "lambda"))]
+pub mod lambda_http {
+    #[derive(Debug)]
+    pub struct Error;
+}
+
+#[cfg(not(feature = "lambda"))]
+pub mod tokio {
+    pub mod runtime {
+        pub struct Builder;
+        impl Builder {
+            pub fn new_current_thread() -> Self { Self }
+            pub fn enable_all(&mut self) -> &mut Self { self }
+            pub fn build(&mut self) -> Result<Runtime, ()> { Ok(Runtime) }
+        }
+        pub struct Runtime;
+        impl Runtime {
+            pub fn block_on<F>(&self, _f: F) -> Result<(), crate::lambda_http::Error> { Ok(()) }
+        }
+    }
+}
+
+#[cfg(not(feature = "lambda"))]
+pub mod lambda_adapter {
+    use super::Server;
+    pub async fn run(_server: Server) -> Result<(), crate::lambda_http::Error> {
+        Ok(())
+    }
+}
