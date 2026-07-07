@@ -4,7 +4,6 @@ description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-server"
 version = "0.1.0"
 edition = "2021"
-publish = false
 
 [features]
 default = []
