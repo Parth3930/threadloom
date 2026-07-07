@@ -20,7 +20,7 @@ pub fn page() -> View {
                 Row(items="center", gap=6, class="hidden sm:flex") {
                     Text(variant="a", class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer", on_click=move || crate::store::navigate("/docs")) { "Documentation" }
                     Text(variant="a", class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer", on_click=move || crate::store::navigate("/components")) { "Components" }
-                    Text(variant="a", class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer") { "GitHub" }
+                    Text(variant="a", href="https://github.com/Parth3930/threadloom", target="_blank", class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer") { "GitHub" }
                 }
             }
 

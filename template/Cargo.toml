@@ -2,6 +2,13 @@
 name = "demo"
 version = "0.1.0"
 edition = "2021"
+default-run = "demo"
+
+[package.metadata.packager]
+product-name = "Threadloom App"
+identifier = "com.threadloom.app"
+resources = ["dist"]
+icons = ["assets/icon.png", "assets/icon.ico"]
 
 [dependencies]
 threadloom = { path = "../crates/threadloom" }
@@ -19,5 +26,6 @@ actix-web = "4"
 actix-files = "0.6"
 env_logger = "0.11"
 log = "0.4"
+threadloom-desktop = { path = "../crates/threadloom-desktop" }
 
 

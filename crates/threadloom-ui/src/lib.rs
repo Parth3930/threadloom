@@ -4,6 +4,36 @@ use threadloom_core::{element, fragment, text, View, IntoView};
 
 pub mod components;
 pub use components::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub fn next_id() -> String {
+    format!("tl-{}", ID_COUNTER.fetch_add(1, Ordering::SeqCst))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn run_animation(script: String) {
+    let _ = js_sys::eval(&script);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_animation(_script: String) {}
+
+pub fn apply_animations(id: &str, animate: Option<String>, animate_from: Option<String>, animate_fromto: Option<(String, String)>) {
+    if let Some(config) = animate {
+        let script = format!("setTimeout(() => {{ if (window.gsap) gsap.to('#{}', {}) }}, 10);", id, config);
+        run_animation(script);
+    }
+    if let Some(config) = animate_from {
+        let script = format!("setTimeout(() => {{ if (window.gsap) gsap.from('#{}', {}) }}, 10);", id, config);
+        run_animation(script);
+    }
+    if let Some((from_cfg, to_cfg)) = animate_fromto {
+        let script = format!("setTimeout(() => {{ if (window.gsap) gsap.fromTo('#{}', {}, {}) }}, 10);", id, from_cfg, to_cfg);
+        run_animation(script);
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Ergonomic helper types
@@ -63,4 +93,18 @@ impl From<Option<String>> for OptClass {
 }
 impl From<()> for OptClass {
     fn from(_: ()) -> Self { OptClass(None) }
+}
+
+/// Optional tuple of CSS class strings.
+#[derive(Default, Clone)]
+pub struct OptTuple(pub Option<(String, String)>);
+
+impl From<(&str, &str)> for OptTuple {
+    fn from(t: (&str, &str)) -> Self { OptTuple(Some((t.0.to_string(), t.1.to_string()))) }
+}
+impl From<(String, String)> for OptTuple {
+    fn from(t: (String, String)) -> Self { OptTuple(Some(t)) }
+}
+impl From<()> for OptTuple {
+    fn from(_: ()) -> Self { OptTuple(None) }
 }

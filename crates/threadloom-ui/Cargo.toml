@@ -7,3 +7,6 @@ edition = "2024"
 threadloom-core = { path = "../threadloom-core" }
 threadloom-macro = { path = "../threadloom-macro" }
 
+[target.wasm32-unknown-unknown.dependencies]
+js-sys = "0.3.103"
+

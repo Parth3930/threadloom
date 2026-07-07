@@ -27,8 +27,15 @@ pub struct RowProps {
     pub justify: OptClass,
     /// Whether the flex items should wrap
     pub wrap: bool,
-    /// Append custom CSS classes
     pub class: OptClass,
+    /// Animate TO properties (e.g. `"{ opacity: 0 }"`)
+    pub animate: OptClass,
+    /// Animate FROM properties
+    pub animate_from: OptClass,
+    /// Animate FROM and TO properties
+    pub animate_fromto: crate::OptTuple,
+    pub href: OptClass,
+    pub target: OptClass,
     /// The child elements to place in the row.
     pub children: Vec<View>,
 }
@@ -350,7 +357,8 @@ fn apply_spacing_and_borders(
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Row(props: RowProps) -> View {
-    let mut e = element("div");
+    let tag = if props.href.0.is_some() { "a" } else { "div" };
+    let mut e = element(tag);
     let mut class_str = "flex flex-row".to_string();
 
     let gap_c = gap_class(props.gap);
@@ -408,7 +416,26 @@ pub fn Row(props: RowProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
+    
+    let id = crate::next_id();
+    e = e.attr("id", id.clone());
+    
+    let anim_to = props.animate.0.clone();
+    let anim_from = props.animate_from.0.clone();
+    let anim_fromto = props.animate_fromto.0.clone();
+    if anim_to.is_some() || anim_from.is_some() || anim_fromto.is_some() {
+        threadloom_core::create_effect(move || {
+            crate::apply_animations(&id, anim_to.clone(), anim_from.clone(), anim_fromto.clone());
+        });
+    }
+
     e = e.attr("class", class_str);
+    if let Some(href) = props.href.0 {
+        e = e.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        e = e.attr("target", target);
+    }
     for child in props.children {
         e = e.child(child);
     }
@@ -441,6 +468,11 @@ pub struct ColumnProps {
     pub justify: OptClass,
     /// Append custom CSS classes
     pub class: OptClass,
+    pub animate: OptClass,
+    pub animate_from: OptClass,
+    pub animate_fromto: crate::OptTuple,
+    pub href: OptClass,
+    pub target: OptClass,
     /// The child elements to stack in the column.
     pub children: Vec<View>,
 }
@@ -468,7 +500,8 @@ pub struct ColumnProps {
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Column(props: ColumnProps) -> View {
-    let mut e = element("div");
+    let tag = if props.href.0.is_some() { "a" } else { "div" };
+    let mut e = element(tag);
     let mut class_str = "flex flex-col".to_string();
 
     let gap_c = gap_class(props.gap);
@@ -513,7 +546,26 @@ pub fn Column(props: ColumnProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
+    
+    let id = crate::next_id();
+    e = e.attr("id", id.clone());
+    
+    let anim_to = props.animate.0.clone();
+    let anim_from = props.animate_from.0.clone();
+    let anim_fromto = props.animate_fromto.0.clone();
+    if anim_to.is_some() || anim_from.is_some() || anim_fromto.is_some() {
+        threadloom_core::create_effect(move || {
+            crate::apply_animations(&id, anim_to.clone(), anim_from.clone(), anim_fromto.clone());
+        });
+    }
+
     e = e.attr("class", class_str);
+    if let Some(href) = props.href.0 {
+        e = e.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        e = e.attr("target", target);
+    }
     for child in props.children {
         e = e.child(child);
     }
@@ -526,6 +578,11 @@ pub fn Column(props: ColumnProps) -> View {
 pub struct ContainerProps {
     /// Append custom CSS classes (e.g., `"max-w-5xl mx-auto"`).
     pub class: OptClass,
+    pub animate: OptClass,
+    pub animate_from: OptClass,
+    pub animate_fromto: crate::OptTuple,
+    pub href: OptClass,
+    pub target: OptClass,
     /// The content inside the wrapper.
     pub children: Vec<View>,
 }
@@ -542,13 +599,33 @@ pub struct ContainerProps {
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Container(props: ContainerProps) -> View {
-    let mut e = element("div");
+    let tag = if props.href.0.is_some() { "a" } else { "div" };
+    let mut e = element(tag);
     let mut class_str = "container".to_string();
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
     }
+    
+    let id = crate::next_id();
+    e = e.attr("id", id.clone());
+    
+    let anim_to = props.animate.0.clone();
+    let anim_from = props.animate_from.0.clone();
+    let anim_fromto = props.animate_fromto.0.clone();
+    if anim_to.is_some() || anim_from.is_some() || anim_fromto.is_some() {
+        threadloom_core::create_effect(move || {
+            crate::apply_animations(&id, anim_to.clone(), anim_from.clone(), anim_fromto.clone());
+        });
+    }
+
     e = e.attr("class", class_str);
+    if let Some(href) = props.href.0 {
+        e = e.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        e = e.attr("target", target);
+    }
     for child in props.children {
         e = e.child(child);
     }
@@ -582,18 +659,23 @@ pub struct SectionProps {
     pub justify: OptClass,
     /// Render as flex column (true by default usually in sections)
     pub row: bool,
-    /// Element ID
     pub id: OptClass,
     pub class: OptClass,
+    pub animate: OptClass,
+    pub animate_from: OptClass,
+    pub animate_fromto: crate::OptTuple,
+    pub href: OptClass,
+    pub target: OptClass,
     pub children: Vec<View>,
 }
 
 /// Renders a structural `<section>` tag.
 #[allow(non_snake_case)]
 pub fn Section(props: SectionProps) -> View {
-    let mut e = element("section");
-    if let Some(id) = props.id.0 {
-        e = e.attr("id", id);
+    let tag = if props.href.0.is_some() { "a" } else { "section" };
+    let mut e = element(tag);
+    if let Some(ref id) = props.id.0 {
+        e = e.attr("id", id.clone());
     }
 
     let mut class_str = if props.row {
@@ -653,7 +735,26 @@ pub fn Section(props: SectionProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
+    
+    let id = props.id.0.clone().unwrap_or_else(|| crate::next_id());
+    e = e.attr("id", id.clone());
+    
+    let anim_to = props.animate.0.clone();
+    let anim_from = props.animate_from.0.clone();
+    let anim_fromto = props.animate_fromto.0.clone();
+    if anim_to.is_some() || anim_from.is_some() || anim_fromto.is_some() {
+        threadloom_core::create_effect(move || {
+            crate::apply_animations(&id, anim_to.clone(), anim_from.clone(), anim_fromto.clone());
+        });
+    }
+
     e = e.attr("class", class_str);
+    if let Some(href) = props.href.0 {
+        e = e.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        e = e.attr("target", target);
+    }
     for child in props.children {
         e = e.child(child);
     }
@@ -706,8 +807,12 @@ pub struct TextProps {
     pub variant: OptClass,
     /// Font weight (e.g., "light", "normal", "medium", "semibold", "bold")
     pub weight: OptClass,
-    /// Tailwind CSS classes.
     pub class: OptClass,
+    pub animate: OptClass,
+    pub animate_from: OptClass,
+    pub animate_fromto: crate::OptTuple,
+    pub href: OptClass,
+    pub target: OptClass,
     /// Optional click handler
     pub on_click: crate::Callback,
     /// The text or elements inside.
@@ -727,7 +832,7 @@ pub struct TextProps {
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Text(props: TextProps) -> View {
-    let tag = props.variant.0.unwrap_or_else(|| "p".to_string());
+    let tag = props.variant.0.unwrap_or_else(|| if props.href.0.is_some() { "a".to_string() } else { "p".to_string() });
     let mut e = element(tag);
 
     let mut class_str = String::new();
@@ -745,9 +850,27 @@ pub fn Text(props: TextProps) -> View {
         }
         class_str.push_str(&c);
     }
+    
+    let id = crate::next_id();
+    e = e.attr("id", id.clone());
+    
+    let anim_to = props.animate.0.clone();
+    let anim_from = props.animate_from.0.clone();
+    let anim_fromto = props.animate_fromto.0.clone();
+    if anim_to.is_some() || anim_from.is_some() || anim_fromto.is_some() {
+        threadloom_core::create_effect(move || {
+            crate::apply_animations(&id, anim_to.clone(), anim_from.clone(), anim_fromto.clone());
+        });
+    }
 
     if !class_str.is_empty() {
         e = e.attr("class", class_str);
+    }
+    if let Some(href) = props.href.0 {
+        e = e.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        e = e.attr("target", target);
     }
 
     if let Some(f) = props.on_click.0 {
@@ -782,8 +905,10 @@ pub struct HeadingProps {
     pub align: OptClass,
     /// Font weight (e.g., "light", "normal", "medium", "semibold", "bold")
     pub weight: OptClass,
-    /// E.g., text sizing and font weights.
     pub class: OptClass,
+    pub animate: OptClass,
+    pub animate_from: OptClass,
+    pub animate_fromto: crate::OptTuple,
     /// Optional click handler
     pub on_click: crate::Callback,
     /// Text content inside the heading.

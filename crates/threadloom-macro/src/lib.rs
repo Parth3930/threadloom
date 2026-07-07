@@ -279,22 +279,22 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         fn main() {
-            let window = ::web_sys::window().unwrap();
+            let window = ::threadloom_dom::web_sys::window().unwrap();
             let doc = window.document().unwrap();
             let body = doc.body().unwrap();
 
             let initial_path = window.location().pathname().unwrap_or_else(|_| "/".to_string());
             let (path_sig, set_path_sig) = ::threadloom_core::create_signal(initial_path);
 
-            crate::store::ROUTER_SETTER.with(|s| {
+            ::threadloom_dom::ROUTER_SETTER.with(|s| {
                 *s.borrow_mut() = Some(set_path_sig);
             });
 
-            use ::web_sys::wasm_bindgen::JsCast;
+            use ::threadloom_dom::wasm_bindgen::JsCast;
             let set_path_clone = set_path_sig;
-            let closure = ::web_sys::wasm_bindgen::closure::Closure::wrap(
+            let closure = ::threadloom_dom::wasm_bindgen::closure::Closure::wrap(
                 Box::new(move || {
-                    if let Some(w) = ::web_sys::window() {
+                    if let Some(w) = ::threadloom_dom::web_sys::window() {
                         let p = w.location().pathname().unwrap_or_else(|_| "/".to_string());
                         set_path_clone.set(p);
                         let _ = ::threadloom_dom::tick();
@@ -306,18 +306,18 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                 .unwrap();
             closure.forget();
 
-            let click_closure = ::web_sys::wasm_bindgen::closure::Closure::wrap(
-                Box::new(move |e: ::web_sys::Event| {
+            let click_closure = ::threadloom_dom::wasm_bindgen::closure::Closure::wrap(
+                Box::new(move |e: ::threadloom_dom::web_sys::Event| {
                     if let Some(target) = e.target() {
-                        use ::web_sys::wasm_bindgen::JsCast;
-                        if let Some(el) = target.dyn_ref::<::web_sys::Element>() {
+                        use ::threadloom_dom::wasm_bindgen::JsCast;
+                        if let Some(el) = target.dyn_ref::<::threadloom_dom::web_sys::Element>() {
                             if let Some(anchor) = el.closest("a[href]").unwrap_or(None) {
                                 if let Some(href) = anchor.get_attribute("href") {
                                     // Only intercept internal relative links
                                     if href.starts_with("/") && !href.starts_with("//") {
                                         e.prevent_default();
-                                        if let Some(w) = ::web_sys::window() {
-                                            let _ = w.history().unwrap().push_state_with_url(&::web_sys::wasm_bindgen::JsValue::NULL, "", Some(&href));
+                                        if let Some(w) = ::threadloom_dom::web_sys::window() {
+                                            let _ = w.history().unwrap().push_state_with_url(&::threadloom_dom::wasm_bindgen::JsValue::NULL, "", Some(&href));
                                             set_path_sig.set(href);
                                             let _ = ::threadloom_dom::tick();
                                             w.scroll_to_with_x_and_y(0.0, 0.0);
@@ -327,7 +327,7 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                             }
                         }
                     }
-                }) as Box<dyn FnMut(::web_sys::Event)>,
+                }) as Box<dyn FnMut(::threadloom_dom::web_sys::Event)>,
             );
             doc.add_event_listener_with_callback("click", click_closure.as_ref().unchecked_ref()).unwrap();
             click_closure.forget();

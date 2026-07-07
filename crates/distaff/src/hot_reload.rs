@@ -14,9 +14,36 @@ lazy_static::lazy_static! {
     static ref BACKEND_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
     static ref FRONTEND_PROCESSES: Mutex<Vec<Child>> = Mutex::new(Vec::new());
     static ref FILE_CACHE: Mutex<std::collections::HashMap<String, String>> = Mutex::new(std::collections::HashMap::new());
-    // Guard flag: while true, incoming watcher events are dropped.
-    // Prevents trunk/tailwind output writes from re-triggering a build.
     static ref IS_BUILDING: AtomicBool = AtomicBool::new(false);
+}
+
+pub fn kill_child(child: &mut std::process::Child) {
+    #[cfg(windows)]
+    {
+        let pid = child.id();
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = child.kill();
+    }
+}
+
+pub fn kill_all() {
+    if let Ok(mut child_guard) = BACKEND_PROCESS.lock() {
+        if let Some(mut child) = child_guard.take() {
+            kill_child(&mut child);
+        }
+    }
+    if let Ok(mut child_guard) = FRONTEND_PROCESSES.lock() {
+        for mut child in child_guard.drain(..) {
+            kill_child(&mut child);
+        }
+    }
 }
 
 fn robust_canonicalize(p: &std::path::Path) -> String {
@@ -81,7 +108,7 @@ pub fn restart_backend() {
     } else {
         // Old kill-and-restart fallback
         if let Some(mut child) = child_guard.take() {
-            let _ = child.kill();
+            kill_child(&mut child);
             let _ = child.wait();
         }
         println!("{} port 3001", "[⚡] backend:".cyan());

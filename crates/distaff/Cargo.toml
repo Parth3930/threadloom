@@ -33,3 +33,5 @@ proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 quote = "1.0.46"
 walkdir = "2.5.0"
 colored = "3.1.1"
+resvg = "0.41.0"
+image = { version = "0.25.10", features = ["ico"] }

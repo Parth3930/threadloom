@@ -1,13 +1,21 @@
 #![allow(warnings)]
+pub use js_sys;
+pub use reqwasm;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use threadloom_core::{AttributeValue, Boundary, NodeId, View, take_pending_boundaries, run_effects, create_effect};
+use threadloom_core::{
+    create_effect, run_effects, take_pending_boundaries, AttributeValue, Boundary, NodeId, View,
+};
+pub use wasm_bindgen;
 use wasm_bindgen::prelude::*;
+pub use wasm_bindgen_futures;
+pub use web_sys;
 use web_sys::{Document, Element, Node};
 
 thread_local! {
     static BOUNDARIES: RefCell<HashMap<NodeId, (Node, Rc<RefCell<dyn FnMut() -> View>>)>> = RefCell::new(HashMap::new());
+    pub static ROUTER_SETTER: std::cell::RefCell<Option<threadloom_core::WriteSignal<String>>> = std::cell::RefCell::new(None);
 }
 
 pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
@@ -22,8 +30,18 @@ pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
 fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
     match view {
         View::Text(text) => Ok(document.create_text_node(&text).into()),
-        View::Element { tag, attrs, children } => {
-            let el = if tag == "svg" || tag == "path" || tag == "circle" || tag == "rect" || tag == "g" || tag == "line" {
+        View::Element {
+            tag,
+            attrs,
+            children,
+        } => {
+            let el = if tag == "svg"
+                || tag == "path"
+                || tag == "circle"
+                || tag == "rect"
+                || tag == "g"
+                || tag == "line"
+            {
                 document.create_element_ns(Some("http://www.w3.org/2000/svg"), &tag)?
             } else {
                 document.create_element(&tag)?
@@ -59,7 +77,8 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                             cb();
                             let _ = crate::tick();
-                        }) as Box<dyn FnMut()>);
+                        })
+                            as Box<dyn FnMut()>);
                         el.add_event_listener_with_callback(&k, closure.as_ref().unchecked_ref())?;
                         closure.forget();
                     }
@@ -77,12 +96,13 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                 compute()
             });
             let node = render_view(document, view)?;
-            
+
             let compute_rc = boundary.compute.clone();
             BOUNDARIES.with(|b| {
-                b.borrow_mut().insert(boundary.id, (node.clone(), compute_rc));
+                b.borrow_mut()
+                    .insert(boundary.id, (node.clone(), compute_rc));
             });
-            
+
             Ok(node)
         }
         View::Fragment(children) => {
@@ -94,9 +114,7 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             }
             Ok(el.into())
         }
-        View::None => {
-            Ok(document.create_text_node("").into())
-        }
+        View::None => Ok(document.create_text_node("").into()),
     }
 }
 
@@ -107,9 +125,9 @@ pub fn tick() -> Result<(), JsValue> {
     // run_effects() re-runs any create_effect closures whose signals changed,
     // including dynamic attribute effects registered during render.
     run_effects();
-    
+
     let pending = take_pending_boundaries();
-    
+
     let mut boundary_updates = Vec::new();
 
     for id in pending {
@@ -126,7 +144,7 @@ pub fn tick() -> Result<(), JsValue> {
             }
         }
     }
-    
+
     BOUNDARIES.with(|b| {
         let mut boundaries = b.borrow_mut();
         for (id, new_node, compute) in boundary_updates {
@@ -137,20 +155,25 @@ pub fn tick() -> Result<(), JsValue> {
     Ok(())
 }
 
-
 #[macro_export]
 macro_rules! get_value {
     ($id:expr) => {{
         let mut val = String::new();
-        if let Some(w) = web_sys::window() {
+        if let Some(w) = $crate::web_sys::window() {
             if let Some(d) = w.document() {
                 if let Some(el) = d.get_element_by_id($id) {
-                    use web_sys::wasm_bindgen::JsCast;
-                    if let Ok(input_el) = el.clone().dyn_into::<web_sys::HtmlInputElement>() {
+                    use $crate::wasm_bindgen::JsCast;
+                    if let Ok(input_el) = el.clone().dyn_into::<$crate::web_sys::HtmlInputElement>()
+                    {
                         val = input_el.value();
-                    } else if let Ok(textarea_el) = el.clone().dyn_into::<web_sys::HtmlTextAreaElement>() {
+                    } else if let Ok(textarea_el) = el
+                        .clone()
+                        .dyn_into::<$crate::web_sys::HtmlTextAreaElement>()
+                    {
                         val = textarea_el.value();
-                    } else if let Ok(select_el) = el.dyn_into::<web_sys::HtmlSelectElement>() {
+                    } else if let Ok(select_el) =
+                        el.dyn_into::<$crate::web_sys::HtmlSelectElement>()
+                    {
                         val = select_el.value();
                     }
                 }
@@ -163,7 +186,7 @@ macro_rules! get_value {
 #[macro_export]
 macro_rules! spawn {
     ($fut:expr) => {
-        wasm_bindgen_futures::spawn_local(async move {
+        $crate::wasm_bindgen_futures::spawn_local(async move {
             $fut.await;
             let _ = $crate::tick();
         });
@@ -174,8 +197,8 @@ macro_rules! spawn {
 macro_rules! fetch {
     // With body
     ($method:ident $url:expr, $body:expr => |$text:ident| $success:block) => {
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(resp) = reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
+        $crate::wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(resp) = $crate::reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
                 if let Ok($text) = resp.text().await {
                     $success
                     let _ = $crate::tick();
@@ -184,8 +207,8 @@ macro_rules! fetch {
         });
     };
     ($method:ident $url:expr, $body:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
-        wasm_bindgen_futures::spawn_local(async move {
-            match reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
+        $crate::wasm_bindgen_futures::spawn_local(async move {
+            match $crate::reqwasm::http::Request::$method($url).header("Content-Type", "application/json").body($body).send().await {
                 Ok(resp) => {
                     match resp.text().await {
                         Ok($text) => {
@@ -210,8 +233,8 @@ macro_rules! fetch {
 
     // Without body
     ($method:ident $url:expr => |$text:ident| $success:block) => {
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(resp) = reqwasm::http::Request::$method($url).send().await {
+        $crate::wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(resp) = $crate::reqwasm::http::Request::$method($url).send().await {
                 if let Ok($text) = resp.text().await {
                     $success
                     let _ = $crate::tick();
@@ -220,8 +243,8 @@ macro_rules! fetch {
         });
     };
     ($method:ident $url:expr => |$text:ident| $success:block, |$err:ident| $error:block) => {
-        wasm_bindgen_futures::spawn_local(async move {
-            match reqwasm::http::Request::$method($url).send().await {
+        $crate::wasm_bindgen_futures::spawn_local(async move {
+            match $crate::reqwasm::http::Request::$method($url).send().await {
                 Ok(resp) => {
                     match resp.text().await {
                         Ok($text) => {
@@ -275,7 +298,7 @@ macro_rules! rpc {
 #[macro_export]
 macro_rules! alert {
     ($msg:expr) => {
-        if let Some(window) = web_sys::window() {
+        if let Some(window) = $crate::web_sys::window() {
             let _ = window.alert_with_message($msg);
         }
     };
@@ -284,7 +307,7 @@ macro_rules! alert {
 #[macro_export]
 macro_rules! log {
     ($($t:tt)*) => {
-        web_sys::console::log_1(&format!($($t)*).into());
+        $crate::web_sys::console::log_1(&format!($($t)*).into());
     }
 }
 
@@ -307,10 +330,10 @@ pub fn toggle_html_class(class: &str, active: bool) {
 macro_rules! get_cookie {
     () => {{
         let mut cookie_string = String::new();
-        if let Some(window) = web_sys::window() {
+        if let Some(window) = $crate::web_sys::window() {
             if let Some(document) = window.document() {
-                use web_sys::wasm_bindgen::JsCast;
-                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                use $crate::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<$crate::web_sys::HtmlDocument>() {
                     if let Ok(c) = html_doc.cookie() {
                         cookie_string = c;
                     }
@@ -337,10 +360,10 @@ macro_rules! get_cookie {
 #[macro_export]
 macro_rules! set_cookie {
     ($name:expr, $value:expr) => {
-        if let Some(window) = web_sys::window() {
+        if let Some(window) = $crate::web_sys::window() {
             if let Some(document) = window.document() {
-                use web_sys::wasm_bindgen::JsCast;
-                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                use $crate::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<$crate::web_sys::HtmlDocument>() {
                     let cookie_str = format!("{}={}; path=/", $name, $value);
                     let _ = html_doc.set_cookie(&cookie_str);
                 }
@@ -348,13 +371,89 @@ macro_rules! set_cookie {
         }
     };
     ($name:expr, $value:expr, $max_age:expr) => {
-        if let Some(window) = web_sys::window() {
+        if let Some(window) = $crate::web_sys::window() {
             if let Some(document) = window.document() {
-                use web_sys::wasm_bindgen::JsCast;
-                if let Ok(html_doc) = document.dyn_into::<web_sys::HtmlDocument>() {
+                use $crate::wasm_bindgen::JsCast;
+                if let Ok(html_doc) = document.dyn_into::<$crate::web_sys::HtmlDocument>() {
                     let cookie_str = format!("{}={}; max-age={}; path=/", $name, $value, $max_age);
                     let _ = html_doc.set_cookie(&cookie_str);
                 }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! navigate {
+    ($path:expr) => {
+        if let Some(window) = $crate::web_sys::window() {
+            let _ = window.history().unwrap().push_state_with_url(
+                &$crate::wasm_bindgen::JsValue::NULL,
+                "",
+                Some($path),
+            );
+            $crate::ROUTER_SETTER.with(|s| {
+                if let Some(setter) = *s.borrow() {
+                    setter.set($path.to_string());
+                }
+            });
+            let _ = $crate::tick();
+            window.scroll_to_with_x_and_y(0.0, 0.0);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! animate {
+    ($selector:expr, $config:expr) => {
+        if let Some(_) = $crate::web_sys::window() {
+            let script = format!("if (window.gsap) {{ gsap.to('{}', {}) }}", $selector, $config);
+            if let Err(e) = $crate::js_sys::eval(&script) {
+                $crate::web_sys::console::error_2(&"GSAP animate! error:".into(), &e);
+            }
+        }
+    };
+    (from $selector:expr, $config:expr) => {
+        if let Some(_) = $crate::web_sys::window() {
+            let script = format!("if (window.gsap) {{ gsap.from('{}', {}) }}", $selector, $config);
+            if let Err(e) = $crate::js_sys::eval(&script) {
+                $crate::web_sys::console::error_2(&"GSAP animate! from error:".into(), &e);
+            }
+        }
+    };
+    (fromTo $selector:expr, $from:expr, $to:expr) => {
+        if let Some(_) = $crate::web_sys::window() {
+            let script = format!("if (window.gsap) {{ gsap.fromTo('{}', {}, {}) }}", $selector, $from, $to);
+            if let Err(e) = $crate::js_sys::eval(&script) {
+                $crate::web_sys::console::error_2(&"GSAP animate! fromTo error:".into(), &e);
+            }
+        }
+    };
+    (timeline $script:expr) => {
+        if let Some(_) = $crate::web_sys::window() {
+            let script = format!("if (window.gsap) {{ let tl = gsap.timeline(); {} }}", $script);
+            if let Err(e) = $crate::js_sys::eval(&script) {
+                $crate::web_sys::console::error_2(&"GSAP animate! timeline error:".into(), &e);
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! redirect {
+    ($url:expr) => {
+        if let Some(w) = $crate::web_sys::window() {
+            let _ = w.location().assign($url);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! back {
+    () => {
+        if let Some(w) = $crate::web_sys::window() {
+            if let Ok(h) = w.history() {
+                let _ = h.back();
             }
         }
     };

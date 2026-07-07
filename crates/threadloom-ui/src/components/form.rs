@@ -13,6 +13,8 @@ pub struct ButtonProps {
     pub variant: OptClass,
     /// Custom class to append or override.
     pub class: OptClass,
+    pub href: OptClass,
+    pub target: OptClass,
     /// Callback triggered when the button is clicked.
     pub on_click: Callback,
     /// Callback triggered when the mouse enters or leaves the button.
@@ -52,8 +54,15 @@ pub fn Button(props: ButtonProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    let mut b = element("button")
-        .attr("class", class_str);
+    let tag = if props.href.0.is_some() { "a" } else { "button" };
+    let mut b = element(tag).attr("class", class_str);
+    
+    if let Some(href) = props.href.0 {
+        b = b.attr("href", href);
+    }
+    if let Some(target) = props.target.0 {
+        b = b.attr("target", target);
+    }
     
     if !props.label.is_empty() {
         b = b.child(text(props.label));

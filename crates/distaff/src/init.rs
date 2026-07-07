@@ -65,6 +65,7 @@ pub fn init_project() -> anyhow::Result<()> {
     if let Ok(content) = fs::read_to_string(&cargo_toml_path) {
         let new_content = content
             .replace("name = \"demo\"", &format!("name = \"{}\"", name))
+            .replace("default-run = \"demo\"", &format!("default-run = \"{}\"", name))
             .replace("../crates/", "../threadloom/crates/");
         fs::write(cargo_toml_path, new_content)?;
     }
@@ -74,7 +75,8 @@ pub fn init_project() -> anyhow::Result<()> {
     if let Ok(content) = fs::read_to_string(&index_html_path) {
         let new_content = content
             .replace("<title>demo</title>", &format!("<title>{}</title>", name))
-            .replace("<title>Demo</title>", &format!("<title>{}</title>", name));
+            .replace("<title>Demo</title>", &format!("<title>{}</title>", name))
+            .replace("data-bin=\"demo\"", &format!("data-bin=\"{}\"", name));
         fs::write(index_html_path, new_content)?;
     }
 
