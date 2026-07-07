@@ -241,22 +241,14 @@ async fn main() -> anyhow::Result<()> {
                 };
                 let safe_pkg_name = pkg_name.replace("-", "_");
 
-                // 2. Write api/index.rs (uses direct imports — always compiled with lambda feature)
-                let index_content = format!(r#"use threadloom::server_types::lambda_adapter;
-use threadloom::server_types::lambda_http;
+                // 2. Write api/index.rs (vercel_runtime v2: TCP listener, no AWS Lambda env vars needed)
+                let index_content = format!(r#"use {}::api_routes;
 
-use {}::api_routes;
-
-fn main() -> Result<(), lambda_http::Error> {{
-    threadloom::server_types::tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {{
-            let mut server = threadloom::server_types::Server::new();
-            api_routes::configure_api(&mut server);
-            lambda_adapter::run(server).await
-        }})
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {{
+    let mut server = threadloom::server_types::Server::new();
+    api_routes::configure_api(&mut server);
+    threadloom::server_types::lambda_adapter::run(server).await
 }}
 "#, safe_pkg_name);
                 std::fs::write("api/index.rs", index_content)?;
@@ -273,7 +265,7 @@ fn main() -> Result<(), lambda_http::Error> {{
                 println!("{} Created vercel.json", "[+]".green());
 
                 // 3.5 Write build_vercel.sh
-                let build_script = r#"#!/bin/bash
+                let build_script = format!(r#"#!/bin/bash
 set -e
 
 if ! command -v rustup &> /dev/null; then
@@ -285,7 +277,9 @@ rustup target add wasm32-unknown-unknown
 cargo fetch
 npm run build:css
 curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_64-unknown-linux-musl.tar.gz | tar -xz
-./trunk build --release"#;
+./trunk build --release
+cargo build --bin index --features lambda --release --target-dir target/vercel
+"#);
                 std::fs::write("build_vercel.sh", build_script)?;
                 println!("{} Created build_vercel.sh", "[+]".green());
                 
@@ -319,6 +313,18 @@ curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_6
                             "threadloom = { path = \"../crates/threadloom\" }",
                             "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
                         );
+                    }
+
+                    // Add tokio as a direct dep in non-wasm section (needed for #[tokio::main] macro)
+                    if !updated_toml.contains("tokio = ") {
+                        let tokio_dep = "tokio = { version = \"1\", features = [\"full\"] }\n";
+                        if let Some(idx) = updated_toml.find("[target.'cfg(not(target_arch") {
+                            // find the end of that section header line
+                            if let Some(newline) = updated_toml[idx..].find('\n') {
+                                let insert_at = idx + newline + 1;
+                                updated_toml.insert_str(insert_at, tokio_dep);
+                            }
+                        }
                     }
 
                     // Add [lib]
