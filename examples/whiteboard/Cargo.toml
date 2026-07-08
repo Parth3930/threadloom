@@ -31,10 +31,13 @@ web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlE
 wasm-bindgen-futures = "0.4"
 reqwasm = "0.5"
 futures-util = "0.3.32"
+
 [features]
+android = ["dep:threadloom-android"]
 desktop = ["dep:threadloom-desktop"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+threadloom-android = { path = "../../crates/threadloom-android", optional = true }
 actix-web = "4"
 threadloom = { path = "../../crates/threadloom", features = ["actix"] }
 actix-files = "0.6"
@@ -53,4 +56,9 @@ js-sys = "0.3.103"
 wasm-bindgen = "0.2"
 serde_json = "1.0"
 
-[workspace]
+
+
+[lib]
+name = "whiteboard_lib"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"

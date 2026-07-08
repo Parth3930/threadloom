@@ -1,4 +1,4 @@
-use threadloom_core::{element, IntoView, View};
+use threadloom_core::View;
 use threadloom_macro::threadloom;
 use threadloom_ui::*;
 
@@ -9,15 +9,15 @@ pub fn page() -> View {
                 Heading(level=1, class="text-8xl sm:text-9xl font-bold tracking-tighter text-foreground leading-none") {
                     "404"
                 }
-                
+
                 Text(variant="p", class="text-xl sm:text-2xl text-muted-foreground font-medium mt-4") {
                     "Page not found."
                 }
-                
+
                 Text(variant="p", class="text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed max-w-md") {
                     "The page you are looking for might have been removed, had its name changed, or is temporarily unavailable."
                 }
-                
+
                 Row(items="center", justify="center", gap=4, class="w-full sm:w-auto flex-col sm:flex-row") {
                     Button(
                         label="Go Back",

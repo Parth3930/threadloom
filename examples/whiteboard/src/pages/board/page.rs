@@ -42,7 +42,7 @@ pub fn page() -> View {
                         .attr("stroke-width", "2")
                         .attr("stroke-linecap", "round")
                         .attr("stroke-linejoin", "round");
-                        
+
                     for (tag, attrs) in paths {
                         let mut el = threadloom_core::element(*tag);
                         for (k, v) in *attrs {
@@ -53,8 +53,8 @@ pub fn page() -> View {
                     svg.into_view()
                 };
 
-                let active_btn = "rounded-full px-4 py-2 !bg-primary !text-primary-foreground font-medium text-sm !border-none hover:!bg-primary hover:!text-primary-foreground !shadow-none flex items-center justify-center";
-                let inactive_btn = "rounded-full px-4 py-2 !bg-transparent !text-foreground font-medium text-sm !border-none hover:!bg-transparent hover:!text-foreground !shadow-none hover:!shadow-none flex items-center justify-center";
+                let active_btn = "rounded-full px-2 sm:px-4 py-2 !bg-primary !text-primary-foreground font-medium text-sm !border-none hover:!bg-primary hover:!text-primary-foreground !shadow-none flex items-center justify-center";
+                let inactive_btn = "rounded-full px-2 sm:px-4 py-2 !bg-transparent !text-foreground font-medium text-sm !border-none hover:!bg-transparent hover:!text-foreground !shadow-none hover:!shadow-none flex items-center justify-center";
 
                 let is_shape = tool == "shape" || tool == "rect" || tool == "circle" || tool == "triangle";
                 let brush_cls = if tool == "brush" { active_btn } else { inactive_btn };
@@ -77,7 +77,7 @@ pub fn page() -> View {
                         { move || {
                             if is_shape {
                                 threadloom! {
-                                    Row(items="center", gap=2, class="bg-card border border-border shadow-lg rounded-full px-4 py-2") {
+                                    Row(items="center", class="gap-1 sm:gap-2 bg-card border border-border shadow-lg rounded-full px-2 sm:px-4 py-2") {
                                         Button(label="", primary=false, class=rect_cls, on_click=move || set_active_tool.set("rect".to_string())) {
                                             { icon(&[("rect", &[("x", "3"), ("y", "3"), ("width", "18"), ("height", "18"), ("rx", "2"), ("ry", "2")])]) }
                                         }
@@ -93,7 +93,7 @@ pub fn page() -> View {
                                 threadloom! { Section(row=false, class="hidden") {} }.into_view()
                             }
                         }}
-                        Row(items="center", gap=2, class="bg-card border border-border shadow-lg rounded-full px-4 py-3") {
+                        Row(items="center", class="gap-1 sm:gap-2 bg-card border border-border shadow-lg rounded-full px-2 sm:px-4 py-2 sm:py-3") {
                             Button(label="", primary=false, class=brush_cls, on_click=move || set_active_tool.set("brush".to_string())) {
                                 { icon(&[("path", &[("d", "m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08")]), ("path", &[("d", "M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.35 2.22 2.02 3 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z")])]) }
                             }
@@ -107,9 +107,9 @@ pub fn page() -> View {
                                 { icon(&[("path", &[("d", "m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21")]), ("path", &[("d", "M22 21H7")]), ("path", &[("d", "m5 11 9 9")])]) }
                             }
 
-                            Section(row=false, class="w-px h-6 bg-border mx-2") {}
+                            Section(row=false, class="w-px h-6 bg-border mx-2 sm:mx-2") {}
 
-                            Row(items="center", gap=2) {
+                            Row(items="center", class="gap-1 sm:gap-5") {
                                 Button(label="", primary=false, class=c_black, on_click=move || set_active_color.set("#000000".to_string())) {}
                                 Button(label="", primary=false, class=c_red, on_click=move || set_active_color.set("#ef4444".to_string())) {}
                                 Button(label="", primary=false, class=c_blue, on_click=move || set_active_color.set("#3b82f6".to_string())) {}

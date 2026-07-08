@@ -172,6 +172,10 @@ fn is_output_path(p: &str) -> bool {
         || p.ends_with("/target")
         || p.starts_with("target/")
         || p == "target"
+        || p.contains("/android/")
+        || p.ends_with("/android")
+        || p.starts_with("android/")
+        || p == "android"
         || p.contains("Cargo.lock")
         || p.contains("src/routes.rs")
         || p.contains("src/api_routes.rs")

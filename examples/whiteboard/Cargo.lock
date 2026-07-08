@@ -4752,6 +4752,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "threadloom-android"
+version = "0.1.0"
+dependencies = [
+ "mime_guess",
+ "tao",
+ "tokio",
+ "wry",
+]
+
+[[package]]
 name = "threadloom-core"
 version = "0.1.1"
 dependencies = [
@@ -4809,7 +4819,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-server"
-version = "0.1.1"
+version = "0.1.11"
 dependencies = [
  "actix-rt",
  "actix-web",
@@ -5672,6 +5682,7 @@ dependencies = [
  "serde",
  "serde_json",
  "threadloom",
+ "threadloom-android",
  "threadloom-core",
  "threadloom-desktop",
  "threadloom-dom",

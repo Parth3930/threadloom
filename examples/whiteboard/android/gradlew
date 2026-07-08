@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fallback to system gradle if no wrapper
+gradle "$@"

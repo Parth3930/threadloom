@@ -1,0 +1,19 @@
+[package]
+name = "threadloom-android"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+wry = "0.45"
+tao = "0.30"
+tokio = { version = "1.0", features = ["full"] }
+mime_guess = "2.0.5"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.threadloom.app">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true"
+        android:label="Threadloom App"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <!-- tao/wry NativeActivity integration -->
+        <activity android:name=".MainActivity"
+                  android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+                  android:exported="true"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+            <meta-data android:name="android.app.lib_name" android:value="whiteboard_lib" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+        

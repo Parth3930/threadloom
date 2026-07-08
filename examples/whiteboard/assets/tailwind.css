@@ -3783,6 +3783,11 @@ select.tl-input {
 }
 
 @media (min-width: 640px) {
+  .sm\:mx-2 {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+  }
+
   .sm\:block {
     display: block;
   }
@@ -3899,8 +3904,26 @@ select.tl-input {
     flex-direction: row;
   }
 
+  .sm\:gap-2 {
+    gap: 0.5rem;
+  }
+
+  .sm\:gap-5 {
+    gap: 1.25rem;
+  }
+
   .sm\:p-8 {
     padding: 2rem;
+  }
+
+  .sm\:px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .sm\:py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
   }
 
   .sm\:text-2xl {

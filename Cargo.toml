@@ -9,9 +9,10 @@ members = [
     "crates/threadloom",
     "crates/distaff",
 
-    "crates/threadloom-desktop", "crates/threadloom-ui"
+    "crates/threadloom-desktop", "crates/threadloom-ui",
+    "crates/threadloom-android",
+    "examples/*"
 ]
-
 [profile.dev]
 opt-level = 0
 lto = false

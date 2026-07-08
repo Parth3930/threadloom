@@ -26,6 +26,8 @@ enum Commands {
         port: u16,
         #[arg(long)]
         desktop: bool,
+        #[arg(long)]
+        android: bool,
     },
     /// Alias for Dev
     Run {
@@ -33,11 +35,15 @@ enum Commands {
         port: u16,
         #[arg(long)]
         desktop: bool,
+        #[arg(long)]
+        android: bool,
     },
     /// Build the project for production
     Build {
         #[arg(long)]
         desktop: bool,
+        #[arg(long)]
+        android: bool,
         /// Setup project for Vercel serverless deployment
         #[arg(long)]
         vercel: bool,
@@ -46,6 +52,8 @@ enum Commands {
     Init,
     /// Update distaff to the latest version
     Update,
+    /// Show help information
+    Help,
 }
 
 fn check_update() {
@@ -106,6 +114,165 @@ fn convert_svg_to_icons() {
     }
 }
 
+fn setup_android() -> anyhow::Result<()> {
+    let ndk_check = std::process::Command::new("cargo")
+        .args(["ndk", "--version"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+        
+    if ndk_check.is_err() || !ndk_check.unwrap().success() {
+        use colored::Colorize;
+        println!("{} cargo-ndk not found, installing...", "[📱] android:".blue());
+        let _ = std::process::Command::new("cargo")
+            .args(["install", "cargo-ndk"])
+            .status();
+    }
+
+    let cargo_toml_str = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
+    let pkg_name = if let Some(name_line) = cargo_toml_str.lines().find(|l| l.starts_with("name = ")) {
+        name_line.replace("name = ", "").replace("\"", "").trim().to_string()
+    } else {
+        "app".to_string()
+    };
+    let safe_pkg_name = pkg_name.replace("-", "_");
+    let lib_name = format!("{}_lib", safe_pkg_name);
+
+    let android_dir = std::path::Path::new("android");
+    if !android_dir.exists() {
+        use colored::Colorize;
+        println!("{} creating android project template", "[📱] android:".green());
+        std::fs::create_dir_all("android/app/src/main/res/values")?;
+        std::fs::create_dir_all("android/app/src/main/java/com/threadloom/app")?;
+        
+        std::fs::write("android/build.gradle", r#"
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+}
+allprojects {
+    repositories { google(); mavenCentral() }
+}
+        "#)?;
+
+        std::fs::write("android/settings.gradle", "include ':app'")?;
+        std::fs::write("android/gradle.properties", "android.useAndroidX=true\nandroid.enableJetifier=true\n")?;
+
+        std::fs::write("android/app/build.gradle", r#"
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'com.threadloom.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.threadloom.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+}
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
+task buildRust(type: Exec) {
+    workingDir '../../'
+    commandLine 'cargo', 'ndk', '-t', 'arm64-v8a', '-o', 'android/app/src/main/jniLibs', 'build', '--lib', '--features', 'android'
+}
+tasks.whenTaskAdded { task ->
+    if (task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease') {
+        task.dependsOn buildRust
+    }
+}
+        "#)?;
+
+        std::fs::write("android/app/src/main/AndroidManifest.xml", format!(r#"<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.threadloom.app">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true"
+        android:label="Threadloom App"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <!-- tao/wry NativeActivity integration -->
+        <activity android:name=".MainActivity"
+                  android:exported="true"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+            <meta-data android:name="android.app.lib_name" android:value="{}" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+        "#, lib_name))?;
+
+        std::fs::write("android/gradlew", "#!/bin/sh\n# Fallback to system gradle if no wrapper\ngradle \"$@\"\n")?;
+        #[cfg(unix)]
+        std::fs::set_permissions("android/gradlew", std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
+    }
+
+    if let Ok(mut cargo_toml) = std::fs::read_to_string("Cargo.toml") {
+        let mut changed = false;
+        if !cargo_toml.contains("threadloom-android") {
+            cargo_toml = cargo_toml.replace(
+                "[target.'cfg(not(target_arch = \"wasm32\"))'.dependencies]", 
+                "[target.'cfg(not(target_arch = \"wasm32\"))'.dependencies]\nthreadloom-android = { optional = true, version = \"*\" }"
+            );
+            changed = true;
+        }
+        if !cargo_toml.contains("android = [\"dep:threadloom-android\"]") && cargo_toml.contains("[features]") {
+            cargo_toml = cargo_toml.replace("[features]", "[features]\nandroid = [\"dep:threadloom-android\"]");
+            changed = true;
+        }
+        if !cargo_toml.contains("[lib]") {
+            cargo_toml.push_str(&format!("\n\n[lib]\nname = \"{}\"\ncrate-type = [\"cdylib\", \"rlib\"]\npath = \"src/lib.rs\"\n", lib_name));
+            changed = true;
+            
+            let lib_path = std::path::Path::new("src/lib.rs");
+            if !lib_path.exists() {
+                let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
+                let mut lib_content = String::new();
+                for line in main_rs.lines() {
+                    if line.starts_with("pub mod ") || line.starts_with("mod ") {
+                        lib_content.push_str(&line.replace("mod ", "pub mod "));
+                        lib_content.push('\n');
+                    }
+                }
+                if lib_content.is_empty() {
+                    lib_content.push_str("pub mod api;\n");
+                }
+                let _ = std::fs::write(lib_path, lib_content);
+            }
+            
+            let mut lib_content = std::fs::read_to_string(lib_path).unwrap_or_default();
+            if !lib_content.contains("android_binding!") {
+                lib_content.push_str(&format!("\n#[cfg(target_os = \"android\")]\npub use threadloom_android::tao;\n#[cfg(target_os = \"android\")]\npub use threadloom_android::run_android_app;\n\n#[cfg(target_os = \"android\")]\n#[allow(non_snake_case)]\n#[no_mangle]\npub extern \"C\" fn _tao_init() {{\n    threadloom_android::tao::android_binding!(\n        com_threadloom,\n        app,\n        WryActivity,\n        threadloom_android::wry::android_setup,\n        run_android_app,\n        threadloom_android::tao\n    );\n    threadloom_android::wry::android_binding!(com_threadloom, app, threadloom_android::wry);\n}}\n"));
+                let _ = std::fs::write(lib_path, lib_content);
+            }
+        }
+        if changed {
+            let _ = std::fs::write("Cargo.toml", cargo_toml);
+            use colored::Colorize;
+            println!("{} auto-patched Cargo.toml for Android", "[📱] android:".green());
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
@@ -122,7 +289,8 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Dev { port, desktop } | Commands::Run { port, desktop } => {
+        Commands::Dev { port, desktop, android } | Commands::Run { port, desktop, android } => {
+
             if matches!(cli.command, Commands::Run { .. }) {
                 check_update();
             }
@@ -160,7 +328,72 @@ async fn main() -> anyhow::Result<()> {
 
             let plugins = std::sync::Arc::new(std::sync::Mutex::new(plugins));
 
-            if *desktop {
+            if *android {
+                if let Err(e) = setup_android() {
+                    tracing::error!("Failed to setup android project: {}", e);
+                    std::process::exit(1);
+                }
+                
+                let port_clone = *port;
+                let plugins_clone = plugins.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = server::start_dev_server(port_clone, plugins_clone).await {
+                        tracing::error!("Dev server error: {}", e);
+                    }
+                });
+
+                println!("{} port forwarding via adb", "[📱] android:".blue());
+                let _ = std::process::Command::new("adb")
+                    .args(["reverse", &format!("tcp:{}", port), &format!("tcp:{}", port)])
+                    .status();
+
+                println!("{} building android app", "[📱] android:".blue());
+                
+                let mut cmd = if cfg!(windows) {
+                    let mut c = std::process::Command::new("cmd");
+                    c.args(["/C", "gradle"]);
+                    c
+                } else {
+                    std::process::Command::new("gradle")
+                };
+                
+                let status = cmd
+                    .current_dir("android")
+                    .args(["installDebug"])
+                    .status();
+                    
+                if let Ok(s) = status {
+                    if !s.success() {
+                        tracing::error!("Failed to build android app");
+                        std::process::exit(1);
+                    }
+                } else {
+                    tracing::error!("Failed to run gradle. Is it installed?");
+                    std::process::exit(1);
+                }
+
+                println!("{} launching android app", "[📱] android:".blue());
+                let _ = std::process::Command::new("adb")
+                    .args(["shell", "am", "start", "-n", "com.threadloom.app/.MainActivity"])
+                    .status();
+                
+                println!("{} streaming logcat...", "[📱] android:".blue());
+                let mut logcat = tokio::process::Command::new("adb")
+                    .args(["logcat", "-v", "time", "-s", "Threadloom:V", "RustStdoutStderr:V"])
+                    .spawn()?;
+                    
+                tokio::select! {
+                    _ = logcat.wait() => {},
+                    _ = tokio::signal::ctrl_c() => {
+                        println!("{} shutting down...", "[👋] exit:".yellow());
+                        let _ = std::process::Command::new("adb")
+                            .args(["reverse", "--remove", &format!("tcp:{}", port)])
+                            .status();
+                    }
+                }
+                crate::hot_reload::kill_all();
+                std::process::exit(0);
+            } else if *desktop {
                 let port_clone = *port;
                 tokio::spawn(async move {
                     if let Err(e) = server::start_dev_server(port_clone, plugins).await {
@@ -240,7 +473,7 @@ async fn main() -> anyhow::Result<()> {
                 std::process::exit(0);
             }
         }
-        Commands::Build { desktop, vercel } => {
+        Commands::Build { desktop, android, vercel } => {
             if *vercel {
                 use colored::Colorize;
                 println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
@@ -458,6 +691,33 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
                 }
             }
 
+            if *android {
+                if let Err(e) = setup_android() {
+                    tracing::error!("Failed to setup android project: {}", e);
+                    std::process::exit(1);
+                }
+                println!("{} building android app", "[📱] android:".blue());
+                
+                let mut cmd = if cfg!(windows) {
+                    let mut c = std::process::Command::new("cmd");
+                    c.args(["/C", "gradle"]);
+                    c
+                } else {
+                    std::process::Command::new("gradle")
+                };
+                
+                let status = cmd
+                    .current_dir("android")
+                    .args(["assembleRelease"])
+                    .status()?;
+                    
+                if status.success() {
+                    println!("{} Android APK built in android/app/build/outputs/apk/release/", "[✅] android:".green());
+                } else {
+                    tracing::error!("Failed to build android app");
+                }
+            }
+
             if *desktop {
                 println!("{} building desktop app", "[💻] desktop:".blue());
                 let status = std::process::Command::new("cargo")
@@ -506,6 +766,10 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
                     eprintln!("Failed to update distaff.");
                 }
             }
+        }
+        Commands::Help => {
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
         }
     }
 

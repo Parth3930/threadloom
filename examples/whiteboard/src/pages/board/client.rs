@@ -442,7 +442,7 @@ async fn init_board_inner(
         *last_x_down.borrow_mut() = x;
         *last_y_down.borrow_mut() = y;
     }) as Box<dyn FnMut(_)>);
-    canvas.add_event_listener_with_callback("mousedown", on_down.as_ref().unchecked_ref())?;
+    canvas.add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())?;
     on_down.forget();
 
     let is_drawing_up = is_drawing.clone();
@@ -502,8 +502,8 @@ async fn init_board_inner(
         // Take snapshot after drawing stroke/shape/eraser is complete
         send_snapshot_up();
     }) as Box<dyn FnMut(_)>);
-    canvas.add_event_listener_with_callback("mouseup", on_up.as_ref().unchecked_ref())?;
-    canvas.add_event_listener_with_callback("mouseleave", on_up.as_ref().unchecked_ref())?;
+    canvas.add_event_listener_with_callback("pointerup", on_up.as_ref().unchecked_ref())?;
+    canvas.add_event_listener_with_callback("pointerleave", on_up.as_ref().unchecked_ref())?;
     on_up.forget();
 
     let is_drawing_move = is_drawing.clone();
@@ -573,7 +573,7 @@ async fn init_board_inner(
         *last_x_move.borrow_mut() = x;
         *last_y_move.borrow_mut() = y;
     }) as Box<dyn FnMut(_)>);
-    canvas.add_event_listener_with_callback("mousemove", on_move.as_ref().unchecked_ref())?;
+    canvas.add_event_listener_with_callback("pointermove", on_move.as_ref().unchecked_ref())?;
     on_move.forget();
 
     let f = Rc::new(RefCell::new(None as Option<Closure<dyn FnMut()>>));
