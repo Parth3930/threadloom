@@ -2,7 +2,7 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-server"
-version = "0.1.1"
+version = "0.1.11"
 edition = "2021"
 
 [features]

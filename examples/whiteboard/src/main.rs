@@ -42,23 +42,21 @@ async fn main() -> std::io::Result<()> {
         log::error!("Failed to init DB: {}", e);
     }
 
-    HttpServer::new(|| {
-        let mut server = threadloom::server_types::Server::new();
-        api_routes::configure_api(&mut server);
+    let mut server = threadloom::server_types::Server::new();
+    api_routes::configure_api(&mut server);
 
-        App::new()
-            .wrap(Logger::default())
-            .configure(|cfg| threadloom::server_types::actix_adapter::configure(&server, cfg))
-            .route("/api/ws", actix_web::web::get().to(crate::ws::handler::ws_route))
-            .service(
-                Files::new("/", "./dist")
-                    .index_file("index.html")
-                    .default_handler(actix_web::web::to(|| async {
-                        actix_files::NamedFile::open("./dist/index.html")
-                    })),
-            )
-    })
-    .bind(format!("0.0.0.0:{}", port))?
-    .run()
-    .await
+    server.run_with_actix_config(port.parse().unwrap(), |cfg| {
+        cfg.service(
+            actix_web::web::scope("")
+                .wrap(Logger::default())
+                .route("/api/ws", actix_web::web::get().to(crate::ws::handler::ws_route))
+                .service(
+                    Files::new("/", "./dist")
+                        .index_file("index.html")
+                        .default_handler(actix_web::web::to(|| async {
+                            actix_files::NamedFile::open("./dist/index.html")
+                        })),
+                )
+        );
+    }).await
 }

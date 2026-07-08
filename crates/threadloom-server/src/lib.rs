@@ -38,6 +38,35 @@ impl Server {
 }
 
 #[cfg(feature = "actix")]
+impl Server {
+    pub async fn run(self, port: u16) -> std::io::Result<()> {
+        let server = Arc::new(self);
+        actix_web::HttpServer::new(move || {
+            actix_web::App::new()
+                .configure(|cfg| actix_adapter::configure_arc(&server, cfg))
+        })
+        .bind(("0.0.0.0", port))?
+        .run()
+        .await
+    }
+
+    pub async fn run_with_actix_config<F>(self, port: u16, actix_cfg: F) -> std::io::Result<()>
+    where
+        F: Fn(&mut actix_web::web::ServiceConfig) + Send + Clone + 'static,
+    {
+        let server = Arc::new(self);
+        actix_web::HttpServer::new(move || {
+            actix_web::App::new()
+                .configure(|cfg| actix_adapter::configure_arc(&server, cfg))
+                .configure(actix_cfg.clone())
+        })
+        .bind(("0.0.0.0", port))?
+        .run()
+        .await
+    }
+}
+
+#[cfg(feature = "actix")]
 pub mod actix_adapter {
     use super::{Handler, Server};
     use actix_web::{web, HttpRequest, HttpResponse};
@@ -74,6 +103,17 @@ pub mod actix_adapter {
     }
 
     pub fn configure(server: &Server, cfg: &mut actix_web::web::ServiceConfig) {
+        for (path, handler) in &server.routes {
+            let handler_data = web::Data::new(Arc::clone(handler));
+            cfg.service(
+                web::resource(path)
+                    .app_data(handler_data.clone())
+                    .route(web::post().to(actix_handler_wrapper))
+            );
+        }
+    }
+
+    pub fn configure_arc(server: &Arc<Server>, cfg: &mut actix_web::web::ServiceConfig) {
         for (path, handler) in &server.routes {
             let handler_data = web::Data::new(Arc::clone(handler));
             cfg.service(

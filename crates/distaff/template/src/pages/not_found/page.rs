@@ -35,7 +35,7 @@ pub fn page() -> View {
                         label="Go Home",
                         primary=true,
                         class="px-8 py-5 rounded-none text-sm font-medium border border-foreground bg-foreground text-background hover:bg-muted-foreground transition-colors shadow-none w-full sm:w-auto",
-                        on_click=move || crate::store::navigate("/")
+                        on_click=move || threadloom::navigate!("/")
                     )
                 }
             }

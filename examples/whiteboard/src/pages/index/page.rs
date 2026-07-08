@@ -114,7 +114,7 @@ pub fn page() -> View {
                                 if !val.is_empty() {
                                     threadloom_dom::wasm_bindgen_futures::spawn_local(async move {
                                         match crate::api::join_room::route::join_room(crate::api::join_room::route::JoinRoomArgs { id: val.clone() }).await {
-                                            Ok(_) => crate::store::navigate(&format!("/board?room={}", val)),
+                                            Ok(_) => threadloom::navigate!(&format!("/board?room={}", val)),
                                             Err(e) => set_error_msg.set(e),
                                         }
                                         let _ = threadloom_dom::tick();
@@ -148,7 +148,7 @@ pub fn page() -> View {
                                                 crate::store::save_cached_rooms(&list);
                                                 set_rooms.set(list);
                                             }
-                                            crate::store::navigate(&format!("/board?room={}", room_id));
+                                            threadloom::navigate!(&format!("/board?room={}", room_id));
                                         }
                                         Err(e) => set_error_msg.set(e),
                                     }

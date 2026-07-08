@@ -18,6 +18,9 @@ thread_local! {
     pub static ROUTER_SETTER: std::cell::RefCell<Option<threadloom_core::WriteSignal<String>>> = std::cell::RefCell::new(None);
 }
 
+pub mod storage;
+pub mod ws;
+
 pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
     let window = web_sys::window().expect("no global `window` exists");
     let document = window.document().expect("should have a document on window");
@@ -392,9 +395,11 @@ macro_rules! navigate {
                 "",
                 Some($path),
             );
+            let path_str = $path;
+            let route = path_str.split(['?', '#']).next().unwrap_or(path_str);
             $crate::ROUTER_SETTER.with(|s| {
                 if let Some(setter) = *s.borrow() {
-                    setter.set($path.to_string());
+                    setter.set(route.to_string());
                 }
             });
             let _ = $crate::tick();

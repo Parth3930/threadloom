@@ -143,7 +143,7 @@ async fn init_board_inner(
         "ws:"
     };
     let host = window.location().host().unwrap();
-    let ws = WebSocket::new(&format!("{}//{}/api/ws?room={}", protocol, host, room_id)).unwrap();
+    let ws = threadloom::ws::WsClient::new(&format!("{}//{}/api/ws?room={}", protocol, host, room_id)).unwrap();
 
     let is_drawing = Rc::new(RefCell::new(false));
     let start_x = Rc::new(RefCell::new(0.0));
@@ -215,13 +215,13 @@ async fn init_board_inner(
                 if let Ok(Some(ls)) = window_ls.local_storage() {
                     let _ = ls.set_item(&format!("board_{}", room_id), &data_url);
                 }
-                if ws.ready_state() == WebSocket::OPEN {
+                if ws.ws.ready_state() == WebSocket::OPEN {
                     let msg = serde_json::json!({
                         "type": "snapshot",
                         "data": data_url
                     })
                     .to_string();
-                    let _ = ws.send_with_str(&msg);
+                    let _ = ws.send(&msg);
                 }
             }
         }) as Rc<dyn Fn()>
@@ -358,7 +358,7 @@ async fn init_board_inner(
             }
         }) as Box<dyn FnMut(_)>)
     };
-    ws_rc.set_onmessage(Some(ws_onmsg.as_ref().unchecked_ref()));
+    ws_rc.ws.set_onmessage(Some(ws_onmsg.as_ref().unchecked_ref()));
     ws_onmsg.forget();
 
     let is_drawing_down = is_drawing.clone();
@@ -410,12 +410,12 @@ async fn init_board_inner(
                     ctx_clone.set_font("20px sans-serif");
                     let _ = ctx_clone.fill_text(&text, x, y + 10.0);
                     
-                    if ws_clone.ready_state() == WebSocket::OPEN {
+                    if ws_clone.ws.ready_state() == WebSocket::OPEN {
                         let msg = serde_json::json!({
                             "type": "stroke",
                             "data": { "tool": "text", "color": color_clone, "x0": x, "y0": y + 10.0, "text": text }
                         }).to_string();
-                        let _ = ws_clone.send_with_str(&msg);
+                        let _ = ws_clone.send(&msg);
                     }
                     snapshot_clone();
                 }
@@ -490,12 +490,12 @@ async fn init_board_inner(
                 ctx_up.stroke();
             }
 
-            if ws_up.ready_state() == WebSocket::OPEN {
+            if ws_up.ws.ready_state() == WebSocket::OPEN {
                 let msg = serde_json::json!({
                     "type": "stroke",
                     "data": { "tool": tool, "color": color, "x0": sx, "y0": sy, "x1": ex, "y1": ey }
                 }).to_string();
-                let _ = ws_up.send_with_str(&msg);
+                let _ = ws_up.send(&msg);
             }
         }
 
@@ -521,9 +521,9 @@ async fn init_board_inner(
 
         let now = js_sys::Date::now();
         if now - *last_ws_send_move.borrow() > 30.0 {
-            if ws_move.ready_state() == WebSocket::OPEN {
+            if ws_move.ws.ready_state() == WebSocket::OPEN {
                 let msg = format!(r#"{{"type":"cursor","x":{},"y":{}}}"#, x, y);
-                let _ = ws_move.send_with_str(&msg);
+                let _ = ws_move.send(&msg);
             }
             *last_ws_send_move.borrow_mut() = now;
         }
@@ -560,13 +560,13 @@ async fn init_board_inner(
             ctx_move.line_to(x, y);
             ctx_move.stroke();
 
-            if ws_move.ready_state() == WebSocket::OPEN {
+            if ws_move.ws.ready_state() == WebSocket::OPEN {
                 let msg = serde_json::json!({
                     "type": "stroke",
                     "data": { "tool": tool, "color": color, "x0": lx, "y0": ly, "x1": x, "y1": y }
                 })
                 .to_string();
-                let _ = ws_move.send_with_str(&msg);
+                let _ = ws_move.send(&msg);
             }
         }
 

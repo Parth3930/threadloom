@@ -31,22 +31,20 @@ async fn main() -> std::io::Result<()> {
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
     log::info!("Starting Threadloom server on port {}", port);
 
-    HttpServer::new(|| {
-        let mut server = threadloom::server_types::Server::new();
-        api_routes::configure_api(&mut server);
+    let mut server = threadloom::server_types::Server::new();
+    api_routes::configure_api(&mut server);
 
-        App::new()
-            .wrap(Logger::default())
-            .configure(|cfg| threadloom::server_types::actix_adapter::configure(&server, cfg))
-            .service(
-                Files::new("/", "./dist")
-                    .index_file("index.html")
-                    .default_handler(actix_web::web::to(|| async {
-                        actix_files::NamedFile::open("./dist/index.html")
-                    })),
-            )
-    })
-    .bind(format!("0.0.0.0:{}", port))?
-    .run()
-    .await
+    server.run_with_actix_config(port.parse().unwrap(), |cfg| {
+        cfg.service(
+            actix_web::web::scope("")
+                .wrap(Logger::default())
+                .service(
+                    Files::new("/", "./dist")
+                        .index_file("index.html")
+                        .default_handler(actix_web::web::to(|| async {
+                            actix_files::NamedFile::open("./dist/index.html")
+                        })),
+                )
+        );
+    }).await
 }
