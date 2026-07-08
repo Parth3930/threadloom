@@ -1,0 +1,56 @@
+[package]
+license = "MIT"
+description = "A meticulously crafted Rust full-stack framework."
+name = "whiteboard"
+version = "0.1.0"
+edition = "2021"
+default-run = "whiteboard"
+
+[[bin]]
+name = "desktop"
+path = "src/bin/desktop.rs"
+required-features = ["desktop"]
+
+[package.metadata.packager]
+product-name = "Threadloom App"
+identifier = "com.threadloom.app"
+resources = ["dist"]
+icons = ["assets/icon.png", "assets/icon.ico"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+threadloom = { path = "../../crates/threadloom" }
+threadloom-core = { path = "../../crates/threadloom-core" }
+threadloom-macro = { path = "../../crates/threadloom-macro" }
+threadloom-dom = { path = "../../crates/threadloom-dom" }
+threadloom-ui = { path = "../../crates/threadloom-ui" }
+threadloom-server = { path = "../../crates/threadloom-server" }
+threadloom-scheduler = { path = "../../crates/threadloom-scheduler" }
+threadloom-desktop = { path = "../../crates/threadloom-desktop", optional = true }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History", "HtmlCanvasElement", "CanvasRenderingContext2d", "MouseEvent", "WebSocket", "MessageEvent", "ErrorEvent", "Event", "HtmlImageElement", "Storage", "KeyboardEvent"] }
+wasm-bindgen-futures = "0.4"
+reqwasm = "0.5"
+futures-util = "0.3.32"
+[features]
+desktop = ["dep:threadloom-desktop"]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+actix-web = "4"
+threadloom = { path = "../../crates/threadloom", features = ["actix"] }
+actix-files = "0.6"
+env_logger = "0.11"
+log = "0.4"
+dotenvy = "0.15"
+libsql = "0.3"
+uuid = { version = "1.8", features = ["v4"] }
+bcrypt = "0.15"
+actix-ws = "0.3"
+tokio = { version = "1.0", features = ["sync"] }
+serde_json = "1.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3.103"
+wasm-bindgen = "0.2"
+serde_json = "1.0"
+
+[workspace]

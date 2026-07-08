@@ -1,0 +1,12 @@
+{
+  "tailwindCSS.experimental.classRegex": [
+    "class\\s*=\\s*\"([^\"]*)\"",
+    "class\\s*=\\s*\\{?\"([^\"]*)\"\\}?",
+    "(?:class|className)\\s*=\\s*\"([^\"]*)\""
+  ],
+  "tailwindCSS.includeLanguages": {
+    "rust": "html"
+  },
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.allFeatures": true
+}

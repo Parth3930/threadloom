@@ -1,0 +1,8 @@
+/target
+/dist
+/node_modules
+*.log
+.vercel
+plan.md
+.env
+src/generated_env.rs

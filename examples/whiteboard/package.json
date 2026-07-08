@@ -1,0 +1,14 @@
+{
+  "name": "whiteboard",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/input.css -o ./assets/tailwind.css",
+    "watch:css": "tailwindcss -i ./src/input.css -o ./assets/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  },
+  "dependencies": {
+    "baseline-browser-mapping": "^2.10.42",
+    "caniuse-lite": "^1.0.30001800"
+  }
+}
