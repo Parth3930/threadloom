@@ -3,3 +3,6 @@
 /node_modules
 *.log
 .vercel
+.env
+src/generated_env.rs
+src/generated_svg.rs

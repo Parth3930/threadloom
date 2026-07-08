@@ -76,8 +76,31 @@ impl DistaffPlugin for TailwindPlugin {
         Ok(())
     }
     
-    fn on_file_change(&mut self, _path: &Path) -> anyhow::Result<()> {
-        // Do nothing in dev watcher, handled by background `--watch` process.
+    fn on_file_change(&mut self, path: &Path) -> anyhow::Result<()> {
+        // The background --watch process can silently die on Windows (null stdio +
+        // CREATE_NEW_PROCESS_GROUP). Run a one-shot rebuild on any .rs or input.css
+        // change so CSS is always up to date without manual `bun build:css`.
+        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+        let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+        if ext == "rs" || name == "input.css" {
+            #[cfg(target_os = "windows")]
+            Command::new("cmd")
+                .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
+                .args(["/C", "npx", "tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .ok();
+
+            #[cfg(not(target_os = "windows"))]
+            Command::new("npx")
+                .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
+                .args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css"])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .ok();
+        }
         Ok(())
     }
 }
@@ -86,15 +109,44 @@ pub struct SvgToComponentPlugin;
 impl DistaffPlugin for SvgToComponentPlugin {
     fn name(&self) -> &'static str { "SVG-to-Component" }
     fn on_build_start(&mut self) -> anyhow::Result<()> {
-        tracing::debug!("SVG to Threadloom conversion");
-        // Minimal logic: read assets/*.svg, write to src/generated_svg.rs
-        std::fs::write("src/generated_svg.rs", "// Auto-generated SVG components\n")?;
-        Ok(())
+        self.generate_svg_module()
     }
     fn on_file_change(&mut self, path: &Path) -> anyhow::Result<()> {
         if path.extension().and_then(|s| s.to_str()) == Some("svg") {
-            self.on_build_start()?;
+            self.generate_svg_module()?;
         }
+        Ok(())
+    }
+}
+
+impl SvgToComponentPlugin {
+    fn generate_svg_module(&self) -> anyhow::Result<()> {
+        let svgs: Vec<_> = std::fs::read_dir("assets")
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("svg"))
+            .collect();
+
+        // ponytail: no SVGs = no file; don't generate stubs
+        if svgs.is_empty() {
+            // Remove stale file if it exists from a previous run
+            let _ = std::fs::remove_file("src/generated_svg.rs");
+            return Ok(());
+        }
+
+        let mut out = String::from("// Auto-generated — do not edit. Re-run `distaff dev` to refresh.\n");
+        for entry in &svgs {
+            let path = entry.path();
+            let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+            let content = std::fs::read_to_string(&path).unwrap_or_default();
+            let fn_name: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+            out.push_str(&format!(
+                "\npub fn {fn_name}_svg() -> &'static str {{ {content:?} }}\n"
+            ));
+        }
+        tracing::debug!("SVG plugin: generated {} component(s) → src/generated_svg.rs", svgs.len());
+        std::fs::write("src/generated_svg.rs", out)?;
         Ok(())
     }
 }
@@ -122,24 +174,10 @@ impl DistaffPlugin for AutoModPlugin {
         Ok(())
     }
 }
-pub struct EnvInjectionPlugin;
-impl DistaffPlugin for EnvInjectionPlugin {
-    fn name(&self) -> &'static str { "Env-Injection" }
-    fn on_build_start(&mut self) -> anyhow::Result<()> {
-        tracing::debug!("Injecting .env variables");
-        if let Ok(env_content) = std::fs::read_to_string(".env") {
-            let rs_content = format!(
-                "pub const ENV_VARS: &str = {:?};", 
-                env_content
-            );
-            std::fs::write("src/generated_env.rs", rs_content)?;
-        }
-        Ok(())
-    }
-    fn on_file_change(&mut self, path: &Path) -> anyhow::Result<()> {
-        if path.file_name().and_then(|s| s.to_str()) == Some(".env") {
-            self.on_build_start()?;
-        }
-        Ok(())
-    }
-}
+// ponytail: EnvInjectionPlugin removed — baking .env into Rust source leaks secrets
+// into version control and compiled binaries. Load env vars at runtime instead:
+//   - Server (native): std::env::var("KEY") — OS env or systemd/container injection
+//   - Dev convenience: add `dotenvy::dotenv().ok();` at the top of your server main()
+//   - WASM (browser): use a build-time feature flag or a `/api/config` endpoint
+//
+// No file is generated. Add `dotenvy` to your project's Cargo.toml if needed.

@@ -488,10 +488,62 @@ async fn hmr_script() -> &'static str {
     "#
 }
 
-async fn api_proxy(req: Request) -> axum::response::Response {
+async fn api_proxy(ws_upgrade: Option<axum::extract::ws::WebSocketUpgrade>, req: Request) -> axum::response::Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
     let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
+    
+    // Check if websocket upgrade
+    let is_ws = req.headers().get("upgrade").and_then(|v| v.to_str().ok()).unwrap_or("").to_lowercase() == "websocket";
+    if is_ws {
+        if let Some(ws) = ws_upgrade {
+            let ws_url = format!("ws://127.0.0.1:3001{}{}", path, query);
+            return ws.on_upgrade(move |socket| async move {
+                use futures_util::{StreamExt, SinkExt};
+                if let Ok((mut backend_socket, _)) = tokio_tungstenite::connect_async(ws_url).await {
+                    let (mut client_tx, mut client_rx) = socket.split();
+                    let (mut backend_tx, mut backend_rx) = backend_socket.split();
+                    
+                    let client_to_backend = async {
+                        while let Some(msg) = client_rx.next().await {
+                            if let Ok(msg) = msg {
+                                let out_msg = match msg {
+                                    axum::extract::ws::Message::Text(t) => tokio_tungstenite::tungstenite::Message::Text(t),
+                                    axum::extract::ws::Message::Binary(b) => tokio_tungstenite::tungstenite::Message::Binary(b),
+                                    axum::extract::ws::Message::Ping(p) => tokio_tungstenite::tungstenite::Message::Ping(p),
+                                    axum::extract::ws::Message::Pong(p) => tokio_tungstenite::tungstenite::Message::Pong(p),
+                                    axum::extract::ws::Message::Close(c) => tokio_tungstenite::tungstenite::Message::Close(c.map(|f| tokio_tungstenite::tungstenite::protocol::CloseFrame { code: tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::from(f.code), reason: f.reason.into() })),
+                                };
+                                if backend_tx.send(out_msg).await.is_err() { break; }
+                            } else { break; }
+                        }
+                    };
+                    
+                    let backend_to_client = async {
+                        while let Some(msg) = backend_rx.next().await {
+                            if let Ok(msg) = msg {
+                                let out_msg = match msg {
+                                    tokio_tungstenite::tungstenite::Message::Text(t) => axum::extract::ws::Message::Text(t),
+                                    tokio_tungstenite::tungstenite::Message::Binary(b) => axum::extract::ws::Message::Binary(b),
+                                    tokio_tungstenite::tungstenite::Message::Ping(p) => axum::extract::ws::Message::Ping(p),
+                                    tokio_tungstenite::tungstenite::Message::Pong(p) => axum::extract::ws::Message::Pong(p),
+                                    tokio_tungstenite::tungstenite::Message::Close(c) => axum::extract::ws::Message::Close(c.map(|f| axum::extract::ws::CloseFrame { code: u16::from(f.code), reason: f.reason.into() })),
+                                    tokio_tungstenite::tungstenite::Message::Frame(_) => continue,
+                                };
+                                if client_tx.send(out_msg).await.is_err() { break; }
+                            } else { break; }
+                        }
+                    };
+                    
+                    tokio::select! {
+                        _ = client_to_backend => {}
+                        _ = backend_to_client => {}
+                    }
+                }
+            });
+        }
+    }
+
     let url = format!("http://127.0.0.1:3001{}{}", path, query);
     
     let client = reqwest::Client::new();

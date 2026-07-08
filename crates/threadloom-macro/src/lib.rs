@@ -36,7 +36,7 @@ struct Element {
 impl Parse for Element {
     fn parse(input: ParseStream) -> Result<Self> {
         let tag = Ident::parse_any(input)?;
-        
+
         let mut attrs = Vec::new();
         if input.peek(syn::token::Paren) {
             let content;
@@ -44,7 +44,7 @@ impl Parse for Element {
             let parsed_attrs = content.parse_terminated(Attribute::parse, Token![,])?;
             attrs = parsed_attrs.into_iter().collect();
         }
-        
+
         let mut children = Vec::new();
         if input.peek(syn::token::Brace) {
             let content;
@@ -53,7 +53,7 @@ impl Parse for Element {
                 children.push(content.parse()?);
             }
         }
-        
+
         Ok(Element { tag, attrs, children })
     }
 }
@@ -69,7 +69,7 @@ impl Parse for Attribute {
         let name = Ident::parse_any(input)?;
         let name_str = name.to_string();
         let is_event = name_str.starts_with("on_");
-        
+
         let value = if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
             input.parse::<Expr>()?
@@ -115,11 +115,11 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
         Node::Element(el) => {
             let tag_name_str = el.tag.to_string();
             let is_component = tag_name_str.chars().next().unwrap().is_uppercase();
-            
+
             if is_component {
                 let tag = &el.tag;
                 let props_name = syn::Ident::new(&format!("{}Props", tag_name_str), proc_macro2::Span::call_site());
-                
+
                 let mut prop_assignments = Vec::new();
                 for attr in &el.attrs {
                     let name_str = attr.name.to_string();
@@ -133,13 +133,13 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                         #name: (#value).into()
                     });
                 }
-                
+
                 let mut children_tokens = Vec::new();
                 for (i, child) in el.children.iter().enumerate() {
                     let child_path = format!("{}-{}", path, i);
                     children_tokens.push(render_node(child, child_path));
                 }
-                
+
                 quote::quote! {
                     ::threadloom_core::IntoView::into_view(
                         #tag(#props_name {
@@ -151,12 +151,12 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                 }
             } else {
                 let mut builder = quote! { ::threadloom_core::element(#tag_name_str) };
-                
+
                 // Inject stable ID for hot reloading
                 builder = quote! {
                     #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
                 };
-                
+
                 for attr in &el.attrs {
                     let name_str = attr.name.to_string();
                     let value = &attr.value;
@@ -168,13 +168,13 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                         builder = quote::quote_spanned! {span=> #builder.attr(#name_str, #value) };
                     }
                 }
-                
+
                 for (i, child) in el.children.iter().enumerate() {
                     let child_path = format!("{}-{}", path, i);
                     let child_tokens = render_node(child, child_path);
                     builder = quote! { #builder.child(#child_tokens) };
                 }
-                
+
                 quote! {
                     ::threadloom_core::IntoView::into_view(#builder)
                 }
@@ -186,12 +186,12 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
 #[proc_macro]
 pub fn threadloom(input: TokenStream) -> TokenStream {
     let view = parse_macro_input!(input as ViewMacro);
-    
+
     let mut tokens = Vec::new();
     for (i, node) in view.nodes.iter().enumerate() {
         tokens.push(render_node(node, i.to_string()));
     }
-    
+
     let expanded = if tokens.len() == 1 {
         let first = &tokens[0];
         quote! { #first }
@@ -202,7 +202,7 @@ pub fn threadloom(input: TokenStream) -> TokenStream {
             ])
         }
     };
-    
+
     TokenStream::from(expanded)
 }
 
@@ -214,7 +214,7 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
     let asyncness = &input.sig.asyncness;
     let return_type = &input.sig.output;
     let inputs = &input.sig.inputs;
-    
+
     let args_names = inputs.iter().filter_map(|arg| {
         if let syn::FnArg::Typed(pat_type) = arg {
             if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
@@ -282,7 +282,7 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
             ).await.unwrap_or_else(|e| Err(e))
         }
     };
-    
+
     TokenStream::from(expanded)
 }
 
@@ -348,7 +348,8 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                                         e.prevent_default();
                                         if let Some(w) = ::threadloom_dom::web_sys::window() {
                                             let _ = w.history().unwrap().push_state_with_url(&::threadloom_dom::wasm_bindgen::JsValue::NULL, "", Some(&href));
-                                            set_path_sig.set(href);
+                                            let route = href.split(['?', '#']).next().unwrap_or(&href);
+                                            set_path_sig.set(route.to_string());
                                             let _ = ::threadloom_dom::tick();
                                             w.scroll_to_with_x_and_y(0.0, 0.0);
                                         }

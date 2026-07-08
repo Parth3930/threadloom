@@ -79,13 +79,25 @@ pub fn run_desktop(config: DesktopConfig) -> wry::Result<()> {
         builder = builder.with_url(&url);
     } else if let Some(dir) = config.prod_dir {
         builder = builder.with_custom_protocol("threadloom".into(), move |request| {
-            let path = request.uri().path();
-            let relative_path = if path == "/" { "index.html" } else { &path[1..] };
+            // Strip the query string; the SPA router only cares about the path.
+            let uri_path = request.uri().path();
+            let path = request.uri().path_and_query().map(|pq| pq.as_str()).unwrap_or(uri_path);
+            let path = path.split('?').next().unwrap_or(uri_path);
+
+            // SPA routes (no file extension) fall back to index.html so the
+            // client-side router can handle them (e.g. /board?room=xxx).
+            let relative_path = if path == "/" || path.is_empty() {
+                "index.html"
+            } else if std::path::Path::new(path).extension().is_some() {
+                &path[1..]
+            } else {
+                "index.html"
+            };
             let file_path = dir.join(relative_path);
-            
+
             let content = std::fs::read(&file_path).unwrap_or_else(|_| b"Not Found".to_vec());
             let mime = mime_guess::from_path(&file_path).first_or_octet_stream().as_ref().to_string();
-            
+
             Response::builder()
                 .header(CONTENT_TYPE, mime)
                 .body(content.into())

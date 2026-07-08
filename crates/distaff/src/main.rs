@@ -132,7 +132,6 @@ async fn main() -> anyhow::Result<()> {
                 Box::new(plugins::TailwindPlugin),
                 Box::new(plugins::AutoModPlugin),
                 Box::new(plugins::SvgToComponentPlugin),
-                Box::new(plugins::EnvInjectionPlugin),
             ];
 
             for p in &mut plugins {
@@ -439,7 +438,6 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
                 Box::new(plugins::TailwindPlugin),
                 Box::new(plugins::AutoModPlugin),
                 Box::new(plugins::SvgToComponentPlugin),
-                Box::new(plugins::EnvInjectionPlugin),
             ];
             for p in &mut plugins {
                 if let Err(e) = p.on_build_start() {
