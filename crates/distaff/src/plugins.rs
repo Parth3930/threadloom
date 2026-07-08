@@ -32,17 +32,47 @@ impl DistaffPlugin for TailwindPlugin {
     }
     fn on_dev_start(&mut self) -> anyhow::Result<()> {
         tracing::debug!("TailwindCSS watch");
-        #[cfg(target_os = "windows")]
-        Command::new("cmd")
-            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
-            .args(["/C", "npx", "tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"])
-            .spawn()?;
-        
-        #[cfg(not(target_os = "windows"))]
-        Command::new("npx")
-            .env("BROWSERSLIST_IGNORE_OLD_DATA", "true")
-            .args(["tailwindcss", "-i", "src/input.css", "-o", "assets/tailwind.css", "--watch"])
-            .spawn()?;
+        // Build the watch command. This is a long-lived process, so it MUST be:
+        //   1. spawned in its own process group (Windows CREATE_NEW_PROCESS_GROUP /
+        //      job control isolation) so a console Ctrl+C does NOT get forwarded to it, and
+        //   2. registered with hot_reload::track_frontend_child so kill_all() terminates it
+        //      on shutdown. Otherwise it lingers attached to the console and the terminal
+        //      appears frozen after Ctrl+C until a new terminal is opened.
+        let mut cmd = Command::new(
+            if cfg!(target_os = "windows") { "cmd" } else { "npx" },
+        );
+        cmd.env("BROWSERSLIST_IGNORE_OLD_DATA", "true");
+        if cfg!(target_os = "windows") {
+            cmd.args([
+                "/C", "npx", "tailwindcss",
+                "-i", "src/input.css",
+                "-o", "assets/tailwind.css",
+                "--watch",
+            ]);
+        } else {
+            cmd.args([
+                "tailwindcss",
+                "-i", "src/input.css",
+                "-o", "assets/tailwind.css",
+                "--watch",
+            ]);
+        }
+        // Isolate from the parent console so Ctrl+C doesn't propagate to the child.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            // CREATE_NEW_PROCESS_GROUP (0x00000200) prevents Ctrl+C forwarding.
+            cmd.creation_flags(0x00000200);
+        }
+        // Redirect stdio to null so the long-lived watcher does NOT hold the parent
+        // console's input/output handles. Without this, the child keeps the console
+        // attached after the parent exits on Ctrl+C and the terminal appears frozen
+        // until a new one is opened.
+        cmd.stdin(std::process::Stdio::null())
+           .stdout(std::process::Stdio::null())
+           .stderr(std::process::Stdio::null());
+        let child = cmd.spawn()?;
+        crate::hot_reload::track_frontend_child(child);
         Ok(())
     }
     

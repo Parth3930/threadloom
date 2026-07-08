@@ -33,6 +33,16 @@ pub fn kill_child(child: &mut std::process::Child) {
     }
 }
 
+/// Register a long-lived child (e.g. the tailwind --watch process spawned by a
+/// plugin) so it is terminated on shutdown. Without this, the child keeps the
+/// console attached after the parent exits on Ctrl+C and the terminal appears
+/// to freeze.
+pub fn track_frontend_child(child: Child) {
+    if let Ok(mut guard) = FRONTEND_PROCESSES.lock() {
+        guard.push(child);
+    }
+}
+
 pub fn kill_all() {
     if let Ok(mut child_guard) = BACKEND_PROCESS.lock() {
         if let Some(mut child) = child_guard.take() {
@@ -43,6 +53,18 @@ pub fn kill_all() {
         for mut child in child_guard.drain(..) {
             kill_child(&mut child);
         }
+    }
+    // Defensive: kill any lingering tailwind watcher by image name. The watcher
+    // (`cmd /C npx tailwindcss --watch`) can spawn a detached process tree, and on
+    // Windows the tracked PID sometimes doesn't own the whole tree. We only target
+    // `tailwindcss.exe` (the actual watcher) to avoid killing unrelated processes.
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/T", "/IM", "tailwindcss.exe"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
     }
 }
 

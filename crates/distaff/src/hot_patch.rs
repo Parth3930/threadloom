@@ -408,6 +408,18 @@ fn extract_literal_value(expr: &syn::Expr) -> Option<serde_json::Value> {
     }
 }
 
+fn class_change(old: Option<String>, new: Option<String>) -> Option<serde_json::Value> {
+    if old == new {
+        return None;
+    }
+    let old_s = old.unwrap_or_default();
+    let new_v = match new {
+        Some(s) => serde_json::Value::String(s),
+        None => serde_json::Value::Null,
+    };
+    Some(serde_json::json!({ "old": old_s, "new": new_v }))
+}
+
 fn diff_single_node(
     old_node: &Node,
     new_node: &Node,
@@ -446,6 +458,23 @@ fn diff_single_node(
                 let mut attrs_diff = std::collections::HashMap::new();
 
                 for (key, new_attr) in &new_attrs {
+                    if key == "class" || key == "extra_class" {
+                        // Emit a { old, new } pair so the HMR client can swap ONLY the
+                        // user-supplied class while preserving the framework's intrinsic
+                        // classes (text size, tl-card, tl-btn, flex/grid, etc.). A plain
+                        // scalar would force a full className replace and wipe component styling.
+                        let old_lit = old_attrs.get(key).and_then(|a| extract_literal_value(&a.value)).and_then(|v| v.as_str().map(|s| s.to_string()));
+                        let new_lit = extract_literal_value(&new_attr.value).and_then(|v| v.as_str().map(|s| s.to_string()));
+                        if new_lit.is_none() {
+                            // Dynamic (non-literal) class — cannot safely patch; fall back to replace.
+                            can_patch = false;
+                            break;
+                        }
+                        if let Some(c) = class_change(old_lit, new_lit) {
+                            attrs_diff.insert(key.clone(), c);
+                        }
+                        continue;
+                    }
                     match old_attrs.get(key) {
                         Some(old_attr) => {
                             let old_name = &old_attr.name;
@@ -488,6 +517,17 @@ fn diff_single_node(
                 if can_patch {
                     for (key, old_attr) in &old_attrs {
                         if !new_attrs.contains_key(key) {
+                            if key == "class" || key == "extra_class" {
+                                let old_lit = extract_literal_value(&old_attr.value).and_then(|v| v.as_str().map(|s| s.to_string()));
+                                if old_lit.is_none() {
+                                    can_patch = false;
+                                    break;
+                                }
+                                if let Some(c) = class_change(old_lit, None) {
+                                    attrs_diff.insert(key.clone(), c);
+                                }
+                                continue;
+                            }
                             if old_attr.is_event {
                                 can_patch = false;
                                 break;

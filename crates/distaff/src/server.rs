@@ -170,8 +170,24 @@ async fn hmr_script() -> &'static str {
                         els.forEach(el => el.remove());
                         shiftIds(patch.parent_path, patch.index + 1, -1);
                     } else {
-                        console.warn("Hot patch failed: could not find element to remove", patch.path);
-                        success = false;
+                        // Text children are rendered as raw text nodes with no data-th-id of
+                        // their own, so a `remove` patch can never match them directly. Fall
+                        // back to deleting the child at the given index from the parent element.
+                        // This keeps the parent (and its classes) intact and avoids ghosting /
+                        // a forced full reload when text is added or removed inside a component.
+                        const parentPath = patch.parent_path;
+                        const idx = patch.index;
+                        const parents = getExactEls(parentPath);
+                        if (parents.length > 0) {
+                            parents.forEach(p => {
+                                const node = p.childNodes[idx];
+                                if (node) node.remove();
+                            });
+                            shiftIds(parentPath, idx + 1, -1);
+                        } else {
+                            console.warn("Hot patch failed: could not find element to remove", patch.path);
+                            success = false;
+                        }
                     }
                     return;
                 }
@@ -216,7 +232,32 @@ async fn hmr_script() -> &'static str {
                                     // ignore setAttribute('class') since WASM controls className.
                                     // We must set el.className directly so Tailwind classes apply instantly.
                                     if (key === 'class' || key === 'extra_class') {
-                                        el.className = patch.attrs[key];
+                                        const c = patch.attrs[key];
+                                        if (c && typeof c === 'object' && 'new' in c) {
+                                            // Merged class change: the framework renders as
+                                            // "<intrinsic classes> <user class>". We must swap ONLY the
+                                            // user-supplied class tokens (c.old -> c.new) and preserve the
+                                            // intrinsic classes (text size, tl-card, tl-btn, flex/grid, etc.).
+                                            // A full className replace would wipe component styling, and an
+                                            // end-anchored substring strip breaks once another HACK (e.g. the
+                                            // `level` handler) reorders the className. So we treat old/new as
+                                            // token sets: remove old tokens wherever they appear, append new.
+                                            const oldTokens = (c.old || '').trim().split(/\s+/).filter(Boolean);
+                                            const newTokens = (c.new == null ? '' : c.new).trim().split(/\s+/).filter(Boolean);
+                                            let parts = el.className.trim().split(/\s+/).filter(Boolean);
+                                            // Remove old user tokens (order-independent).
+                                            if (oldTokens.length) {
+                                                parts = parts.filter(t => !oldTokens.includes(t));
+                                            }
+                                            // Append new user tokens (dedup).
+                                            for (const t of newTokens) {
+                                                if (!parts.includes(t)) parts.push(t);
+                                            }
+                                            el.className = parts.join(' ');
+                                        } else if (c != null) {
+                                            // Plain scalar (e.g. a literal non-component element) — safe to set directly.
+                                            el.className = c;
+                                        }
                                     }
                                     // HACK: for threadloom-ui components, label and text often map to textContent
                                     if ((key === 'label' || key === 'text' || key === 'title') && patch.attrs[key] !== null) {
@@ -326,9 +367,13 @@ async fn hmr_script() -> &'static str {
                                                 if (a.name !== 'level') newEl.setAttribute(a.name, a.value);
                                             });
                                             
-                                            // Fix Tailwind text size class for hot patch
+                                            // Fix Tailwind text size class for hot patch.
+                                            // Strip ANY leading text-size token (not just the known set),
+                                            // then append the correct one for the new level. This avoids
+                                            // leaving a stale size class behind (e.g. text-9xl) when the
+                                            // levels change.
                                             const sizes = ['text-4xl', 'text-3xl', 'text-2xl', 'text-xl', 'text-lg', 'text-base'];
-                                            let newClass = newEl.className.replace(/\btext-(4xl|3xl|2xl|xl|lg|base)\b/g, '');
+                                            let newClass = newEl.className.replace(/\btext-(xs|sm|base|lg|xl|[2-9]xl)\b/g, '').replace(/\s+/g, ' ').trim();
                                             newClass += ' ' + (sizes[newLevel - 1] || 'text-3xl');
                                             newEl.className = newClass.trim().replace(/\s+/g, ' ');
                                             
