@@ -4758,7 +4758,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-dom"
-version = "0.1.1"
+version = "0.1.11"
 dependencies = [
  "js-sys",
  "reqwasm",
@@ -4772,7 +4772,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-macro"
-version = "0.1.1"
+version = "0.1.11"
 dependencies = [
  "proc-macro2",
  "quote",
