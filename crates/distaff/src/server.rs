@@ -227,7 +227,6 @@ async fn hmr_script() -> &'static str {
                                 if (patch.attrs[key] === null) {
                                     el.removeAttribute(key);
                                 } else {
-                                    el.setAttribute(key, patch.attrs[key]);
                                     // Direct className swap for class/extra_class — WASM-rendered elements
                                     // ignore setAttribute('class') since WASM controls className.
                                     // We must set el.className directly so Tailwind classes apply instantly.
@@ -242,6 +241,9 @@ async fn hmr_script() -> &'static str {
                                             // end-anchored substring strip breaks once another HACK (e.g. the
                                             // `level` handler) reorders the className. So we treat old/new as
                                             // token sets: remove old tokens wherever they appear, append new.
+                                            // NOTE: Do NOT call el.setAttribute here — passing an object would
+                                            // coerce it to "[object Object]" and corrupt el.className before
+                                            // the token-swap reads it, wiping intrinsic classes like text-3xl.
                                             const oldTokens = (c.old || '').trim().split(/\s+/).filter(Boolean);
                                             const newTokens = (c.new == null ? '' : c.new).trim().split(/\s+/).filter(Boolean);
                                             let parts = el.className.trim().split(/\s+/).filter(Boolean);
@@ -256,8 +258,11 @@ async fn hmr_script() -> &'static str {
                                             el.className = parts.join(' ');
                                         } else if (c != null) {
                                             // Plain scalar (e.g. a literal non-component element) — safe to set directly.
+                                            el.setAttribute(key, c);
                                             el.className = c;
                                         }
+                                    } else {
+                                        el.setAttribute(key, patch.attrs[key]);
                                     }
                                     // HACK: for threadloom-ui components, label and text often map to textContent
                                     if ((key === 'label' || key === 'text' || key === 'title') && patch.attrs[key] !== null) {

@@ -232,7 +232,11 @@ fn node_to_html(node: &Node, path: &str) -> Option<String> {
                     "Image" => html_tag = "img".to_string(),
                     "Divider" => { html_tag = "hr".to_string(); base_classes = "w-full border-t dark:border-gray-800".to_string(); },
                     "Container" => { html_tag = "div".to_string(); base_classes = "container".to_string(); },
-                    _ => return None,
+                    _ => {
+                        // Unknown component — fall back to a plain div so the `replace` action
+                        // can still proceed. WASM will re-render it correctly after the patch.
+                        html_tag = "div".to_string();
+                    }
                 }
             }
 
@@ -553,7 +557,16 @@ fn diff_single_node(
                             "align", "title_align", "weight", "shadow", "wide", "cols", "gap",
                             "sm_cols", "md_cols", "lg_cols", "xl_cols", "2xl_cols",
                             "primary", "label", "text", "title", "level", "items", "justify",
-                            "width", "height", "rounded"
+                            "width", "height", "rounded",
+                            // Card / Badge / data components
+                            "variant", "subtitle", "footer", "clickable",
+                            // Form components (Input, Label, Checkbox, Radio, Select, Textarea)
+                            "placeholder", "disabled", "checked", "value", "name", "type_",
+                            "rows", "options", "selected", "required", "readonly",
+                            // Navigation (Tabs, Dropdown)
+                            "href", "active", "open",
+                            // Image
+                            "src", "alt", "lazy",
                         ];
                         for key in attrs_diff.keys() {
                             if !safe_props.contains(&key.as_str()) {
