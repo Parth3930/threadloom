@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.threadloom.app">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
+    android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
         android:label="Threadloom App"
@@ -19,4 +20,3 @@
         </activity>
     </application>
 </manifest>
-        

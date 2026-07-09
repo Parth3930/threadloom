@@ -14,7 +14,6 @@ pub fn page() -> View {
             // Header
             Row(items="center", justify="between", class="w-full px-6 py-4 border-b border-border bg-background shadow-sm z-20") {
                 Row(items="center", gap=3) {
-                    Image(src="/assets/favicon.svg", alt="Collab Whiteboard Logo", class="w-6 h-6") {}
                     Text(variant="span", class="font-bold tracking-tight") { "Collab Whiteboard" }
                     Text(variant="span", class="text-xs text-muted-foreground ml-4 hidden sm:block") { "Share the URL to collaborate" }
                 }
@@ -107,7 +106,7 @@ pub fn page() -> View {
                                 { icon(&[("path", &[("d", "m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21")]), ("path", &[("d", "M22 21H7")]), ("path", &[("d", "m5 11 9 9")])]) }
                             }
 
-                            Section(row=false, class="w-px h-6 bg-border mx-2 sm:mx-2") {}
+                            Section(row=false, class="w-px h-10 bg-border mx-2 sm:mx-2") {}
 
                             Row(items="center", class="gap-1 sm:gap-5") {
                                 Button(label="", primary=false, class=c_black, on_click=move || set_active_color.set("#000000".to_string())) {}

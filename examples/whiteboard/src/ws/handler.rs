@@ -1,6 +1,6 @@
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -68,11 +68,13 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
             while let Ok(Some(row)) = rows.next().await {
                 if let Ok(data) = row.get::<String>(0) {
                     // data stored as JSON string of the stroke object
-                    let parsed: serde_json::Value = serde_json::from_str(&data).unwrap_or(serde_json::Value::Null);
+                    let parsed: serde_json::Value =
+                        serde_json::from_str(&data).unwrap_or(serde_json::Value::Null);
                     let msg = serde_json::json!({
                         "type": "snapshot",
                         "data": parsed
-                    }).to_string();
+                    })
+                    .to_string();
                     let _ = tx.send(msg);
                 }
             }
@@ -127,10 +129,15 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
                                         "INSERT OR IGNORE INTO rooms (id, name, user_id) VALUES (?, ?, ?)",
                                         libsql::params![room_id_for_db.clone(), room_id_for_db.clone(), "auto-joined"]
                                     ).await;
-                                    
+
                                     // Delete old history to prevent bloat
-                                    let _ = conn.execute("DELETE FROM strokes WHERE room_id = ?", libsql::params![room_id_for_db.clone()]).await;
-                                    
+                                    let _ = conn
+                                        .execute(
+                                            "DELETE FROM strokes WHERE room_id = ?",
+                                            libsql::params![room_id_for_db.clone()],
+                                        )
+                                        .await;
+
                                     let stroke_id = Uuid::new_v4().to_string();
                                     let _ = conn
                                         .execute(
@@ -157,12 +164,13 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
             let mut rooms_map = rooms().lock().unwrap();
             if let Some(room) = rooms_map.get_mut(&room_id_cloned) {
                 room.remove(&user_id_cloned);
-                
+
                 let msg = serde_json::json!({
                     "type": "leave",
                     "user_id": user_id_cloned
-                }).to_string();
-                
+                })
+                .to_string();
+
                 for (_, sender) in room.iter() {
                     let _ = sender.send(msg.clone());
                 }

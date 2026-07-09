@@ -114,6 +114,128 @@ fn convert_svg_to_icons() {
     }
 }
 
+/// Render assets/favicon.svg into Android launcher icons (legacy mipmaps +
+/// adaptive foreground/background) and wire them into the manifest.
+fn generate_android_icons() -> anyhow::Result<()> {
+    let svg_path = std::path::Path::new("assets/favicon.svg");
+    if !svg_path.exists() {
+        return Ok(());
+    }
+
+    use colored::Colorize;
+    println!("{} generating Android launcher icons", "[📱] android:".blue());
+
+    let opt = resvg::usvg::Options::default();
+    let mut fontdb = resvg::usvg::fontdb::Database::new();
+    fontdb.load_system_fonts();
+    let svg_data = std::fs::read(svg_path)?;
+    let tree = resvg::usvg::Tree::from_data(&svg_data, &opt, &fontdb)
+        .map_err(|e| anyhow::anyhow!("failed to parse favicon.svg: {}", e))?;
+    let size = tree.size();
+    let w = (size.width() as u32).max(1);
+    let h = (size.height() as u32).max(1);
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h)
+        .ok_or_else(|| anyhow::anyhow!("failed to allocate pixmap"))?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::default(),
+        &mut pixmap.as_mut(),
+    );
+    let rgba = pixmap.take();
+    let base_img = image::RgbaImage::from_raw(w, h, rgba)
+        .ok_or_else(|| anyhow::anyhow!("failed to build image from pixmap"))?;
+    let base = image::DynamicImage::ImageRgba8(base_img);
+
+    // (density, px) where px is the launcher icon edge length.
+    let densities: &[(&str, u32)] = &[
+        ("mdpi", 48),
+        ("hdpi", 72),
+        ("xhdpi", 96),
+        ("xxhdpi", 144),
+        ("xxxhdpi", 192),
+    ];
+
+    // Dark backdrop so the (white, transparent) logo reads well on any launcher.
+    let bg = image::Rgba([26u8, 26u8, 46u8, 255u8]);
+
+    for (density, edge) in densities {
+        let dir = format!("android/app/src/main/res/mipmap-{}", density);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir)?;
+
+        // Legacy icon: background colour + logo at 80% (with padding).
+        let legacy_logo = ((*edge as f32) * 0.80) as u32;
+        let logo = base.resize_exact(legacy_logo, legacy_logo, image::imageops::FilterType::Lanczos3);
+        let mut legacy = image::RgbaImage::from_pixel(*edge, *edge, bg);
+        let legacy_off = ((*edge - legacy_logo) / 2) as i64;
+        image::imageops::overlay(&mut legacy, &logo, legacy_off, legacy_off);
+        image::DynamicImage::ImageRgba8(legacy)
+            .save_with_format(dir.join("ic_launcher.png"), image::ImageFormat::Png)?;
+
+        // Adaptive foreground: transparent + logo within the 66% safe zone.
+        let fg_size = ((*edge as f32) * 0.66) as u32;
+        let fg = base.resize_exact(fg_size, fg_size, image::imageops::FilterType::Lanczos3);
+        let mut fg_canvas = image::RgbaImage::new(*edge, *edge);
+        let fg_off = ((*edge - fg_size) / 2) as i64;
+        image::imageops::overlay(&mut fg_canvas, &fg, fg_off, fg_off);
+        image::DynamicImage::ImageRgba8(fg_canvas)
+            .save_with_format(dir.join("ic_launcher_foreground.png"), image::ImageFormat::Png)?;
+    }
+
+    // Adaptive-icon background colour.
+    let values_dir = std::path::Path::new("android/app/src/main/res/values");
+    std::fs::create_dir_all(values_dir)?;
+    std::fs::write(
+        values_dir.join("ic_launcher_background.xml"),
+        r#"<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#1a1a2e</color>
+</resources>
+"#,
+    )?;
+
+    // Adaptive-icon descriptor (API 26+, anydpi).
+    let anydpi_dir = std::path::Path::new("android/app/src/main/res/mipmap-anydpi-v26");
+    std::fs::create_dir_all(anydpi_dir)?;
+    std::fs::write(
+        anydpi_dir.join("ic_launcher.xml"),
+        r#"<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+"#,
+    )?;
+
+    // Point the manifest at the icon (idempotent + self-correcting).
+    let manifest = std::path::Path::new("android/app/src/main/AndroidManifest.xml");
+    if manifest.exists() {
+        let raw = std::fs::read_to_string(manifest)?;
+        let mut lines: Vec<String> = raw.lines().map(|l| l.to_string()).collect();
+        // Drop any pre-existing icon attribute (whether well-placed or dangling).
+        lines.retain(|l| l.trim() != "android:icon=\"@mipmap/ic_launcher\"");
+        // Insert it inside the <application> opening tag.
+        if let Some(idx) = lines
+            .iter()
+            .position(|l| l.trim_start().starts_with("<application"))
+        {
+            let already = lines
+                .get(idx + 1)
+                .map_or(false, |l| l.contains("android:icon"));
+            if !already {
+                let indent = " ".repeat(lines[idx].len() - lines[idx].trim_start().len());
+                lines.insert(
+                    idx + 1,
+                    format!("{}android:icon=\"@mipmap/ic_launcher\"", indent),
+                );
+            }
+        }
+        std::fs::write(manifest, lines.join("\n"))?;
+    }
+
+    Ok(())
+}
+
 fn setup_android() -> anyhow::Result<()> {
     let ndk_check = std::process::Command::new("cargo")
         .args(["ndk", "--version"])
@@ -332,6 +454,9 @@ async fn main() -> anyhow::Result<()> {
                 if let Err(e) = setup_android() {
                     tracing::error!("Failed to setup android project: {}", e);
                     std::process::exit(1);
+                }
+                if let Err(e) = generate_android_icons() {
+                    tracing::warn!("Failed to generate android launcher icon: {}", e);
                 }
                 
                 let port_clone = *port;
@@ -695,6 +820,9 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
                 if let Err(e) = setup_android() {
                     tracing::error!("Failed to setup android project: {}", e);
                     std::process::exit(1);
+                }
+                if let Err(e) = generate_android_icons() {
+                    tracing::warn!("Failed to generate android launcher icon: {}", e);
                 }
                 println!("{} building android app", "[📱] android:".blue());
                 
