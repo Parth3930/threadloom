@@ -5,6 +5,9 @@ use syn::visit::Visit;
 use syn::{braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token};
 use syn::{parse2, parse_file, Macro};
 
+use syn::visit_mut::VisitMut;
+
+#[derive(Clone)]
 enum Node {
     Element(Element),
     Text(LitStr),
@@ -25,6 +28,7 @@ impl Parse for Node {
     }
 }
 
+#[derive(Clone)]
 struct Element {
     tag: Ident,
     attrs: Vec<Attribute>,
@@ -87,6 +91,7 @@ impl Parse for Attribute {
     }
 }
 
+#[derive(Clone)]
 struct ViewMacro {
     line: usize,
     nodes: Vec<Node>,
@@ -106,16 +111,61 @@ pub struct MacroVisitor {
     pub macros: Vec<ViewMacro>,
 }
 
+impl MacroVisitor {
+    fn visit_custom_node(&mut self, node: &Node) {
+        match node {
+            Node::Expr(expr) => {
+                self.visit_expr_block(expr);
+            }
+            Node::Element(el) => {
+                for attr in &el.attrs {
+                    self.visit_expr(&attr.value);
+                }
+                for child in &el.children {
+                    self.visit_custom_node(child);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for MacroVisitor {
     fn visit_macro(&mut self, node: &'ast Macro) {
         if node.path.segments.last().map(|s| s.ident.to_string()) == Some("threadloom".to_string())
         {
             if let Ok(mut parsed) = parse2::<ViewMacro>(node.tokens.clone()) {
                 parsed.line = node.path.segments.last().unwrap().ident.span().start().line;
+                let parsed_clone = parsed.clone();
                 self.macros.push(parsed);
+                for n in &parsed_clone.nodes {
+                    self.visit_custom_node(n);
+                }
             }
         }
         syn::visit::visit_macro(self, node);
+    }
+}
+
+struct StripThreadloom;
+impl VisitMut for StripThreadloom {
+    fn visit_expr_mut(&mut self, i: &mut syn::Expr) {
+        if let syn::Expr::Macro(mac) = i {
+            if mac.mac.path.segments.last().map(|s| s.ident.to_string()) == Some("threadloom".to_string()) {
+                *i = syn::parse_quote!(());
+                return;
+            }
+        }
+        syn::visit_mut::visit_expr_mut(self, i);
+    }
+    fn visit_stmt_mut(&mut self, i: &mut syn::Stmt) {
+        if let syn::Stmt::Macro(mac) = i {
+            if mac.mac.path.segments.last().map(|s| s.ident.to_string()) == Some("threadloom".to_string()) {
+                *i = syn::parse_quote!((););
+                return;
+            }
+        }
+        syn::visit_mut::visit_stmt_mut(self, i);
     }
 }
 
@@ -184,31 +234,47 @@ fn node_to_html(node: &Node, path: &str) -> Option<String> {
                         html_tag = "p".to_string();
                         for attr in &el.attrs {
                             if attr.name.to_string() == "variant" {
-                                if let Some(serde_json::Value::String(s)) = extract_literal_value(&attr.value) {
+                                if let Some(serde_json::Value::String(s)) =
+                                    extract_literal_value(&attr.value)
+                                {
                                     html_tag = s;
                                 }
                             }
                         }
                     }
-                    "Row" => { html_tag = "div".to_string(); base_classes = "flex flex-row".to_string(); },
-                    "Column" => { html_tag = "div".to_string(); base_classes = "flex flex-col".to_string(); },
+                    "Row" => {
+                        html_tag = "div".to_string();
+                        base_classes = "flex flex-row".to_string();
+                    }
+                    "Column" => {
+                        html_tag = "div".to_string();
+                        base_classes = "flex flex-col".to_string();
+                    }
                     "Section" => {
                         html_tag = "section".to_string();
                         let mut is_row = false;
                         for attr in &el.attrs {
                             if attr.name.to_string() == "row" {
-                                if let Some(serde_json::Value::Bool(b)) = extract_literal_value(&attr.value) {
+                                if let Some(serde_json::Value::Bool(b)) =
+                                    extract_literal_value(&attr.value)
+                                {
                                     is_row = b;
                                 }
                             }
                         }
-                        base_classes = if is_row { "flex flex-row".to_string() } else { "flex flex-col".to_string() };
+                        base_classes = if is_row {
+                            "flex flex-row".to_string()
+                        } else {
+                            "flex flex-col".to_string()
+                        };
                     }
                     "Heading" => {
                         html_tag = "h2".to_string();
                         for attr in &el.attrs {
                             if attr.name.to_string() == "level" {
-                                if let Some(serde_json::Value::Number(n)) = extract_literal_value(&attr.value) {
+                                if let Some(serde_json::Value::Number(n)) =
+                                    extract_literal_value(&attr.value)
+                                {
                                     if let Some(i) = n.as_i64() {
                                         html_tag = format!("h{}", i.min(6).max(1));
                                     }
@@ -221,17 +287,32 @@ fn node_to_html(node: &Node, path: &str) -> Option<String> {
                         let mut is_primary = false;
                         for attr in &el.attrs {
                             if attr.name.to_string() == "primary" {
-                                if let Some(serde_json::Value::Bool(b)) = extract_literal_value(&attr.value) {
+                                if let Some(serde_json::Value::Bool(b)) =
+                                    extract_literal_value(&attr.value)
+                                {
                                     is_primary = b;
                                 }
                             }
                         }
-                        base_classes = if is_primary { "tl-btn tl-btn-primary".to_string() } else { "tl-btn tl-btn-secondary".to_string() };
+                        base_classes = if is_primary {
+                            "tl-btn tl-btn-primary".to_string()
+                        } else {
+                            "tl-btn tl-btn-secondary".to_string()
+                        };
                     }
-                    "Grid" => { html_tag = "div".to_string(); base_classes = "grid".to_string(); },
+                    "Grid" => {
+                        html_tag = "div".to_string();
+                        base_classes = "grid".to_string();
+                    }
                     "Image" => html_tag = "img".to_string(),
-                    "Divider" => { html_tag = "hr".to_string(); base_classes = "w-full border-t dark:border-gray-800".to_string(); },
-                    "Container" => { html_tag = "div".to_string(); base_classes = "container".to_string(); },
+                    "Divider" => {
+                        html_tag = "hr".to_string();
+                        base_classes = "w-full border-t dark:border-gray-800".to_string();
+                    }
+                    "Container" => {
+                        html_tag = "div".to_string();
+                        base_classes = "container".to_string();
+                    }
                     _ => {
                         // Unknown component — fall back to a plain div so the `replace` action
                         // can still proceed. WASM will re-render it correctly after the patch.
@@ -271,7 +352,7 @@ fn node_to_html(node: &Node, path: &str) -> Option<String> {
                     }
                 }
             }
-            
+
             html.push('>');
             for (i, child) in el.children.iter().enumerate() {
                 let child_path = format!("{}-{}", path, i);
@@ -295,7 +376,11 @@ fn diff_nodes(
 ) -> bool {
     if old_nodes.len() == new_nodes.len() {
         for (i, (old_node, new_node)) in old_nodes.iter().zip(new_nodes.iter()).enumerate() {
-            let path = if base_path.is_empty() { i.to_string() } else { format!("{}-{}", base_path, i) };
+            let path = if base_path.is_empty() {
+                i.to_string()
+            } else {
+                format!("{}-{}", base_path, i)
+            };
             if !diff_single_node(old_node, new_node, &path, patches) {
                 return false;
             }
@@ -306,7 +391,7 @@ fn diff_nodes(
     let mut old_i = 0;
     let mut new_i = 0;
     let mut temp_patches = Vec::new();
-    
+
     while old_i < old_nodes.len() && new_i < new_nodes.len() {
         if node_to_string(&old_nodes[old_i]) == node_to_string(&new_nodes[new_i]) {
             old_i += 1;
@@ -315,10 +400,10 @@ fn diff_nodes(
             break;
         }
     }
-    
+
     let mut old_j = old_nodes.len();
     let mut new_j = new_nodes.len();
-    
+
     while old_j > old_i && new_j > new_i {
         if node_to_string(&old_nodes[old_j - 1]) == node_to_string(&new_nodes[new_j - 1]) {
             old_j -= 1;
@@ -327,11 +412,15 @@ fn diff_nodes(
             break;
         }
     }
-    
+
     if old_i == old_j {
         for idx in new_i..new_j {
-            let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
-            
+            let path = if base_path.is_empty() {
+                idx.to_string()
+            } else {
+                format!("{}-{}", base_path, idx)
+            };
+
             // Return false for Expr (closures) to be perfectly safe
             if let Node::Expr(_) = &new_nodes[idx] {
                 return false;
@@ -354,13 +443,17 @@ fn diff_nodes(
         patches.extend(temp_patches);
         return true;
     }
-    
+
     if new_i == new_j {
         // Removal: all node types (including components) have data-th-id in the DOM.
         // We can target them by path regardless of whether they are uppercase components,
         // lowercase elements, or text nodes rendered by WASM.
         for idx in (old_i..old_j).rev() {
-            let path = if base_path.is_empty() { idx.to_string() } else { format!("{}-{}", base_path, idx) };
+            let path = if base_path.is_empty() {
+                idx.to_string()
+            } else {
+                format!("{}-{}", base_path, idx)
+            };
             temp_patches.push(serde_json::json!({
                 "action": "remove",
                 "path": path,
@@ -371,18 +464,27 @@ fn diff_nodes(
         patches.extend(temp_patches);
         return true;
     }
-    
+
     if old_j - old_i == new_j - new_i {
         for k in 0..(old_j - old_i) {
-            let path = if base_path.is_empty() { (old_i + k).to_string() } else { format!("{}-{}", base_path, old_i + k) };
-            if !diff_single_node(&old_nodes[old_i + k], &new_nodes[new_i + k], &path, &mut temp_patches) {
+            let path = if base_path.is_empty() {
+                (old_i + k).to_string()
+            } else {
+                format!("{}-{}", base_path, old_i + k)
+            };
+            if !diff_single_node(
+                &old_nodes[old_i + k],
+                &new_nodes[new_i + k],
+                &path,
+                &mut temp_patches,
+            ) {
                 return false;
             }
         }
         patches.extend(temp_patches);
         return true;
     }
-    
+
     false
 }
 
@@ -396,7 +498,7 @@ fn extract_literal_value(expr: &syn::Expr) -> Option<serde_json::Value> {
                 } else {
                     None
                 }
-            },
+            }
             syn::Lit::Bool(b) => Some(serde_json::Value::Bool(b.value())),
             syn::Lit::Float(f) => {
                 if let Ok(v) = f.base10_parse::<f64>() {
@@ -404,7 +506,7 @@ fn extract_literal_value(expr: &syn::Expr) -> Option<serde_json::Value> {
                 } else {
                     None
                 }
-            },
+            }
             _ => None,
         }
     } else {
@@ -462,13 +564,29 @@ fn diff_single_node(
                 let mut attrs_diff = std::collections::HashMap::new();
 
                 for (key, new_attr) in &new_attrs {
+                    if let Some(old_attr) = old_attrs.get(key) {
+                        let old_name = &old_attr.name;
+                        let old_val = &old_attr.value;
+                        let new_name = &new_attr.name;
+                        let new_val = &new_attr.value;
+                        let old_val_str = quote::quote!(#old_name = #old_val).to_string();
+                        let new_val_str = quote::quote!(#new_name = #new_val).to_string();
+                        if old_val_str == new_val_str {
+                            continue;
+                        }
+                    }
+
                     if key == "class" || key == "extra_class" {
                         // Emit a { old, new } pair so the HMR client can swap ONLY the
                         // user-supplied class while preserving the framework's intrinsic
                         // classes (text size, tl-card, tl-btn, flex/grid, etc.). A plain
                         // scalar would force a full className replace and wipe component styling.
-                        let old_lit = old_attrs.get(key).and_then(|a| extract_literal_value(&a.value)).and_then(|v| v.as_str().map(|s| s.to_string()));
-                        let new_lit = extract_literal_value(&new_attr.value).and_then(|v| v.as_str().map(|s| s.to_string()));
+                        let old_lit = old_attrs
+                            .get(key)
+                            .and_then(|a| extract_literal_value(&a.value))
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+                        let new_lit = extract_literal_value(&new_attr.value)
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
                         if new_lit.is_none() {
                             // Dynamic (non-literal) class — cannot safely patch; fall back to replace.
                             can_patch = false;
@@ -522,7 +640,8 @@ fn diff_single_node(
                     for (key, old_attr) in &old_attrs {
                         if !new_attrs.contains_key(key) {
                             if key == "class" || key == "extra_class" {
-                                let old_lit = extract_literal_value(&old_attr.value).and_then(|v| v.as_str().map(|s| s.to_string()));
+                                let old_lit = extract_literal_value(&old_attr.value)
+                                    .and_then(|v| v.as_str().map(|s| s.to_string()));
                                 if old_lit.is_none() {
                                     can_patch = false;
                                     break;
@@ -549,24 +668,77 @@ fn diff_single_node(
                 if can_patch && !attrs_diff.is_empty() {
                     let tag_str = old_el.tag.to_string();
                     let is_component = tag_str.chars().next().unwrap().is_uppercase();
-                    
+
                     if is_component {
                         let safe_props = [
-                            "class", "extra_class", "p", "px", "py", "pt", "pb", "pl", "pr",
-                            "m", "mx", "my", "mt", "mb", "ml", "mr", "border", "border_color", "bg",
-                            "align", "title_align", "weight", "shadow", "wide", "cols", "gap",
-                            "sm_cols", "md_cols", "lg_cols", "xl_cols", "2xl_cols",
-                            "primary", "label", "text", "title", "level", "items", "justify",
-                            "width", "height", "rounded",
-                            // Card / Badge / data components
-                            "variant", "subtitle", "footer", "clickable",
-                            // Form components (Input, Label, Checkbox, Radio, Select, Textarea)
-                            "placeholder", "disabled", "checked", "value", "name", "type_",
-                            "rows", "options", "selected", "required", "readonly",
-                            // Navigation (Tabs, Dropdown)
-                            "href", "active", "open",
-                            // Image
-                            "src", "alt", "lazy",
+                            "class",
+                            "extra_class",
+                            "p",
+                            "px",
+                            "py",
+                            "pt",
+                            "pb",
+                            "pl",
+                            "pr",
+                            "m",
+                            "mx",
+                            "my",
+                            "mt",
+                            "mb",
+                            "ml",
+                            "mr",
+                            "border",
+                            "border_color",
+                            "bg",
+                            "align",
+                            "title_align",
+                            "weight",
+                            "shadow",
+                            "wide",
+                            "cols",
+                            "gap",
+                            "sm_cols",
+                            "md_cols",
+                            "lg_cols",
+                            "xl_cols",
+                            "2xl_cols",
+                            "primary",
+                            "label",
+                            "text",
+                            "title",
+                            "level",
+                            "items",
+                            "justify",
+                            "width",
+                            "height",
+                            "rounded",
+                            "variant",
+                            "subtitle",
+                            "footer",
+                            "clickable",
+                            "placeholder",
+                            "disabled",
+                            "checked",
+                            "value",
+                            "name",
+                            "type_",
+                            "rows",
+                            "options",
+                            "selected",
+                            "required",
+                            "readonly",
+                            "href",
+                            "active",
+                            "open",
+                            "src",
+                            "alt",
+                            "lazy",
+                            "row",
+                            "column",
+                            "wrap",
+                            "direction",
+                            "flex",
+                            "id",
                         ];
                         for key in attrs_diff.keys() {
                             if !safe_props.contains(&key.as_str()) {
@@ -575,7 +747,7 @@ fn diff_single_node(
                             }
                         }
                     }
-                    
+
                     if can_patch {
                         patches.push(serde_json::json!({
                             "action": "update_attrs",
@@ -608,7 +780,23 @@ fn diff_single_node(
             true
         }
         (Node::Expr(old_expr), Node::Expr(new_expr)) => {
-            quote::quote!(#old_expr).to_string() == quote::quote!(#new_expr).to_string()
+            if quote::quote!(#old_expr).to_string() == quote::quote!(#new_expr).to_string() {
+                return true;
+            }
+            let mut old_clone = old_expr.clone();
+            let mut new_clone = new_expr.clone();
+            let mut stripper = StripThreadloom;
+            stripper.visit_expr_block_mut(&mut old_clone);
+            stripper.visit_expr_block_mut(&mut new_clone);
+            let old_str = quote::quote!(#old_clone).to_string();
+            let new_str = quote::quote!(#new_clone).to_string();
+            let eq = old_str == new_str;
+            if !eq {
+                tracing::debug!("[hot_patch] Node::Expr diff failed at path {}", path);
+                tracing::debug!("[hot_patch] Old stripped: {}", old_str);
+                tracing::debug!("[hot_patch] New stripped: {}", new_str);
+            }
+            eq
         }
         _ => false,
     }
@@ -632,7 +820,10 @@ pub fn attempt_hot_patch(
     let mut new_visitor = MacroVisitor { macros: Vec::new() };
     new_visitor.visit_file(&new_ast);
 
+    tracing::debug!("[hot_patch] Macros found - old: {}, new: {}", old_visitor.macros.len(), new_visitor.macros.len());
+
     if old_visitor.macros.len() != new_visitor.macros.len() {
+        tracing::debug!("[hot_patch] Macro count mismatch");
         return None;
     }
 
@@ -641,11 +832,13 @@ pub fn attempt_hot_patch(
     for (old_m, new_m) in old_visitor.macros.iter().zip(new_visitor.macros.iter()) {
         let base = new_m.line.to_string();
         if !diff_nodes(&old_m.nodes, &new_m.nodes, &base, &mut patches) {
+            tracing::debug!("[hot_patch] diff_nodes failed for macro at line {}", new_m.line);
             return None;
         }
     }
 
     if !patches.is_empty() {
+        tracing::debug!("[hot_patch] Generated patches: {:?}", patches);
         Some(serde_json::json!({ "type": "patch", "data": patches }))
     } else {
         None

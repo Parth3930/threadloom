@@ -12,7 +12,7 @@ members = [
     "crates/threadloom-desktop", "crates/threadloom-ui",
     "crates/threadloom-android",
     "examples/*"
-]
+, ]
 [profile.dev]
 opt-level = 0
 lto = false

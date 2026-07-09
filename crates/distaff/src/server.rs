@@ -322,6 +322,21 @@ async fn hmr_script() -> &'static str {
                                         el.className = el.className.replace(/\bjustify-(center|start|end|between|around|evenly)\b/, '') + ' justify-' + patch.attrs[key];
                                         el.className = el.className.trim().replace(/\s+/g, ' ');
                                     }
+                                    // Layout hacks
+                                    if (key === 'row') {
+                                        if (patch.attrs[key] === true || patch.attrs[key] === 'true') {
+                                            el.className = el.className.replace(/\bflex-col\b/, 'flex-row');
+                                        } else {
+                                            el.className = el.className.replace(/\bflex-row\b/, 'flex-col');
+                                        }
+                                    }
+                                    if (key === 'wrap') {
+                                        if (patch.attrs[key] === true || patch.attrs[key] === 'true') {
+                                            if (!el.className.includes('flex-wrap')) el.className += ' flex-wrap';
+                                        } else {
+                                            el.className = el.className.replace(/\bflex-wrap\b/, '').trim();
+                                        }
+                                    }
                                     if (key === 'width') {
                                         el.className = el.className.replace(/\bw-[^\s]+\b/, '') + ' w-' + patch.attrs[key];
                                         el.className = el.className.trim().replace(/\s+/g, ' ');

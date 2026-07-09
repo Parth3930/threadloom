@@ -6,6 +6,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::ext::IdentExt;
 use syn::{parse_macro_input, braced, parenthesized, Expr, ExprBlock, Ident, LitStr, Token, Result, ItemFn, Block};
 use syn::spanned::Spanned;
+use syn::visit_mut::VisitMut;
 
 enum Node {
     Element(Element),
@@ -107,9 +108,41 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
         }
         Node::Expr(expr) => {
             let span = expr.span();
+            let mut expr_clone = expr.clone();
+            
+            struct ExprVisitor {
+                path: String,
+                counter: usize,
+            }
+            impl VisitMut for ExprVisitor {
+                fn visit_expr_mut(&mut self, i: &mut syn::Expr) {
+                    syn::visit_mut::visit_expr_mut(self, i);
+                    if let syn::Expr::Call(call) = i {
+                        if let syn::Expr::Path(expr_path) = &*call.func {
+                            if let Some(segment) = expr_path.path.segments.last() {
+                                let ident_str = segment.ident.to_string();
+                                if ident_str.chars().next().map_or(false, |c| c.is_uppercase()) {
+                                    if ident_str != "Some" && ident_str != "Ok" && ident_str != "Err" && ident_str != "String" {
+                                        let span = i.span();
+                                        let child_path = format!("{}-expr-{}", self.path, self.counter);
+                                        self.counter += 1;
+                                        let inner = i.clone();
+                                        *i = syn::parse_quote_spanned! { span=>
+                                            ::threadloom_core::IntoView::into_view(#inner).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #child_path))
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let mut visitor = ExprVisitor { path, counter: 0 };
+            visitor.visit_expr_block_mut(&mut expr_clone);
+
             quote::quote_spanned! {span=>
                 #[allow(unused_braces)]
-                ::threadloom_core::IntoView::into_view(#expr)
+                ::threadloom_core::IntoView::into_view(#expr_clone)
             }
         }
         Node::Element(el) => {
