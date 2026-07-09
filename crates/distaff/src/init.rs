@@ -20,8 +20,8 @@ const RESET: &str = "\x1b[0m";
 struct Template;
 
 pub fn init_project() -> anyhow::Result<()> {
-    println!("\n  {}🚀 Welcome to Distaff! Let's build something amazing.{}", BOLD, RESET);
-    println!("  {}{}─────────────────────────────────────────────────────────{}\n", CYAN, BOLD, RESET);
+    print!("\r\n  {}🚀 Welcome to Distaff! Let's build something amazing.{}\r\n", BOLD, RESET);
+    print!("  {}{}─────────────────────────────────────────────────────────{}\r\n\r\n", CYAN, BOLD, RESET);
 
     use dialoguer::{theme::ColorfulTheme, Input, Confirm, Select};
 
@@ -47,7 +47,7 @@ pub fn init_project() -> anyhow::Result<()> {
         .interact()?;
     let pm = pms[pm_idx];
 
-    println!("\n  {}Scaffolding full-stack project...{}", YELLOW, RESET);
+    print!("\r\n  {}Scaffolding full-stack project...{}\r\n", YELLOW, RESET);
 
     // Extract embedded template
     for file in Template::iter() {
@@ -103,19 +103,19 @@ pub fn init_project() -> anyhow::Result<()> {
     }
 
     if setup_tw {
-        println!("  {}Running {} install...{}", CYAN, pm, RESET);
+        print!("  {}Running {} install...{}\r\n", CYAN, pm, RESET);
         #[cfg(target_os = "windows")]
         let _ = std::process::Command::new("cmd").args(["/C", pm, "install"]).current_dir(&name).status();
         #[cfg(not(target_os = "windows"))]
         let _ = std::process::Command::new(pm).args(["install"]).current_dir(&name).status();
     }
 
-    println!("  {}✔{} Project {} created successfully!", GREEN, RESET, name);
-    println!("\n  Next steps:");
+    print!("\r\n  {}✔{} Project {} created successfully!\r\n", GREEN, RESET, name);
+    print!("\r\n  Next steps:\r\n");
     
     // Check if trunk is installed
     if std::process::Command::new("trunk").arg("--version").output().is_err() {
-        println!("    {}cargo install trunk{} (required for building WASM)", CYAN, RESET);
+        print!("    {}cargo install trunk{} (required for building WASM)\r\n", CYAN, RESET);
     }
     
     // Check if wasm target is installed
@@ -126,10 +126,10 @@ pub fn init_project() -> anyhow::Result<()> {
         .unwrap_or(false);
 
     if !target_installed {
-        println!("    {}rustup target add wasm32-unknown-unknown{} (required for building WASM)", CYAN, RESET);
+        print!("    {}rustup target add wasm32-unknown-unknown{} (required for building WASM)\r\n", CYAN, RESET);
     }
     
-    println!("    {}cd {}{}", CYAN, name, RESET);
-    println!("    {}distaff run{}\n", CYAN, RESET);
+    print!("    {}cd {}{}\r\n", CYAN, name, RESET);
+    print!("    {}distaff run{}\r\n\r\n", CYAN, RESET);
     Ok(())
 }
