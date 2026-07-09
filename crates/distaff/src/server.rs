@@ -24,7 +24,11 @@ pub async fn start_dev_server(port: u16, plugins: Arc<Mutex<Vec<Box<dyn DistaffP
         .route("/api/*path", any(api_proxy))
         .nest_service("/assets", ServeDir::new("assets"))
         .fallback_service(ServeDir::new("dist").fallback(get(fallback_handler)))
-        .with_state(tx);
+        .with_state(tx)
+        .layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+            axum::http::header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+        ));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;

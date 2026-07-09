@@ -543,10 +543,12 @@ async fn main() -> anyhow::Result<()> {
                 if let Ok(s) = status {
                     if !s.success() {
                         tracing::error!("Failed to build android app");
+                        crate::hot_reload::kill_all();
                         std::process::exit(1);
                     }
                 } else {
                     tracing::error!("Failed to run gradle. Is it installed?");
+                    crate::hot_reload::kill_all();
                     std::process::exit(1);
                 }
 
@@ -585,6 +587,7 @@ async fn main() -> anyhow::Result<()> {
                     .status()?;
                 if !build_status.success() {
                     tracing::error!("Failed to build desktop app");
+                    crate::hot_reload::kill_all();
                     std::process::exit(1);
                 }
 

@@ -1,7 +1,7 @@
 [package]
 license = "MIT"
 name = "distaff"
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
 
@@ -22,7 +22,7 @@ path = "src/main.rs"
 clap = { version = "4.4", features = ["derive"] }
 tokio = { version = "1.32", features = ["full"] }
 axum = { version = "0.7", features = ["ws"] }
-tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace", "set-header"] }
 notify = "6.1"
 notify-debouncer-mini = "0.4"
 tracing = "0.1"
