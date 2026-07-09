@@ -6,3 +6,14 @@
 .env
 src/generated_env.rs
 src/generated_svg.rs
+
+
+# Android
+/android/.gradle
+/android/build
+/android/app/build
+/android/local.properties
+/android/**/*.iml
+/android/.idea
+
+/android/app/src/main/jniLibs/

@@ -10,6 +10,12 @@ mod init;
 mod mod_gen;
 mod hot_patch;
 
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "android_java"]
+struct AndroidJavaTemplate;
+
 #[derive(Parser)]
 #[command(name = "distaff")]
 #[command(about = "Vite-equivalent dev tool for Threadloom and Rust UI frameworks", long_about = None)]
@@ -267,10 +273,32 @@ fn setup_android() -> anyhow::Result<()> {
         std::fs::create_dir_all("android/app/src/main/res/values")?;
         std::fs::create_dir_all("android/app/src/main/java/com/threadloom/app")?;
         
+        for file in AndroidJavaTemplate::iter() {
+            if let Some(embedded_file) = AndroidJavaTemplate::get(&file) {
+                let dst_path = std::path::Path::new("android/app/src/main/java").join(file.as_ref());
+                if let Some(parent) = dst_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                
+                if file.as_ref().ends_with(".kt") {
+                    if let Ok(mut kotlin_code) = String::from_utf8(embedded_file.data.to_vec()) {
+                        kotlin_code = kotlin_code.replace("whiteboard_lib", &lib_name);
+                        let _ = std::fs::write(&dst_path, kotlin_code);
+                        continue;
+                    }
+                }
+                
+                std::fs::write(&dst_path, embedded_file.data)?;
+            }
+        }
+        
         std::fs::write("android/build.gradle", r#"
 buildscript {
     repositories { google(); mavenCentral() }
-    dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+    dependencies { 
+        classpath 'com.android.tools.build:gradle:8.5.0' 
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24"
+    }
 }
 allprojects {
     repositories { google(); mavenCentral() }
@@ -283,6 +311,7 @@ allprojects {
         std::fs::write("android/app/build.gradle", r#"
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 android {
     namespace 'com.threadloom.app'
@@ -293,6 +322,9 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+    }
+    buildFeatures {
+        buildConfig = true
     }
     buildTypes {
         release {
@@ -305,9 +337,19 @@ android {
             jniLibs.srcDirs = ['src/main/jniLibs']
         }
     }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.webkit:webkit:1.8.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10'
 }
 task buildRust(type: Exec) {
     workingDir '../../'
@@ -368,10 +410,21 @@ tasks.whenTaskAdded { task ->
             if !lib_path.exists() {
                 let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
                 let mut lib_content = String::new();
+                let mut current_cfg = String::new();
                 for line in main_rs.lines() {
-                    if line.starts_with("pub mod ") || line.starts_with("mod ") {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("#[cfg(") {
+                        current_cfg = line.to_string();
+                    } else if trimmed.starts_with("pub mod ") || trimmed.starts_with("mod ") {
+                        if !current_cfg.is_empty() {
+                            lib_content.push_str(&current_cfg);
+                            lib_content.push('\n');
+                        }
                         lib_content.push_str(&line.replace("mod ", "pub mod "));
                         lib_content.push('\n');
+                        current_cfg.clear();
+                    } else if !trimmed.is_empty() && !trimmed.starts_with("//") {
+                        current_cfg.clear();
                     }
                 }
                 if lib_content.is_empty() {
