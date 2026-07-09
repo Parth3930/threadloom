@@ -1,4 +1,4 @@
-﻿// Copyright 2020-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2020-2023 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -24,6 +24,8 @@ class RustWebView(context: Context, val initScripts: Array<String>): WebView(con
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.javaScriptCanOpenWindowsAutomatically = true
+        settings.useWideViewPort = true
+        settings.loadWithOverviewMode = true
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             isDocumentStartScriptEnabled = true

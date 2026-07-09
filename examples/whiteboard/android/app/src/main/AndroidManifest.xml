@@ -9,7 +9,6 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         <!-- tao/wry NativeActivity integration -->
         <activity android:name=".MainActivity"
-                  android:theme="@style/Theme.AppCompat.Light.NoActionBar"
                   android:exported="true"
                   android:configChanges="orientation|keyboardHidden|screenSize">
             <meta-data android:name="android.app.lib_name" android:value="whiteboard_lib" />
@@ -20,3 +19,4 @@
         </activity>
     </application>
 </manifest>
+        
