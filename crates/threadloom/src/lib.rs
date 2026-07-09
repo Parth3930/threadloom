@@ -38,6 +38,10 @@ macro_rules! back { ($($t:tt)*) => { $crate::__consume(($($t)*)) } }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
+macro_rules! navigate { ($($t:tt)*) => { $crate::__consume(($($t)*)) } }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[macro_export]
 macro_rules! animate { ($($t:tt)*) => { let _ = stringify!($($t)*); } }
 
 #[cfg(not(target_arch = "wasm32"))]
