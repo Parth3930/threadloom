@@ -2,6 +2,11 @@
 name = "threadloom-android"
 version = "0.1.0"
 edition = "2024"
+description = "Android bindings and utilities for the Threadloom framework"
+license = "MIT"
+repository = "https://github.com/Parth3930/threadloom"
+readme = "README.md"
+
 
 [lib]
 crate-type = ["rlib"]
