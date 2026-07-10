@@ -37,6 +37,18 @@ pub struct RowProps {
     pub href: OptClass,
     pub target: OptClass,
     /// The child elements to place in the row.
+    pub shadow: OptClass,
+    pub backdrop_blur: OptClass,
+    pub opacity: OptClass,
+    pub overflow: OptClass,
+    pub overflow_x: OptClass,
+    pub overflow_y: OptClass,
+    pub hide_scrollbar: bool,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+    pub on_focus: crate::Callback,
+    pub on_blur: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -292,6 +304,61 @@ fn bg_color_class(color: &str) -> &'static str {
     }
 }
 
+
+fn apply_advanced_layout(
+    class_str: &mut String,
+    shadow: &OptClass,
+    backdrop_blur: &OptClass,
+    opacity: &OptClass,
+    overflow: &OptClass,
+    overflow_x: &OptClass,
+    overflow_y: &OptClass,
+    hide_scrollbar: bool,
+) {
+    if let Some(s) = &shadow.0 {
+        if s == "none" {
+            class_str.push_str(" shadow-none");
+        } else {
+            class_str.push_str(" shadow-"); class_str.push_str(s);
+        }
+    }
+    if let Some(b) = &backdrop_blur.0 {
+        class_str.push_str(" backdrop-blur-"); class_str.push_str(b);
+    }
+    if let Some(o) = &opacity.0 {
+        class_str.push_str(" opacity-"); class_str.push_str(o);
+    }
+    if let Some(o) = &overflow.0 {
+        class_str.push_str(" overflow-"); class_str.push_str(o);
+    }
+    if let Some(o) = &overflow_x.0 {
+        class_str.push_str(" overflow-x-"); class_str.push_str(o);
+    }
+    if let Some(o) = &overflow_y.0 {
+        class_str.push_str(" overflow-y-"); class_str.push_str(o);
+    }
+    if hide_scrollbar {
+        class_str.push_str(" [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]");
+    }
+}
+
+fn apply_text_layout(
+    class_str: &mut String,
+    align: &OptClass,
+    color: &OptClass,
+    size: &OptClass,
+) {
+    if let Some(a) = &align.0 {
+        class_str.push_str(" text-"); class_str.push_str(a);
+    }
+    if let Some(c) = &color.0 {
+        class_str.push_str(" text-"); class_str.push_str(c);
+    }
+    if let Some(s) = &size.0 {
+        class_str.push_str(" text-"); class_str.push_str(s);
+    }
+}
+
 fn apply_spacing_and_borders(
     class_str: &mut String,
     p: i32,
@@ -412,6 +479,9 @@ pub fn Row(props: RowProps) -> View {
         &props.rounded,
     );
 
+    
+    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -436,6 +506,12 @@ pub fn Row(props: RowProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
+    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
     for child in props.children {
         e = e.child(child);
     }
@@ -474,6 +550,18 @@ pub struct ColumnProps {
     pub href: OptClass,
     pub target: OptClass,
     /// The child elements to stack in the column.
+    pub shadow: OptClass,
+    pub backdrop_blur: OptClass,
+    pub opacity: OptClass,
+    pub overflow: OptClass,
+    pub overflow_x: OptClass,
+    pub overflow_y: OptClass,
+    pub hide_scrollbar: bool,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+    pub on_focus: crate::Callback,
+    pub on_blur: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -542,6 +630,9 @@ pub fn Column(props: ColumnProps) -> View {
         &props.rounded,
     );
 
+    
+    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -566,6 +657,12 @@ pub fn Column(props: ColumnProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
+    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
     for child in props.children {
         e = e.child(child);
     }
@@ -584,6 +681,18 @@ pub struct ContainerProps {
     pub href: OptClass,
     pub target: OptClass,
     /// The content inside the wrapper.
+    pub shadow: OptClass,
+    pub backdrop_blur: OptClass,
+    pub opacity: OptClass,
+    pub overflow: OptClass,
+    pub overflow_x: OptClass,
+    pub overflow_y: OptClass,
+    pub hide_scrollbar: bool,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+    pub on_focus: crate::Callback,
+    pub on_blur: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -602,6 +711,9 @@ pub fn Container(props: ContainerProps) -> View {
     let tag = if props.href.0.is_some() { "a" } else { "div" };
     let mut e = element(tag);
     let mut class_str = "container".to_string();
+    
+    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -626,6 +738,12 @@ pub fn Container(props: ContainerProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
+    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
     for child in props.children {
         e = e.child(child);
     }
@@ -666,6 +784,18 @@ pub struct SectionProps {
     pub animate_fromto: crate::OptTuple,
     pub href: OptClass,
     pub target: OptClass,
+    pub shadow: OptClass,
+    pub backdrop_blur: OptClass,
+    pub opacity: OptClass,
+    pub overflow: OptClass,
+    pub overflow_x: OptClass,
+    pub overflow_y: OptClass,
+    pub hide_scrollbar: bool,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+    pub on_focus: crate::Callback,
+    pub on_blur: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -731,6 +861,9 @@ pub fn Section(props: SectionProps) -> View {
         &props.rounded,
     );
 
+    
+    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -755,6 +888,12 @@ pub fn Section(props: SectionProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
+    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
     for child in props.children {
         e = e.child(child);
     }
@@ -816,6 +955,12 @@ pub struct TextProps {
     /// Optional click handler
     pub on_click: crate::Callback,
     /// The text or elements inside.
+    pub align: OptClass,
+    pub color: OptClass,
+    pub size: OptClass,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -844,6 +989,7 @@ pub fn Text(props: TextProps) -> View {
         }
     }
 
+    apply_text_layout(&mut class_str, &props.align, &props.color, &props.size);
     if let Some(c) = props.class.0 {
         if !class_str.is_empty() {
             class_str.push(' ');
@@ -876,6 +1022,10 @@ pub fn Text(props: TextProps) -> View {
     if let Some(f) = props.on_click.0 {
         e = e.on("click", move || f());
     }
+
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
 
     for child in props.children {
         e = e.child(child);
@@ -912,6 +1062,11 @@ pub struct HeadingProps {
     /// Optional click handler
     pub on_click: crate::Callback,
     /// Text content inside the heading.
+    pub color: OptClass,
+    pub size: OptClass,
+    pub on_mouse_enter: crate::Callback,
+    pub on_mouse_leave: crate::Callback,
+
     pub children: Vec<View>,
 }
 
@@ -1019,6 +1174,7 @@ pub fn Heading(props: HeadingProps) -> View {
         &props.rounded,
     );
 
+    apply_text_layout(&mut class_str, &OptClass(None), &props.color, &props.size);
     if let Some(c) = props.class.0 {
         if !class_str.is_empty() {
             class_str.push(' ');
@@ -1033,6 +1189,10 @@ pub fn Heading(props: HeadingProps) -> View {
     if let Some(f) = props.on_click.0 {
         e = e.on("click", move || f());
     }
+
+    
+    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
+    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
 
     for child in props.children {
         e = e.child(child);

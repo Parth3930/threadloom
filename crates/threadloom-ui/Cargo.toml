@@ -1,9 +1,15 @@
 [package]
-license = "MIT"
-description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-ui"
-version = "0.1.1"
+version = "0.1.11"
 edition = "2024"
+description = "A meticulously crafted, Tailwind-ready UI component library for the Threadloom framework. To serve and build, use the Distaff CLI tool."
+license = "MIT"
+repository = "https://github.com/Parth3930/threadloom"
+homepage = "https://github.com/Parth3930/threadloom"
+documentation = "https://crates.io/crates/distaff"
+readme = "README.md"
+keywords = ["ui", "framework", "components", "webassembly", "threadloom"]
+categories = ["gui", "web-programming", "wasm"]
 
 [dependencies]
 threadloom-core = { path = "../threadloom-core", version = "0.1.1" }
@@ -11,4 +17,3 @@ threadloom-macro = { path = "../threadloom-macro", version = "0.1.1" }
 
 [target.wasm32-unknown-unknown.dependencies]
 js-sys = "0.3.103"
-

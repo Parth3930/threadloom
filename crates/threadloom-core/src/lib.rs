@@ -1,4 +1,5 @@
 #![allow(warnings)]
+use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -11,6 +12,8 @@ static NEXT_RUNTIME_ID: AtomicUsize = AtomicUsize::new(1);
 thread_local! {
     static RUNTIME_ID: usize = NEXT_RUNTIME_ID.fetch_add(1, Ordering::Relaxed);
     static GRAPH: RefCell<Graph> = RefCell::new(Graph::new());
+    static CONTEXT_STACK: RefCell<Vec<HashMap<TypeId, Rc<dyn Any>>>> = RefCell::new(vec![HashMap::new()]);
+    static HYDRATION_STORE: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -44,12 +47,6 @@ struct Graph {
     next_id: usize,
     current_subscriber: Option<NodeId>,
     pending_effects: HashSet<NodeId>,
-    /// INVARIANT: This queue must only ever hold `NodeId` values (which are `Copy` and `Send`),
-    /// never the `Boundary` object itself.
-    ///
-    /// `Boundary` contains an `Rc` and cannot cross thread boundaries. A coordinator will drain these
-    /// `NodeId`s, route them to the correct worker thread based on their `runtime_id`, and that
-    /// thread will look up its local `HashMap<NodeId, Boundary>` to re-evaluate the boundary.
     pub pending_boundaries: HashSet<NodeId>,
     is_batching: bool,
 }
@@ -75,7 +72,7 @@ impl NodeId {
     pub fn index(&self) -> usize {
         self.index
     }
-    
+
     pub fn test_new(runtime_id: usize, index: usize) -> Self {
         Self { runtime_id, index }
     }
@@ -93,7 +90,11 @@ impl NodeId {
         });
     }
 
-    fn new(is_effect: bool, compute: Option<ComputeFn>, value: Option<Box<dyn std::any::Any>>) -> Self {
+    fn new(
+        is_effect: bool,
+        compute: Option<ComputeFn>,
+        value: Option<Box<dyn std::any::Any>>,
+    ) -> Self {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             let index = g.next_id;
@@ -159,7 +160,13 @@ impl NodeId {
                         } else {
                             node.state = State::Dirty;
                         }
-                        println!("node {} is now {:?} (is_effect: {}, has_compute: {})", current.index, node.state, is_effect, node.compute.is_some());
+                        println!(
+                            "node {} is now {:?} (is_effect: {}, has_compute: {})",
+                            current.index,
+                            node.state,
+                            is_effect,
+                            node.compute.is_some()
+                        );
                         (is_effect, subs, true, node.compute.is_some())
                     } else {
                         (false, vec![], false, false)
@@ -394,7 +401,12 @@ impl<T: Clone + 'static> ReadSignal<T> {
         GRAPH.with(|g| {
             let g = g.borrow();
             let node = g.nodes[self.id.index].as_ref().unwrap();
-            node.value.as_ref().unwrap().downcast_ref::<T>().unwrap().clone()
+            node.value
+                .as_ref()
+                .unwrap()
+                .downcast_ref::<T>()
+                .unwrap()
+                .clone()
         })
     }
 }
@@ -479,7 +491,10 @@ where
     id.mark_dirty();
     id.update_if_necessary();
 
-    Memo { id, _marker: std::marker::PhantomData }
+    Memo {
+        id,
+        _marker: std::marker::PhantomData,
+    }
 }
 
 impl<T: Clone + 'static> Memo<T> {
@@ -489,7 +504,13 @@ impl<T: Clone + 'static> Memo<T> {
         GRAPH.with(|g| {
             let g = g.borrow();
             let node = g.nodes[self.id.index].as_ref().unwrap();
-            node.value.as_ref().unwrap().downcast_ref::<Option<T>>().unwrap().clone().unwrap()
+            node.value
+                .as_ref()
+                .unwrap()
+                .downcast_ref::<Option<T>>()
+                .unwrap()
+                .clone()
+                .unwrap()
         })
     }
 }
@@ -544,13 +565,13 @@ impl From<Rc<dyn Fn() -> AttributeValue>> for AttributeValue {
 }
 
 /// Represents a dynamic UI boundary.
-/// 
+///
 /// ```compile_fail
 /// use std::sync::mpsc;
 /// use std::rc::Rc;
 /// use std::cell::RefCell;
 /// use threadloom_core::{Boundary, NodeId, View};
-/// 
+///
 /// // This test proves that Boundary cannot cross threads!
 /// // If someone tries to send a Boundary over a channel, it will fail to compile
 /// // because Boundary contains an Rc.
@@ -613,7 +634,10 @@ impl View {
     pub fn with_attr(mut self, key: &str, value: &str) -> Self {
         match &mut self {
             View::Element { attrs, .. } => {
-                attrs.insert(key.to_string(), crate::AttributeValue::String(value.to_string()));
+                attrs.insert(
+                    key.to_string(),
+                    crate::AttributeValue::String(value.to_string()),
+                );
             }
             View::Fragment(children) => {
                 if let Some(first) = children.first_mut() {
@@ -623,6 +647,59 @@ impl View {
             _ => {}
         }
         self
+    }
+}
+
+pub fn render_to_string(view: &View) -> String {
+    match view {
+        View::Text(s) => s.replace("<", "&lt;").replace(">", "&gt;"),
+        View::DynamicNode(boundary) => {
+            let mut compute = boundary.compute.borrow_mut();
+            render_to_string(&compute())
+        }
+        View::Element {
+            tag,
+            attrs,
+            children,
+        } => {
+            let mut html = format!("<{}", tag);
+            for (k, v) in attrs {
+                let val_str = match v {
+                    AttributeValue::String(s) => s.clone(),
+                    AttributeValue::Bool(true) => k.to_string(),
+                    AttributeValue::Bool(false) => continue,
+                    AttributeValue::Dynamic(f) => {
+                        let dyn_v = f();
+                        match dyn_v {
+                            AttributeValue::String(s) => s,
+                            AttributeValue::Bool(true) => k.to_string(),
+                            _ => continue,
+                        }
+                    }
+                    AttributeValue::Event(_) => continue,
+                };
+                html.push_str(&format!(" {}=\"{}\"", k, val_str.replace("\"", "&quot;")));
+            }
+            html.push('>');
+
+            let void_elements = [
+                "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+                "param", "source", "track", "wbr",
+            ];
+            if !void_elements.contains(&tag.as_str()) {
+                for child in children {
+                    html.push_str(&render_to_string(child));
+                }
+                html.push_str(&format!("</{}>", tag));
+            }
+            html
+        }
+        View::Fragment(children) => children
+            .iter()
+            .map(render_to_string)
+            .collect::<Vec<_>>()
+            .join(""),
+        View::None => String::new(),
     }
 }
 
@@ -667,7 +744,9 @@ macro_rules! impl_into_view_for_display {
         )*
     }
 }
-impl_into_view_for_display!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize, f32, f64, bool);
+impl_into_view_for_display!(
+    i8, i16, i32, i64, isize, u8, u16, u32, u64, usize, f32, f64, bool
+);
 
 impl<T: IntoView + 'static, F: FnMut() -> T + 'static> IntoView for F {
     fn into_view(mut self) -> View {
@@ -780,7 +859,7 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
     pub const fn new(init: fn() -> T) -> Self {
         Self { init }
     }
-    
+
     fn get_signals(&self) -> (ReadSignal<T>, WriteSignal<T>) {
         thread_local! {
             static GLOBALS: RefCell<HashMap<usize, (NodeId, NodeId)>> = RefCell::new(HashMap::new());
@@ -789,7 +868,16 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
         GLOBALS.with(|g| {
             let mut g = g.borrow_mut();
             if let Some(&(r, w)) = g.get(&addr) {
-                (ReadSignal { id: r, _marker: std::marker::PhantomData }, WriteSignal { id: w, _marker: std::marker::PhantomData })
+                (
+                    ReadSignal {
+                        id: r,
+                        _marker: std::marker::PhantomData,
+                    },
+                    WriteSignal {
+                        id: w,
+                        _marker: std::marker::PhantomData,
+                    },
+                )
             } else {
                 let (read, write) = create_signal((self.init)());
                 g.insert(addr, (read.id, write.id));
@@ -801,7 +889,7 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
     pub fn get(&self) -> T {
         self.get_signals().0.get()
     }
-    
+
     pub fn set(&self, value: T) {
         self.get_signals().1.set(value)
     }
@@ -830,20 +918,26 @@ impl<I: 'static, O: 'static> Clone for Action<I, O> {
 }
 
 impl<I: 'static, O: 'static> Action<I, O> {
-    pub fn new<F, Fut>(f: F) -> Self 
-    where 
+    pub fn new<F, Fut>(f: F) -> Self
+    where
         F: Fn(I) -> Fut + 'static,
-        Fut: std::future::Future<Output = O> + 'static
+        Fut: std::future::Future<Output = O> + 'static,
     {
         let (is_loading, set_loading) = create_signal(false);
-        let func = std::rc::Rc::new(move |i| Box::pin(f(i)) as std::pin::Pin<Box<dyn std::future::Future<Output = O>>>);
-        Self { is_loading, set_loading, func }
+        let func = std::rc::Rc::new(move |i| {
+            Box::pin(f(i)) as std::pin::Pin<Box<dyn std::future::Future<Output = O>>>
+        });
+        Self {
+            is_loading,
+            set_loading,
+            func,
+        }
     }
-    
+
     pub fn is_loading(&self) -> bool {
         self.is_loading.get()
     }
-    
+
     pub async fn execute(&self, input: I) -> O {
         self.set_loading.set(true);
         let res = (self.func)(input).await;
@@ -853,16 +947,117 @@ impl<I: 'static, O: 'static> Action<I, O> {
 }
 
 // ---------------------------------------------------------
+// CONTEXT API
+// ---------------------------------------------------------
+
+pub fn provide_context<T: 'static>(value: T) {
+    CONTEXT_STACK.with(|stack| {
+        let mut stack = stack.borrow_mut();
+        if let Some(frame) = stack.last_mut() {
+            frame.insert(TypeId::of::<T>(), Rc::new(value));
+        }
+    });
+}
+
+pub fn use_context<T: Clone + 'static>() -> Option<T> {
+    CONTEXT_STACK.with(|stack| {
+        let stack = stack.borrow();
+        for frame in stack.iter().rev() {
+            if let Some(val) = frame.get(&TypeId::of::<T>()) {
+                if let Some(typed_val) = val.downcast_ref::<T>() {
+                    return Some(typed_val.clone());
+                }
+            }
+        }
+        None
+    })
+}
+
+pub fn with_context_frame<R>(f: impl FnOnce() -> R) -> R {
+    CONTEXT_STACK.with(|stack| stack.borrow_mut().push(HashMap::new()));
+    let result = f();
+    CONTEXT_STACK.with(|stack| stack.borrow_mut().pop());
+    result
+}
+
+// ---------------------------------------------------------
+// DEVTOOLS
+// ---------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct NodeExport {
+    id: usize,
+    state: String,
+    is_effect: bool,
+    version: usize,
+    subscribers: Vec<usize>,
+    sources: Vec<usize>,
+}
+
+pub fn export_graph() -> String {
+    GRAPH.with(|g| {
+        let g = g.borrow();
+        let mut exports = Vec::new();
+        for (i, node_opt) in g.nodes.iter().enumerate() {
+            if let Some(node) = node_opt {
+                let state_str = match node.state {
+                    State::Clean => "Clean",
+                    State::Check => "Check",
+                    State::Dirty => "Dirty",
+                }
+                .to_string();
+
+                exports.push(NodeExport {
+                    id: i,
+                    state: state_str,
+                    is_effect: node.is_effect,
+                    version: node.version,
+                    subscribers: node.subscribers.iter().map(|id| id.index).collect(),
+                    sources: node.sources.keys().map(|id| id.index).collect(),
+                });
+            }
+        }
+        serde_json::to_string(&exports).unwrap_or_else(|_| "[]".to_string())
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn __threadloom_graph() -> String {
+    export_graph()
+}
+
+// ---------------------------------------------------------
 // HYDRATION (Feature 5)
 // ---------------------------------------------------------
 pub fn serialize_signal_graph() -> String {
-    // In a real Zero-JS scenario, we'd walk GRAPH and serialize nodes to JSON.
-    // For now, return empty state.
-    "{}".to_string()
+    HYDRATION_STORE
+        .with(|store| serde_json::to_string(&*store.borrow()).unwrap_or_else(|_| "{}".to_string()))
 }
 
-pub fn hydrate_signal_graph(_json: &str) {
-    // Restore signal state from serialized graph.
+pub fn hydrate_signal_graph(json: &str) {
+    if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(json) {
+        HYDRATION_STORE.with(|store| {
+            *store.borrow_mut() = map;
+        });
+    }
+}
+
+pub fn set_hydrated<T: serde::Serialize>(key: &str, value: &T) {
+    if let Ok(val_str) = serde_json::to_string(value) {
+        HYDRATION_STORE.with(|store| {
+            store.borrow_mut().insert(key.to_string(), val_str);
+        });
+    }
+}
+
+pub fn get_hydrated<T: serde::de::DeserializeOwned>(key: &str) -> Option<T> {
+    HYDRATION_STORE.with(|store| {
+        store
+            .borrow()
+            .get(key)
+            .and_then(|s| serde_json::from_str(s).ok())
+    })
 }
 
 #[cfg(test)]
@@ -955,14 +1150,17 @@ mod tests {
     #[test]
     fn test_thread_safety_invariants() {
         fn assert_send<T: Send>() {}
-        
+
         // Prove that NodeId can safely cross thread boundaries
         assert_send::<NodeId>();
     }
 }
 
 #[cfg(target_arch = "wasm32")]
-pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: serde_json::Value) -> Result<T, String> {
+pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(
+    url: &str,
+    body: serde_json::Value,
+) -> Result<T, String> {
     use wasm_bindgen::JsCast;
 
     let mut opts = web_sys::RequestInit::new();
@@ -972,11 +1170,12 @@ pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: se
     let js_body = wasm_bindgen::JsValue::from_str(&body.to_string());
     opts.body(Some(&js_body));
 
-    let headers = web_sys::Headers::new()
-        .map_err(|e| format!("Headers::new failed: {:?}", e))?;
-    headers.set("Content-Type", "application/json")
+    let headers = web_sys::Headers::new().map_err(|e| format!("Headers::new failed: {:?}", e))?;
+    headers
+        .set("Content-Type", "application/json")
         .map_err(|e| format!("set Content-Type failed: {:?}", e))?;
-    headers.set("x-threadloom-route", url)
+    headers
+        .set("x-threadloom-route", url)
         .map_err(|e| format!("set x-threadloom-route failed: {:?}", e))?;
     opts.headers(&headers);
 
@@ -994,22 +1193,25 @@ pub async fn client_rpc_call<T: serde::de::DeserializeOwned>(url: &str, body: se
     if !resp.ok() {
         let status = resp.status();
         let err_text = match resp.text() {
-            Ok(promise) => {
-                match wasm_bindgen_futures::JsFuture::from(promise).await {
-                    Ok(js_val) => js_val.as_string().unwrap_or_default(),
-                    Err(_) => "Could not read response text".to_string()
-                }
+            Ok(promise) => match wasm_bindgen_futures::JsFuture::from(promise).await {
+                Ok(js_val) => js_val.as_string().unwrap_or_default(),
+                Err(_) => "Could not read response text".to_string(),
             },
-            Err(_) => "Could not read response text promise".to_string()
+            Err(_) => "Could not read response text promise".to_string(),
         };
         return Err(format!("server returned HTTP {}: {}", status, err_text));
     }
 
-    let text_promise = resp.text().map_err(|e| format!("resp.text() failed: {:?}", e))?;
+    let text_promise = resp
+        .text()
+        .map_err(|e| format!("resp.text() failed: {:?}", e))?;
     let text_val = wasm_bindgen_futures::JsFuture::from(text_promise)
         .await
         .map_err(|e| format!("reading body failed: {:?}", e))?;
-    let text = text_val.as_string().ok_or_else(|| "body is not a string".to_string())?;
+    let text = text_val
+        .as_string()
+        .ok_or_else(|| "body is not a string".to_string())?;
 
-    serde_json::from_str(&text).map_err(|e| format!("deserialize failed: {} | body was: {}", e, text))
+    serde_json::from_str(&text)
+        .map_err(|e| format!("deserialize failed: {} | body was: {}", e, text))
 }

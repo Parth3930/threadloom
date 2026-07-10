@@ -95,7 +95,7 @@ pub struct InputProps {
     /// Placeholder text shown when empty.
     pub placeholder: String,
     /// The type of input (e.g., text, email, password)
-    pub r#type: OptClass,
+    pub type_: OptClass,
     /// Callback triggered on input change.
     pub on_input: Callback,
     /// Any additional child elements.
@@ -110,7 +110,7 @@ pub struct InputProps {
 /// - `class: OptClass`
 /// - `value: String`
 /// - `placeholder: String`
-/// - `type: OptClass`
+/// - `type_: OptClass`
 /// - `on_input: Callback`
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
@@ -120,7 +120,7 @@ pub fn Input(props: InputProps) -> View {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    let input_type = props.r#type.0.unwrap_or_else(|| "text".to_string());
+    let input_type = props.type_.0.unwrap_or_else(|| "text".to_string());
     let mut b = element("input")
         .attr("type", input_type)
         .attr("class", class_str)
