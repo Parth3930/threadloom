@@ -1,9 +1,15 @@
 [package]
-license = "MIT"
-description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-core"
 version = "0.1.11"
 edition = "2024"
+description = "Core primitives and reactivity engine for the Threadloom framework. Best used with the Distaff CLI tool."
+license = "MIT"
+repository = "https://github.com/Parth3930/threadloom"
+homepage = "https://github.com/Parth3930/threadloom"
+documentation = "https://crates.io/crates/distaff"
+readme = "README.md"
+keywords = ["core", "framework", "webassembly", "threadloom", "reactivity"]
+categories = ["web-programming", "wasm", "gui"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
