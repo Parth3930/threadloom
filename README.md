@@ -2,10 +2,12 @@
 
 > **Threadloom** is a full-stack Rust framework for building reactive, cross-platform applications — web (WASM), desktop, and Android — from a single Rust codebase. No JavaScript. No TypeScript. No context-switching.
 
-[![GitHub Stars](https://img.shields.io/github/stars/Parth3930/threadloom?style=flat-square)](https://github.com/Parth3930/threadloom/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/Parth3930/threadloom?style=for-the-badge&color=yellow)](https://github.com/Parth3930/threadloom/stargazers)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square)](https://www.rust-lang.org)
 [![WASM](https://img.shields.io/badge/target-WebAssembly-654ff0?style=flat-square)](https://webassembly.org)
+
+**⭐ Support the project:** If you find Threadloom interesting, please consider starring it on GitHub!
 
 **Keywords:** Rust web framework, full-stack Rust, Rust WASM framework, Rust frontend framework, Rust UI framework, Rust desktop app framework, Rust Android framework, cross-platform Rust, reactive signals Rust, WebAssembly frontend, Vercel Rust deployment, JSX-like Rust macro, Yew alternative.
 

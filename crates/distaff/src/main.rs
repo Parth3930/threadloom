@@ -469,7 +469,9 @@ async fn main() -> anyhow::Result<()> {
             if matches!(cli.command, Commands::Run { .. }) {
                 check_update();
             }
+            use colored::Colorize;
             println!("{} starting on port {}", "[🚀] distaff:".green(), port);
+            println!("{} ⭐ Like Threadloom? Star us on GitHub! https://github.com/Parth3930/threadloom", "[⭐] support:".yellow());
 
             let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
                 Box::new(plugins::TailwindPlugin),

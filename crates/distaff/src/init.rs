@@ -131,5 +131,6 @@ pub fn init_project() -> anyhow::Result<()> {
     
     print!("    {}cd {}{}\r\n", CYAN, name, RESET);
     print!("    {}distaff run{}\r\n\r\n", CYAN, RESET);
+    print!("  {}⭐ Like Threadloom? Star us on GitHub! https://github.com/Parth3930/threadloom{}\r\n\r\n", YELLOW, RESET);
     Ok(())
 }
