@@ -2,7 +2,7 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-dom"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 repository = "https://github.com/Parth3930/threadloom"
 homepage = "https://github.com/Parth3930/threadloom"
@@ -15,9 +15,9 @@ wasm-bindgen = "0.2"
 js-sys = "0.3"
 reqwasm = "0.5"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Document", "Element", "HtmlDocument", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Window", "Node", "Text", "History", "WebSocket", "MessageEvent"] }
-threadloom-core = { path = "../threadloom-core", version = "0.1.1" }
-threadloom-scheduler = { path = "../threadloom-scheduler", version = "0.1.1" }
+web-sys = { version = "0.3", features = ["Document", "DocumentFragment", "Element", "HtmlDocument", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Window", "Node", "Text", "History", "WebSocket", "MessageEvent"] }
+threadloom-core = { path = "../threadloom-core", version = "*" }
+threadloom-scheduler = { path = "../threadloom-scheduler", version = "*" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 [dev-dependencies]

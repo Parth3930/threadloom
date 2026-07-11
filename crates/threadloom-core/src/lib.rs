@@ -1,5 +1,6 @@
 #![allow(warnings)]
 use std::any::{Any, TypeId};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -517,7 +518,9 @@ impl<T: Clone + 'static> Memo<T> {
 
 #[derive(Clone)]
 pub enum AttributeValue {
-    String(String),
+    // ponytail: Cow avoids heap alloc for &'static str from macro-generated code
+    String(Cow<'static, str>),
+    RcString(Rc<String>),
     Bool(bool),
     Dynamic(Rc<dyn Fn() -> AttributeValue>),
     Event(Rc<dyn Fn()>),
@@ -527,6 +530,7 @@ impl std::fmt::Debug for AttributeValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::String(s) => write!(f, "String({:?})", s),
+            Self::RcString(s) => write!(f, "RcString({:?})", s),
             Self::Bool(b) => write!(f, "Bool({})", b),
             Self::Dynamic(_) => write!(f, "Dynamic(..)"),
             Self::Event(_) => write!(f, "Event(..)"),
@@ -534,14 +538,24 @@ impl std::fmt::Debug for AttributeValue {
     }
 }
 
-impl From<&str> for AttributeValue {
-    fn from(s: &str) -> Self {
-        AttributeValue::String(s.to_string())
+impl From<&'static str> for AttributeValue {
+    fn from(s: &'static str) -> Self {
+        AttributeValue::String(Cow::Borrowed(s))
     }
 }
 impl From<String> for AttributeValue {
     fn from(s: String) -> Self {
+        AttributeValue::String(Cow::Owned(s))
+    }
+}
+impl From<Cow<'static, str>> for AttributeValue {
+    fn from(s: Cow<'static, str>) -> Self {
         AttributeValue::String(s)
+    }
+}
+impl From<Rc<String>> for AttributeValue {
+    fn from(s: Rc<String>) -> Self {
+        AttributeValue::RcString(s)
     }
 }
 impl From<bool> for AttributeValue {
@@ -551,7 +565,7 @@ impl From<bool> for AttributeValue {
 }
 impl<F: Fn() -> String + 'static> From<F> for AttributeValue {
     fn from(f: F) -> Self {
-        AttributeValue::Dynamic(Rc::new(move || AttributeValue::String(f())))
+        AttributeValue::Dynamic(Rc::new(move || AttributeValue::String(Cow::Owned(f()))))
     }
 }
 impl From<Rc<dyn Fn() -> AttributeValue>> for AttributeValue {
@@ -594,11 +608,16 @@ impl std::fmt::Debug for Boundary {
 
 #[derive(Clone)]
 pub enum View {
-    Text(String),
+    // ponytail: Cow<'static,str> for Text/tag — static literals skip heap alloc
+    Text(Cow<'static, str>),
+    RcText(Rc<String>),
+    DynamicText(Rc<dyn Fn() -> String>),
+    DynamicRcText(Rc<dyn Fn() -> Rc<String>>),
     DynamicNode(Boundary),
     Element {
-        tag: String,
-        attrs: std::collections::HashMap<String, AttributeValue>,
+        tag: Cow<'static, str>,
+        // ponytail: keys are often static strings ("id", "class")
+        attrs: Vec<(Cow<'static, str>, AttributeValue)>,
         children: Vec<View>,
     },
     Fragment(Vec<View>),
@@ -610,6 +629,9 @@ impl std::fmt::Debug for View {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text(s) => write!(f, "Text({:?})", s),
+            Self::RcText(s) => write!(f, "RcText({:?})", s),
+            Self::DynamicText(_) => write!(f, "DynamicText(..)"),
+            Self::DynamicRcText(_) => write!(f, "DynamicRcText(..)"),
             Self::DynamicNode(_) => write!(f, "DynamicNode(..)"),
             Self::Element {
                 tag,
@@ -629,13 +651,13 @@ impl std::fmt::Debug for View {
 }
 
 impl View {
-    pub fn with_attr(mut self, key: &str, value: &str) -> Self {
+    pub fn with_attr(mut self, key: &'static str, value: &'static str) -> Self {
         match &mut self {
             View::Element { attrs, .. } => {
-                attrs.insert(
-                    key.to_string(),
-                    crate::AttributeValue::String(value.to_string()),
-                );
+                attrs.push((
+                    Cow::Borrowed(key),
+                    crate::AttributeValue::String(Cow::Borrowed(value)),
+                ));
             }
             View::Fragment(children) => {
                 if let Some(first) = children.first_mut() {
@@ -656,6 +678,9 @@ impl View {
 pub fn render_to_string(view: &View) -> String {
     match view {
         View::Text(s) => s.replace("<", "&lt;").replace(">", "&gt;"),
+        View::RcText(s) => s.replace("<", "&lt;").replace(">", "&gt;"),
+        View::DynamicText(f) => f().replace("<", "&lt;").replace(">", "&gt;"),
+        View::DynamicRcText(f) => f().replace("<", "&lt;").replace(">", "&gt;"),
         View::DynamicNode(boundary) => {
             let mut compute = boundary.compute.borrow_mut();
             render_to_string(&compute())
@@ -666,16 +691,17 @@ pub fn render_to_string(view: &View) -> String {
             children,
         } => {
             let mut html = format!("<{}", tag);
-            for (k, v) in attrs {
-                let val_str = match v {
+            for (k, v) in attrs.iter() {
+                let val_str: Cow<'_, str> = match v {
                     AttributeValue::String(s) => s.clone(),
-                    AttributeValue::Bool(true) => k.to_string(),
+                    AttributeValue::RcString(s) => Cow::Borrowed(s.as_str()),
+                    AttributeValue::Bool(true) => Cow::Owned(k.clone().into_owned()),
                     AttributeValue::Bool(false) => continue,
                     AttributeValue::Dynamic(f) => {
                         let dyn_v = f();
                         match dyn_v {
                             AttributeValue::String(s) => s,
-                            AttributeValue::Bool(true) => k.to_string(),
+                            AttributeValue::Bool(true) => k.clone(),
                             _ => continue,
                         }
                     }
@@ -689,7 +715,7 @@ pub fn render_to_string(view: &View) -> String {
                 "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
                 "param", "source", "track", "wbr",
             ];
-            if !void_elements.contains(&tag.as_str()) {
+            if !void_elements.contains(&tag.as_ref()) {
                 for child in children {
                     html.push_str(&render_to_string(child));
                 }
@@ -717,12 +743,17 @@ pub trait IntoView {
 
 impl IntoView for String {
     fn into_view(self) -> View {
-        View::Text(self)
+        View::Text(Cow::Owned(self))
     }
 }
-impl IntoView for &str {
+impl IntoView for Rc<String> {
     fn into_view(self) -> View {
-        View::Text(self.to_string())
+        View::RcText(self)
+    }
+}
+impl IntoView for &'static str {
+    fn into_view(self) -> View {
+        View::Text(Cow::Borrowed(self))
     }
 }
 impl IntoView for View {
@@ -746,7 +777,7 @@ macro_rules! impl_into_view_for_display {
         $(
             impl IntoView for $t {
                 fn into_view(self) -> View {
-                    View::Text(self.to_string())
+                    View::Text(Cow::Owned(self.to_string()))
                 }
             }
         )*
@@ -768,26 +799,27 @@ impl<T: IntoView + 'static, F: FnMut() -> T + 'static> IntoView for F {
 
 // Builders
 pub struct ElementBuilder {
-    tag: String,
-    attrs: std::collections::HashMap<String, AttributeValue>,
+    tag: Cow<'static, str>,
+    // ponytail: keys stay Cow — static strings avoid allocation
+    attrs: Vec<(Cow<'static, str>, AttributeValue)>,
     children: Vec<View>,
 }
 
 impl ElementBuilder {
-    pub fn new(tag: impl Into<String>) -> Self {
+    pub fn new(tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
             tag: tag.into(),
-            attrs: std::collections::HashMap::new(),
+            attrs: Vec::new(),
             children: vec![],
         }
     }
-    pub fn attr(mut self, key: impl Into<String>, value: impl Into<AttributeValue>) -> Self {
-        self.attrs.insert(key.into(), value.into());
+    pub fn attr(mut self, key: impl Into<Cow<'static, str>>, value: impl Into<AttributeValue>) -> Self {
+        self.attrs.push((key.into(), value.into()));
         self
     }
-    pub fn on(mut self, key: impl Into<String>, f: impl Fn() + 'static) -> Self {
+    pub fn on(mut self, key: impl Into<Cow<'static, str>>, f: impl Fn() + 'static) -> Self {
         self.attrs
-            .insert(key.into(), AttributeValue::Event(Rc::new(f)));
+            .push((key.into(), AttributeValue::Event(Rc::new(f))));
         self
     }
     pub fn child(mut self, child: impl IntoView) -> Self {
@@ -806,11 +838,59 @@ impl IntoView for ElementBuilder {
     }
 }
 
-pub fn element(tag: impl Into<String>) -> ElementBuilder {
+pub fn map_keyed<T, K, V>(
+    list: ReadSignal<Vec<T>>,
+    key_fn: impl Fn(&T) -> K + 'static,
+    view_fn: impl Fn(ReadSignal<T>) -> V + 'static,
+) -> View
+where
+    T: Clone + PartialEq + 'static,
+    K: Eq + std::hash::Hash + Clone + std::fmt::Display + 'static,
+    V: IntoView + 'static,
+{
+    let cache = Rc::new(RefCell::new(HashMap::<K, (WriteSignal<T>, View, String)>::new()));
+
+    let compute = move || {
+        let items = list.get();
+        let mut c = cache.borrow_mut();
+        let mut new_cache = HashMap::new();
+        let mut views = Vec::with_capacity(items.len());
+
+        for item in items {
+            let k = key_fn(&item);
+            if let Some((write_sig, view, k_str)) = c.remove(&k) {
+                write_sig.set(item.clone());
+                views.push((k_str.clone(), view.clone()));
+                new_cache.insert(k, (write_sig, view, k_str));
+            } else {
+                let (read_sig, write_sig) = create_signal(item.clone());
+                let raw_view = view_fn(read_sig).into_view();
+                let id = NodeId::new(true, None, None);
+                let view = View::DynamicNode(Boundary {
+                    id,
+                    compute: Rc::new(RefCell::new(move || raw_view.clone())),
+                });
+                let k_str = k.to_string();
+                views.push((k_str.clone(), view.clone()));
+                new_cache.insert(k, (write_sig, view, k_str));
+            }
+        }
+        *c = new_cache;
+        View::KeyedList(views)
+    };
+
+    let id = NodeId::new(true, None, None);
+    View::DynamicNode(Boundary {
+        id,
+        compute: Rc::new(RefCell::new(compute)),
+    })
+}
+
+pub fn element(tag: impl Into<Cow<'static, str>>) -> ElementBuilder {
     ElementBuilder::new(tag)
 }
-pub fn text(text: impl Into<String>) -> View {
-    View::Text(text.into())
+pub fn text(t: impl Into<Cow<'static, str>>) -> View {
+    View::Text(t.into())
 }
 pub fn dyn_node<F: FnMut() -> View + 'static>(f: F) -> View {
     f.into_view()
@@ -832,7 +912,7 @@ where
     pub view: F,
 }
 
-/// Renders a list of items using a mapping function. 
+/// Renders a list of items using a mapping function.
 /// Currently this re-renders boundaries based on signals, but preserves syntax for keyed iteration.
 #[allow(non_snake_case)]
 pub fn For<T, K, I, F, KFn>(props: ForProps<T, K, I, F, KFn>) -> View
@@ -845,13 +925,16 @@ where
     let each = props.each;
     let view = props.view;
     let key_fn = props.key;
-    
+
     dyn_node(move || {
         let items = each();
-        let views: Vec<(String, View)> = items.into_iter().map(|item| {
-            let k = key_fn(&item).to_string();
-            (k, view(item))
-        }).collect();
+        let views: Vec<(String, View)> = items
+            .into_iter()
+            .map(|item| {
+                let k = key_fn(&item).to_string();
+                (k, view(item))
+            })
+            .collect();
         View::KeyedList(views)
     })
 }
@@ -904,11 +987,16 @@ pub struct GlobalSignal<T: 'static> {
 
 impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
     pub const fn new(init: fn() -> T) -> Self {
-        Self { init, state: std::sync::OnceLock::new() }
+        Self {
+            init,
+            state: std::sync::OnceLock::new(),
+        }
     }
 
     fn shared_state(&self) -> std::sync::Arc<std::sync::RwLock<T>> {
-        self.state.get_or_init(|| std::sync::Arc::new(std::sync::RwLock::new((self.init)()))).clone()
+        self.state
+            .get_or_init(|| std::sync::Arc::new(std::sync::RwLock::new((self.init)())))
+            .clone()
     }
 
     fn get_signals(&self) -> (ReadSignal<T>, WriteSignal<T>) {
@@ -942,11 +1030,11 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
         // Sync local signal with global state if it differs
         let local_signals = self.get_signals();
         let global_val = self.shared_state().read().unwrap().clone();
-        
+
         // We do not call `.get()` first to avoid tracking dependencies before sync
         // Instead, we just sync if needed. We need to track it though!
         let local_val = local_signals.0.get(); // this tracks the dependency
-        
+
         if local_val != global_val {
             local_signals.1.set(global_val.clone()); // updates local value and triggers effects
             global_val

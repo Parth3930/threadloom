@@ -12,8 +12,8 @@ keywords = ["ui", "framework", "components", "webassembly", "threadloom"]
 categories = ["gui", "web-programming", "wasm"]
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core", version = "0.1.1" }
-threadloom-macro = { path = "../threadloom-macro", version = "0.1.1" }
+threadloom-core = { path = "../threadloom-core", version = "*" }
+threadloom-macro = { path = "../threadloom-macro", version = "*" }
 
 [target.wasm32-unknown-unknown.dependencies]
 js-sys = "0.3.103"

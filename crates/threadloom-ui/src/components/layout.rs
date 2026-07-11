@@ -304,7 +304,6 @@ fn bg_color_class(color: &str) -> &'static str {
     }
 }
 
-
 fn apply_advanced_layout(
     class_str: &mut String,
     shadow: &OptClass,
@@ -319,43 +318,49 @@ fn apply_advanced_layout(
         if s == "none" {
             class_str.push_str(" shadow-none");
         } else {
-            class_str.push_str(" shadow-"); class_str.push_str(s);
+            class_str.push_str(" shadow-");
+            class_str.push_str(s);
         }
     }
     if let Some(b) = &backdrop_blur.0 {
-        class_str.push_str(" backdrop-blur-"); class_str.push_str(b);
+        class_str.push_str(" backdrop-blur-");
+        class_str.push_str(b);
     }
     if let Some(o) = &opacity.0 {
-        class_str.push_str(" opacity-"); class_str.push_str(o);
+        class_str.push_str(" opacity-");
+        class_str.push_str(o);
     }
     if let Some(o) = &overflow.0 {
-        class_str.push_str(" overflow-"); class_str.push_str(o);
+        class_str.push_str(" overflow-");
+        class_str.push_str(o);
     }
     if let Some(o) = &overflow_x.0 {
-        class_str.push_str(" overflow-x-"); class_str.push_str(o);
+        class_str.push_str(" overflow-x-");
+        class_str.push_str(o);
     }
     if let Some(o) = &overflow_y.0 {
-        class_str.push_str(" overflow-y-"); class_str.push_str(o);
+        class_str.push_str(" overflow-y-");
+        class_str.push_str(o);
     }
     if hide_scrollbar {
-        class_str.push_str(" [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]");
+        class_str.push_str(
+            " [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+        );
     }
 }
 
-fn apply_text_layout(
-    class_str: &mut String,
-    align: &OptClass,
-    color: &OptClass,
-    size: &OptClass,
-) {
+fn apply_text_layout(class_str: &mut String, align: &OptClass, color: &OptClass, size: &OptClass) {
     if let Some(a) = &align.0 {
-        class_str.push_str(" text-"); class_str.push_str(a);
+        class_str.push_str(" text-");
+        class_str.push_str(a);
     }
     if let Some(c) = &color.0 {
-        class_str.push_str(" text-"); class_str.push_str(c);
+        class_str.push_str(" text-");
+        class_str.push_str(c);
     }
     if let Some(s) = &size.0 {
-        class_str.push_str(" text-"); class_str.push_str(s);
+        class_str.push_str(" text-");
+        class_str.push_str(s);
     }
 }
 
@@ -479,17 +484,25 @@ pub fn Row(props: RowProps) -> View {
         &props.rounded,
     );
 
-    
-    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+    apply_advanced_layout(
+        &mut class_str,
+        &props.shadow,
+        &props.backdrop_blur,
+        &props.opacity,
+        &props.overflow,
+        &props.overflow_x,
+        &props.overflow_y,
+        props.hide_scrollbar,
+    );
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    
+
     let id = crate::next_id();
     e = e.attr("id", id.clone());
-    
+
     let anim_to = props.animate.0.clone();
     let anim_from = props.animate_from.0.clone();
     let anim_fromto = props.animate_fromto.0.clone();
@@ -506,11 +519,23 @@ pub fn Row(props: RowProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
-    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
-    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
+    if let Some(f) = props.on_focus.0 {
+        let f = f.clone();
+        e = e.on("focus", move || f());
+    }
+    if let Some(f) = props.on_blur.0 {
+        let f = f.clone();
+        e = e.on("blur", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -630,17 +655,25 @@ pub fn Column(props: ColumnProps) -> View {
         &props.rounded,
     );
 
-    
-    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+    apply_advanced_layout(
+        &mut class_str,
+        &props.shadow,
+        &props.backdrop_blur,
+        &props.opacity,
+        &props.overflow,
+        &props.overflow_x,
+        &props.overflow_y,
+        props.hide_scrollbar,
+    );
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    
+
     let id = crate::next_id();
     e = e.attr("id", id.clone());
-    
+
     let anim_to = props.animate.0.clone();
     let anim_from = props.animate_from.0.clone();
     let anim_fromto = props.animate_fromto.0.clone();
@@ -657,11 +690,23 @@ pub fn Column(props: ColumnProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
-    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
-    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
+    if let Some(f) = props.on_focus.0 {
+        let f = f.clone();
+        e = e.on("focus", move || f());
+    }
+    if let Some(f) = props.on_blur.0 {
+        let f = f.clone();
+        e = e.on("blur", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -711,17 +756,26 @@ pub fn Container(props: ContainerProps) -> View {
     let tag = if props.href.0.is_some() { "a" } else { "div" };
     let mut e = element(tag);
     let mut class_str = "container".to_string();
-    
-    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+
+    apply_advanced_layout(
+        &mut class_str,
+        &props.shadow,
+        &props.backdrop_blur,
+        &props.opacity,
+        &props.overflow,
+        &props.overflow_x,
+        &props.overflow_y,
+        props.hide_scrollbar,
+    );
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    
+
     let id = crate::next_id();
     e = e.attr("id", id.clone());
-    
+
     let anim_to = props.animate.0.clone();
     let anim_from = props.animate_from.0.clone();
     let anim_fromto = props.animate_fromto.0.clone();
@@ -738,11 +792,23 @@ pub fn Container(props: ContainerProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
-    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
-    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
+    if let Some(f) = props.on_focus.0 {
+        let f = f.clone();
+        e = e.on("focus", move || f());
+    }
+    if let Some(f) = props.on_blur.0 {
+        let f = f.clone();
+        e = e.on("blur", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -802,7 +868,11 @@ pub struct SectionProps {
 /// Renders a structural `<section>` tag.
 #[allow(non_snake_case)]
 pub fn Section(props: SectionProps) -> View {
-    let tag = if props.href.0.is_some() { "a" } else { "section" };
+    let tag = if props.href.0.is_some() {
+        "a"
+    } else {
+        "section"
+    };
     let mut e = element(tag);
     if let Some(ref id) = props.id.0 {
         e = e.attr("id", id.clone());
@@ -861,17 +931,25 @@ pub fn Section(props: SectionProps) -> View {
         &props.rounded,
     );
 
-    
-    apply_advanced_layout(&mut class_str, &props.shadow, &props.backdrop_blur, &props.opacity, &props.overflow, &props.overflow_x, &props.overflow_y, props.hide_scrollbar);
+    apply_advanced_layout(
+        &mut class_str,
+        &props.shadow,
+        &props.backdrop_blur,
+        &props.opacity,
+        &props.overflow,
+        &props.overflow_x,
+        &props.overflow_y,
+        props.hide_scrollbar,
+    );
 
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
     }
-    
+
     let id = props.id.0.clone().unwrap_or_else(|| crate::next_id());
     e = e.attr("id", id.clone());
-    
+
     let anim_to = props.animate.0.clone();
     let anim_from = props.animate_from.0.clone();
     let anim_fromto = props.animate_fromto.0.clone();
@@ -888,11 +966,23 @@ pub fn Section(props: SectionProps) -> View {
     if let Some(target) = props.target.0 {
         e = e.attr("target", target);
     }
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
-    if let Some(f) = props.on_focus.0 { let f = f.clone(); e = e.on("focus", move || f()); }
-    if let Some(f) = props.on_blur.0 { let f = f.clone(); e = e.on("blur", move || f()); }
+
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
+    if let Some(f) = props.on_focus.0 {
+        let f = f.clone();
+        e = e.on("focus", move || f());
+    }
+    if let Some(f) = props.on_blur.0 {
+        let f = f.clone();
+        e = e.on("blur", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -977,7 +1067,13 @@ pub struct TextProps {
 /// - `children: Vec<View>`
 #[allow(non_snake_case)]
 pub fn Text(props: TextProps) -> View {
-    let tag = props.variant.0.unwrap_or_else(|| if props.href.0.is_some() { "a".to_string() } else { "p".to_string() });
+    let tag = props.variant.0.unwrap_or_else(|| {
+        if props.href.0.is_some() {
+            "a".to_string()
+        } else {
+            "p".to_string()
+        }
+    });
     let mut e = element(tag);
 
     let mut class_str = String::new();
@@ -996,10 +1092,10 @@ pub fn Text(props: TextProps) -> View {
         }
         class_str.push_str(&c);
     }
-    
+
     let id = crate::next_id();
     e = e.attr("id", id.clone());
-    
+
     let anim_to = props.animate.0.clone();
     let anim_from = props.animate_from.0.clone();
     let anim_fromto = props.animate_fromto.0.clone();
@@ -1023,9 +1119,14 @@ pub fn Text(props: TextProps) -> View {
         e = e.on("click", move || f());
     }
 
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -1190,9 +1291,14 @@ pub fn Heading(props: HeadingProps) -> View {
         e = e.on("click", move || f());
     }
 
-    
-    if let Some(f) = props.on_mouse_enter.0 { let f = f.clone(); e = e.on("mouseenter", move || f()); }
-    if let Some(f) = props.on_mouse_leave.0 { let f = f.clone(); e = e.on("mouseleave", move || f()); }
+    if let Some(f) = props.on_mouse_enter.0 {
+        let f = f.clone();
+        e = e.on("mouseenter", move || f());
+    }
+    if let Some(f) = props.on_mouse_leave.0 {
+        let f = f.clone();
+        e = e.on("mouseleave", move || f());
+    }
 
     for child in props.children {
         e = e.child(child);
@@ -1594,7 +1700,7 @@ pub fn NotFound(props: NotFoundProps) -> View {
                 "class",
                 "text-4xl font-bold tracking-tight text-foreground mb-4",
             )
-            .child(threadloom_core::text(&msg));
+            .child(threadloom_core::text(msg));
 
         let p = element("p")
             .attr("class", "text-muted-foreground mb-8 text-lg")
@@ -1612,7 +1718,6 @@ pub fn NotFound(props: NotFoundProps) -> View {
     e.into_view()
 }
 
-
 /// Which direction the mobile sidebar slides in from.
 #[derive(Clone, Copy, PartialEq)]
 pub enum SidebarVariant {
@@ -1625,7 +1730,9 @@ pub enum SidebarVariant {
 }
 
 impl Default for SidebarVariant {
-    fn default() -> Self { SidebarVariant::SlideLeft }
+    fn default() -> Self {
+        SidebarVariant::SlideLeft
+    }
 }
 
 pub struct AppLayoutProps {
@@ -1682,7 +1789,9 @@ impl Default for AppLayoutProps {
             sidebar_class: String::new(),
             backdrop_class: "bg-background/50 backdrop-blur-sm".to_string(),
             topbar_class: String::new(),
-            content_class: "max-w-4xl mx-auto p-6 sm:p-8 md:p-12 lg:p-16 w-full flex flex-col gap-6".to_string(),
+            content_class:
+                "max-w-4xl mx-auto p-6 sm:p-8 md:p-12 lg:p-16 w-full flex flex-col gap-6"
+                    .to_string(),
         }
     }
 }
@@ -1692,13 +1801,13 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
 
     let (is_open, set_is_open) = create_signal(false);
 
-    let variant      = props.sidebar_variant;
-    let s_width      = props.sidebar_width.clone();
-    let s_bg         = props.sidebar_bg.clone();
-    let s_blur       = props.sidebar_blur;
-    let s_border     = props.sidebar_border.clone();
-    let s_padding    = props.sidebar_padding.clone();
-    let s_extra      = props.sidebar_class.clone();
+    let variant = props.sidebar_variant;
+    let s_width = props.sidebar_width.clone();
+    let s_bg = props.sidebar_bg.clone();
+    let s_blur = props.sidebar_blur;
+    let s_border = props.sidebar_border.clone();
+    let s_padding = props.sidebar_padding.clone();
+    let s_extra = props.sidebar_class.clone();
     let backdrop_cls = props.backdrop_class.clone();
 
     // ── Main container ────────────────────────────────────────────────
@@ -1715,8 +1824,11 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
     let mut topbar = element("div").attr("class", topbar_base);
 
     let title_el = element("div")
-        .attr("class", "font-bold text-foreground text-lg tracking-tight".to_string())
-        .child(text(&props.title));
+        .attr(
+            "class",
+            "font-bold text-foreground text-lg tracking-tight".to_string(),
+        )
+        .child(text(props.title));
 
     let is_open_for_btn = is_open;
     let set_is_open_btn = set_is_open;
@@ -1752,17 +1864,25 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
     let blur_class = if s_blur { "backdrop-blur-md" } else { "" }.to_string();
 
     let sidebar_class_fn = {
-        let s_width   = s_width.clone();
-        let s_bg      = s_bg.clone();
+        let s_width = s_width.clone();
+        let s_bg = s_bg.clone();
         let blur_class = blur_class.clone();
-        let s_border  = s_border.clone();
+        let s_border = s_border.clone();
         let s_padding = s_padding.clone();
-        let s_extra   = s_extra.clone();
+        let s_extra = s_extra.clone();
 
         move || {
             // Static parts shared across variants
-            let blur = if blur_class.is_empty() { String::new() } else { format!(" {}", blur_class) };
-            let extra = if s_extra.is_empty() { String::new() } else { format!(" {}", s_extra) };
+            let blur = if blur_class.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", blur_class)
+            };
+            let extra = if s_extra.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", s_extra)
+            };
 
             let open = is_open_for_sidebar.get();
 
@@ -1777,8 +1897,13 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
                         "shrink-0 border-r {border} h-screen {bg}{blur} {pad} overflow-y-auto \
                          transition-all duration-300 ease-in-out z-30 {w} \
                          md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
-                        border = s_border, bg = s_bg, blur = blur,
-                        pad = s_padding, w = s_width, pos = pos, extra = extra,
+                        border = s_border,
+                        bg = s_bg,
+                        blur = blur,
+                        pad = s_padding,
+                        w = s_width,
+                        pos = pos,
+                        extra = extra,
                     )
                 }
                 SidebarVariant::SlideRight => {
@@ -1791,8 +1916,13 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
                         "shrink-0 border-l {border} h-screen {bg}{blur} {pad} overflow-y-auto \
                          transition-all duration-300 ease-in-out z-30 {w} \
                          md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
-                        border = s_border, bg = s_bg, blur = blur,
-                        pad = s_padding, w = s_width, pos = pos, extra = extra,
+                        border = s_border,
+                        bg = s_bg,
+                        blur = blur,
+                        pad = s_padding,
+                        w = s_width,
+                        pos = pos,
+                        extra = extra,
                     )
                 }
                 SidebarVariant::SlideDown => {
@@ -1806,8 +1936,12 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
                         "border-b {border} w-full max-h-[70vh] {bg}{blur} {pad} overflow-y-auto \
                          transition-all duration-300 ease-in-out z-30 \
                          md:hidden {pos}{extra}",
-                        border = s_border, bg = s_bg, blur = blur,
-                        pad = s_padding, pos = pos, extra = extra,
+                        border = s_border,
+                        bg = s_bg,
+                        blur = blur,
+                        pad = s_padding,
+                        pos = pos,
+                        extra = extra,
                     )
                 }
             }

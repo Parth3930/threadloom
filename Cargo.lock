@@ -5554,7 +5554,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "threadloom-core",
  "threadloom-dom",
@@ -5575,7 +5575,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-core"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "serde",
  "serde_json",
@@ -5599,7 +5599,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-dom"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "js-sys",
  "reqwasm",
@@ -5615,7 +5615,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-macro"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5624,7 +5624,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-scheduler"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "loom",
  "threadloom-core",

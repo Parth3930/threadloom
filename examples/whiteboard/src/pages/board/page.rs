@@ -30,7 +30,7 @@ pub fn page() -> View {
                     let tool = active_tool.get();
                     let color = active_color.get();
 
-                    let icon = |paths: &[(&str, &[(&str, &str)])]| -> View {
+                    let icon = |paths: &[(&'static str, &[(&'static str, &'static str)])]| -> View {
                         let mut svg = threadloom_core::element("svg")
                             .attr("xmlns", "http://www.w3.org/2000/svg")
                             .attr("width", "20")

@@ -2,11 +2,11 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-scheduler"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core", version = "0.1.1" }
+threadloom-core = { path = "../threadloom-core", version = "*" }
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"

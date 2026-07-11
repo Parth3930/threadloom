@@ -30,31 +30,97 @@ pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
     Ok(())
 }
 
+thread_local! {
+    static ELEMENT_CACHE: std::cell::RefCell<std::collections::HashMap<String, web_sys::Element>> = std::cell::RefCell::new(std::collections::HashMap::new());
+    static STRING_CACHE: std::cell::RefCell<std::collections::HashMap<String, wasm_bindgen::JsValue>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+fn get_interned_string(s: &str) -> wasm_bindgen::JsValue {
+    STRING_CACHE.with(|c| {
+        let mut cache = c.borrow_mut();
+        if let Some(val) = cache.get(s) {
+            val.clone()
+        } else {
+            let val = wasm_bindgen::JsValue::from_str(s);
+            cache.insert(s.to_string(), val.clone());
+            val
+        }
+    })
+}
+
 fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
     match view {
         View::Text(text) => Ok(document.create_text_node(&text).into()),
+        View::RcText(text) => Ok(document.create_text_node(&text).into()),
+        View::DynamicText(f) => {
+            let text = f();
+            let node = document.create_text_node(&text);
+            let node_clone = node.clone();
+            create_effect(move || {
+                let new_text = f();
+                node_clone.set_data(&new_text);
+            });
+            Ok(node.into())
+        }
+        View::DynamicRcText(f) => {
+            let text = f();
+            let node = document.create_text_node(&text);
+            let node_clone = node.clone();
+            create_effect(move || {
+                let new_text = f();
+                node_clone.set_data(&new_text);
+            });
+            Ok(node.into())
+        }
         View::Element {
             tag,
             attrs,
             children,
         } => {
-            let el = if tag == "svg"
-                || tag == "path"
-                || tag == "circle"
-                || tag == "rect"
-                || tag == "g"
-                || tag == "line"
-            {
-                document.create_element_ns(Some("http://www.w3.org/2000/svg"), &tag)?
-            } else {
-                document.create_element(&tag)?
-            };
+            let tag_str = tag.to_string();
+            let is_svg = tag == "svg" || tag == "path" || tag == "circle" || tag == "rect" || tag == "g" || tag == "line";
+            
+            let el = ELEMENT_CACHE.with(|c| {
+                let mut cache = c.borrow_mut();
+                if let Some(template) = cache.get(&tag_str) {
+                    template.clone_node().unwrap().unchecked_into::<web_sys::Element>()
+                } else {
+                    let el = if is_svg {
+                        document.create_element_ns(Some("http://www.w3.org/2000/svg"), tag.as_ref()).unwrap()
+                    } else {
+                        document.create_element(tag.as_ref()).unwrap()
+                    };
+                    cache.insert(tag_str, el.clone());
+                    el
+                }
+            });
+
             for (k, v) in attrs {
+                let k_interned = wasm_bindgen::intern(&k);
                 match v {
-                    AttributeValue::String(s) => el.set_attribute(&k, &s)?,
+                    AttributeValue::String(s) => {
+                        if k == "class" {
+                            let s_interned = wasm_bindgen::intern(&s);
+                            el.set_class_name(s_interned);
+                        } else if k == "id" {
+                            el.set_id(&s);
+                        } else {
+                            let _ = el.set_attribute(k_interned, &s);
+                        }
+                    }
+                    AttributeValue::RcString(s) => {
+                        if k == "class" {
+                            let s_interned = wasm_bindgen::intern(&s);
+                            el.set_class_name(s_interned);
+                        } else if k == "id" {
+                            el.set_id(&s);
+                        } else {
+                            let _ = el.set_attribute(k_interned, &s);
+                        }
+                    }
                     AttributeValue::Bool(b) => {
                         if b {
-                            el.set_attribute(&k, "")?;
+                            el.set_attribute(k_interned, "")?;
                         }
                     }
                     AttributeValue::Dynamic(f) => {
@@ -63,27 +129,42 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         // inside the closure changes.
                         let el_clone = el.clone();
                         let k_clone = k.clone();
-                        let val = f();
+                        let f_rc = f.clone();
+                        let val = f_rc();
                         if let AttributeValue::String(s) = &val {
-                            let _ = el.set_attribute(&k, s);
+                            let _ = el.set_attribute(k_interned, s);
+                        } else if let AttributeValue::RcString(s) = &val {
+                            let _ = el.set_attribute(k_interned, s);
                         }
                         // Reactive update effect
                         create_effect(move || {
-                            let val = f();
+                            let val = f_rc();
                             if let AttributeValue::String(s) = val {
+                                let _ = el_clone.set_attribute(&k_clone, &s);
+                            } else if let AttributeValue::RcString(s) = val {
                                 let _ = el_clone.set_attribute(&k_clone, &s);
                             }
                         });
                     }
                     AttributeValue::Event(cb) => {
                         use wasm_bindgen::JsCast;
-                        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                            cb();
-                            let _ = crate::tick();
-                        })
-                            as Box<dyn FnMut()>);
-                        el.add_event_listener_with_callback(&k, closure.as_ref().unchecked_ref())?;
-                        closure.forget();
+                        let attr_key = format!("data-th-evt-{}", k);
+                        let js_key = wasm_bindgen::JsValue::from_str(&attr_key);
+                        if js_sys::Reflect::has(&el, &js_key).unwrap_or(false) == false {
+                            let _ =
+                                js_sys::Reflect::set(&el, &js_key, &wasm_bindgen::JsValue::TRUE);
+                            let cb_rc = cb.clone();
+                            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                cb_rc();
+                                let _ = crate::tick();
+                            })
+                                as Box<dyn FnMut()>);
+                            el.add_event_listener_with_callback(
+                                k_interned,
+                                closure.as_ref().unchecked_ref(),
+                            )?;
+                            closure.forget();
+                        }
                     }
                 }
             }
@@ -123,14 +204,212 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             use wasm_bindgen::JsCast;
             for (key, child) in children {
                 let child_node = render_view(document, child)?;
-                if let Some(child_el) = child_node.dyn_ref::<Element>() {
-                    let _ = child_el.set_attribute("data-th-key", &key);
-                }
+                let child_el = child_node.unchecked_ref::<Element>();
+                let _ = child_el.set_attribute("data-th-key", &key);
                 el.append_child(&child_node)?;
             }
             Ok(el.into())
         }
         View::None => Ok(document.create_text_node("").into()),
+    }
+}
+
+fn patch_node(document: &Document, dom_node: &Node, new_view: View) -> Result<Node, JsValue> {
+    match new_view {
+        View::Text(text) => {
+            if dom_node.node_type() == Node::TEXT_NODE {
+                if let Some(text_content) = dom_node.text_content() {
+                    if text_content != text {
+                        let _ = dom_node.set_text_content(Some(&text));
+                    }
+                }
+                Ok(dom_node.clone())
+            } else {
+                let new_node: Node = document.create_text_node(&text).into();
+                if let Some(parent) = dom_node.parent_node() {
+                    let _ = parent.replace_child(&new_node, dom_node);
+                }
+                Ok(new_node)
+            }
+        }
+        View::RcText(text) => {
+            if dom_node.node_type() == Node::TEXT_NODE {
+                if let Some(text_content) = dom_node.text_content() {
+                    if text_content != *text {
+                        let _ = dom_node.set_text_content(Some(&text));
+                    }
+                }
+                Ok(dom_node.clone())
+            } else {
+                let new_node: Node = document.create_text_node(&text).into();
+                if let Some(parent) = dom_node.parent_node() {
+                    let _ = parent.replace_child(&new_node, dom_node);
+                }
+                Ok(new_node)
+            }
+        }
+        View::DynamicText(_) => {
+            if dom_node.node_type() == Node::TEXT_NODE {
+                Ok(dom_node.clone())
+            } else {
+                let new_node = render_view(document, new_view)?;
+                if let Some(parent) = dom_node.parent_node() {
+                    let _ = parent.replace_child(&new_node, dom_node);
+                }
+                Ok(new_node)
+            }
+        }
+        View::DynamicRcText(_) => {
+            if dom_node.node_type() == Node::TEXT_NODE {
+                Ok(dom_node.clone())
+            } else {
+                let new_node = render_view(document, new_view)?;
+                if let Some(parent) = dom_node.parent_node() {
+                    let _ = parent.replace_child(&new_node, dom_node);
+                }
+                Ok(new_node)
+            }
+        }
+        View::DynamicNode(_) => {
+            // Dynamic nodes handle their own updates via boundaries.
+            // We just assume the DOM node is the root of that boundary.
+            Ok(dom_node.clone())
+        }
+        View::Element {
+            tag,
+            attrs,
+            children,
+        } => {
+            if dom_node.node_type() == Node::ELEMENT_NODE {
+                if let Some(el) = dom_node.dyn_ref::<Element>() {
+                    if el.tag_name().eq_ignore_ascii_case(&tag) {
+                        for (k, v) in attrs {
+                            let k_interned = wasm_bindgen::intern(&k);
+                            match v {
+                                AttributeValue::String(s) => {
+                                    if k == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        let _ = el.set_class_name(s_interned);
+                                    } else if k == "id" {
+                                        let _ = el.set_id(&s);
+                                    } else {
+                                        if el.get_attribute(k_interned).as_deref() != Some(&*s) {
+                                            let _ = el.set_attribute(k_interned, &s);
+                                        }
+                                    }
+                                }
+                                AttributeValue::RcString(s) => {
+                                    if k == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        let _ = el.set_class_name(s_interned);
+                                    } else if k == "id" {
+                                        let _ = el.set_id(&s);
+                                    } else {
+                                        if el.get_attribute(k_interned).as_deref() != Some(&**s) {
+                                            let _ = el.set_attribute(k_interned, &s);
+                                        }
+                                    }
+                                }
+                                AttributeValue::Bool(b) => {
+                                    if b {
+                                        if !el.has_attribute(&k) {
+                                            let _ = el.set_attribute(&k, "");
+                                        }
+                                    } else {
+                                        if el.has_attribute(&k) {
+                                            let _ = el.remove_attribute(&k);
+                                        }
+                                    }
+                                }
+                                AttributeValue::Dynamic(f) => {
+                                    let attr_key = format!("data-th-dyn-{}", k);
+                                    if !el.has_attribute(&attr_key) {
+                                        let _ = el.set_attribute(&attr_key, "");
+                                        let el_clone = el.clone();
+                                        let k_clone = k.clone();
+                                        let f_rc = f.clone();
+                                        let val = f_rc();
+                                        if let AttributeValue::String(s) = &val {
+                                            let _ = el.set_attribute(&k, s);
+                                        }
+                                        create_effect(move || {
+                                            let val = f_rc();
+                                            if let AttributeValue::String(s) = val {
+                                                let _ = el_clone.set_attribute(&k_clone, &s);
+                                            }
+                                        });
+                                    }
+                                }
+                                AttributeValue::Event(cb) => {
+                                    let attr_key = format!("data-th-evt-{}", k);
+                                    let js_key = wasm_bindgen::JsValue::from_str(&attr_key);
+                                    if js_sys::Reflect::has(&el, &js_key).unwrap_or(false) == false
+                                    {
+                                        let _ = js_sys::Reflect::set(
+                                            &el,
+                                            &js_key,
+                                            &wasm_bindgen::JsValue::TRUE,
+                                        );
+                                        let cb_rc = cb.clone();
+                                        let closure = wasm_bindgen::closure::Closure::wrap(
+                                            Box::new(move || {
+                                                cb_rc();
+                                                let _ = crate::tick();
+                                            })
+                                                as Box<dyn FnMut()>,
+                                        );
+                                        let _ = el.add_event_listener_with_callback(
+                                            k_interned,
+                                            closure.as_ref().unchecked_ref(),
+                                        );
+                                        closure.forget();
+                                    }
+                                }
+                            }
+                        }
+
+                        let mut current_child = el.first_child();
+                        for child_view in children {
+                            if let Some(child_node) = current_child.clone() {
+                                let _ = patch_node(document, &child_node, child_view)?;
+                                current_child = child_node.next_sibling();
+                            } else {
+                                let new_child = render_view(document, child_view)?;
+                                el.append_child(&new_child)?;
+                            }
+                        }
+
+                        while let Some(child_node) = current_child {
+                            let next = child_node.next_sibling();
+                            let _ = el.remove_child(&child_node);
+                            current_child = next;
+                        }
+
+                        return Ok(dom_node.clone());
+                    }
+                }
+            }
+
+            let new_node = render_view(
+                document,
+                View::Element {
+                    tag,
+                    attrs,
+                    children,
+                },
+            )?;
+            if let Some(parent) = dom_node.parent_node() {
+                parent.replace_child(&new_node, dom_node)?;
+            }
+            Ok(new_node)
+        }
+        _ => {
+            let new_node = render_view(document, new_view)?;
+            if let Some(parent) = dom_node.parent_node() {
+                parent.replace_child(&new_node, dom_node)?;
+            }
+            Ok(new_node)
+        }
     }
 }
 
@@ -162,34 +441,81 @@ pub fn tick() -> Result<(), JsValue> {
                         handled = true;
 
                         let mut old_nodes = std::collections::HashMap::new();
-                        let mut current_child = old_node.first_child();
+                        let mut old_keys_in_order = Vec::new();
+                        let mut current_child = old_el.first_child();
                         while let Some(child) = current_child {
                             if let Some(child_el) = child.dyn_ref::<web_sys::Element>() {
                                 if let Some(key) = child_el.get_attribute("data-th-key") {
+                                    old_keys_in_order.push(key.clone());
                                     old_nodes.insert(key, child.clone());
                                 }
                             }
                             current_child = child.next_sibling();
                         }
 
-                        // Temporarily hold children in an array to append them in order after clearing
-                        let mut new_ordered_children = Vec::new();
+                        if children.is_empty() {
+                            let _ = old_el.set_text_content(Some(""));
+                            boundary_updates.push((id, old_node.clone(), compute.clone()));
+                            continue;
+                        }
 
-                        for (key, child_view) in children {
-                            if let Some(existing_node) = old_nodes.remove(key) {
-                                new_ordered_children.push(existing_node);
-                            } else {
-                                let new_child = render_view(&document, child_view.clone())?;
-                                if let Some(child_el) = new_child.dyn_ref::<web_sys::Element>() {
-                                    let _ = child_el.set_attribute("data-th-key", key);
+                        let mut is_append_only = false;
+                        if children.len() >= old_keys_in_order.len() {
+                            is_append_only = true;
+                            for (i, old_key) in old_keys_in_order.iter().enumerate() {
+                                if &children[i].0 != old_key {
+                                    is_append_only = false;
+                                    break;
                                 }
-                                new_ordered_children.push(new_child);
                             }
                         }
 
-                        old_el.set_inner_html("");
-                        for child in new_ordered_children {
-                            old_el.append_child(&child)?;
+                        if is_append_only {
+                            // Fast path: skip prefix diffing entirely, just append new nodes
+                            let fragment = document.create_document_fragment();
+                            for (key, child_view) in
+                                children.into_iter().skip(old_keys_in_order.len())
+                            {
+                                let new_child = render_view(&document, child_view.clone())?;
+                                let child_el = new_child.unchecked_ref::<web_sys::Element>();
+                                let _ = child_el.set_attribute("data-th-key", &key);
+                                let _ = fragment.append_child(&new_child);
+                            }
+                            let _ = old_el.append_child(&fragment);
+                        } else {
+                            // Slow path: full keyed reconciliation
+                            let mut current_dom_node = old_el.first_child();
+                            for (key, child_view) in children {
+                                let node_to_place = if let Some(existing_node) =
+                                    old_nodes.remove(key)
+                                {
+                                    patch_node(&document, &existing_node, child_view.clone())?
+                                } else {
+                                    let new_child = render_view(&document, child_view.clone())?;
+                                    let child_el = new_child.unchecked_ref::<web_sys::Element>();
+                                    let _ = child_el.set_attribute("data-th-key", key);
+                                    new_child
+                                };
+
+                                if let Some(current) = current_dom_node.clone() {
+                                    if current != node_to_place {
+                                        if current.next_sibling().as_ref() == Some(&node_to_place) {
+                                            current_dom_node = node_to_place.next_sibling();
+                                        } else {
+                                            let _ = old_el
+                                                .insert_before(&node_to_place, Some(&current));
+                                        }
+                                    } else {
+                                        current_dom_node = current.next_sibling();
+                                    }
+                                } else {
+                                    let _ = old_el.append_child(&node_to_place);
+                                }
+                            }
+
+                            for (_, old_child) in old_nodes {
+                                let _ = old_el.remove_child(&old_child);
+                            }
                         }
 
                         boundary_updates.push((id, old_node.clone(), compute.clone()));

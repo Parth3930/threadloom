@@ -2,16 +2,16 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core", version = "0.1.1" }
-threadloom-macro = { path = "../threadloom-macro", version = "0.1.1" }
-threadloom-server = { path = "../threadloom-server", version = "0.1.1" }
+threadloom-core = { path = "../threadloom-core", version = "*" }
+threadloom-macro = { path = "../threadloom-macro", version = "*" }
+threadloom-server = { path = "../threadloom-server", version = "*" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-threadloom-dom = { path = "../threadloom-dom", version = "0.1.1" }
+threadloom-dom = { path = "../threadloom-dom", version = "*" }
 
 [dev-dependencies]
 trybuild = "1.0"
