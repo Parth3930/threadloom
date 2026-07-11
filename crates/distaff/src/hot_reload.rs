@@ -353,9 +353,16 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                                     let _ = tx.send(patch.to_string());
                                     // Bump last_build_time so the tailwind.css write that follows
                                     // (triggered by this same .rs save) doesn't fire a css_refresh
-                                    // immediately — wait for tailwind to finish first. ponytail: root cause fix
+                                    // immediately — wait for tailwind to finish first.
                                     last_build_time = std::time::Instant::now();
                                     last_was_hot_patch = true;
+                                    
+                                    // ponytail: Spawn background rebuild so app.wasm is updated for the next hard reload
+                                    std::thread::spawn(|| {
+                                        let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+                                        let mut cmd = adapter.build_command();
+                                        let _ = cmd.output();
+                                    });
                                 } else {
                                     tracing::debug!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
                                     handled_via_patch = false;
