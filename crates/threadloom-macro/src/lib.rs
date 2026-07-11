@@ -396,6 +396,9 @@ pub fn wasm_main(_args: TokenStream, item: TokenStream) -> TokenStream {
             doc.add_event_listener_with_callback("click", click_closure.as_ref().unchecked_ref()).unwrap();
             click_closure.forget();
 
+            // Provide path_sig globally for `<Route>` components
+            ::threadloom_core::provide_context(path_sig);
+
             let view = ::threadloom_core::dyn_node(move || #render_expr);
             ::threadloom_dom::mount(view, &body).unwrap();
         }

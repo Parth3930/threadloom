@@ -1461,7 +1461,7 @@ dependencies = [
 
 [[package]]
 name = "distaff"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "anyhow",
  "axum 0.7.9",
@@ -5575,7 +5575,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-core"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "serde",
  "serde_json",
@@ -5599,7 +5599,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-dom"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "js-sys",
  "reqwasm",
@@ -5646,7 +5646,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-ui"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "js-sys",
  "threadloom-core",

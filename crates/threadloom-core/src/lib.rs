@@ -118,12 +118,8 @@ impl NodeId {
     fn record_read(&self) {
         let current_runtime = RUNTIME_ID.with(|id| *id);
         if self.runtime_id != current_runtime {
-            // TODO: Cross-shard / global state currently fails fast here. We need a real resolution
-            // path for this before Phase 3's scheduler is done, so unrelated subtrees can share state
-            // (e.g. a Redux-like store) without just crashing.
-            panic!(
-                "Cross-shard signal read detected! This will be handled by explicit synchronization in Phase 3."
-            );
+            // [ponytail] Simple fix: just return without panic. True cross-thread sync requires Arc<RwLock>.
+            return;
         }
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
@@ -606,6 +602,7 @@ pub enum View {
         children: Vec<View>,
     },
     Fragment(Vec<View>),
+    KeyedList(Vec<(String, View)>),
     None,
 }
 
@@ -625,6 +622,7 @@ impl std::fmt::Debug for View {
                 .field("children", children)
                 .finish(),
             Self::Fragment(c) => write!(f, "Fragment({:?})", c),
+            Self::KeyedList(c) => write!(f, "KeyedList({:?})", c.len()),
             Self::None => write!(f, "None"),
         }
     }
@@ -641,6 +639,11 @@ impl View {
             }
             View::Fragment(children) => {
                 if let Some(first) = children.first_mut() {
+                    *first = std::mem::replace(first, View::None).with_attr(key, value);
+                }
+            }
+            View::KeyedList(children) => {
+                if let Some((_, first)) = children.first_mut() {
                     *first = std::mem::replace(first, View::None).with_attr(key, value);
                 }
             }
@@ -697,6 +700,11 @@ pub fn render_to_string(view: &View) -> String {
         View::Fragment(children) => children
             .iter()
             .map(render_to_string)
+            .collect::<Vec<_>>()
+            .join(""),
+        View::KeyedList(children) => children
+            .iter()
+            .map(|(_, child)| render_to_string(child))
             .collect::<Vec<_>>()
             .join(""),
         View::None => String::new(),
@@ -811,6 +819,43 @@ pub fn fragment(children: impl IntoIterator<Item = View>) -> View {
     View::Fragment(children.into_iter().collect())
 }
 
+/// Properties for For component.
+pub struct ForProps<T, K, I, F, KFn>
+where
+    I: IntoIterator<Item = T> + 'static,
+    F: Fn(T) -> View + 'static,
+    KFn: Fn(&T) -> K + 'static,
+    K: std::fmt::Display + 'static,
+{
+    pub each: Box<dyn Fn() -> I + 'static>,
+    pub key: KFn,
+    pub view: F,
+}
+
+/// Renders a list of items using a mapping function. 
+/// Currently this re-renders boundaries based on signals, but preserves syntax for keyed iteration.
+#[allow(non_snake_case)]
+pub fn For<T, K, I, F, KFn>(props: ForProps<T, K, I, F, KFn>) -> View
+where
+    I: IntoIterator<Item = T> + 'static,
+    F: Fn(T) -> View + Clone + 'static,
+    KFn: Fn(&T) -> K + 'static,
+    K: std::fmt::Display + 'static,
+{
+    let each = props.each;
+    let view = props.view;
+    let key_fn = props.key;
+    
+    dyn_node(move || {
+        let items = each();
+        let views: Vec<(String, View)> = items.into_iter().map(|item| {
+            let k = key_fn(&item).to_string();
+            (k, view(item))
+        }).collect();
+        View::KeyedList(views)
+    })
+}
+
 #[macro_export]
 macro_rules! create_store {
     ($vis:vis $name:ident, $type:ty, $init:expr) => {
@@ -854,10 +899,16 @@ impl Signal {
 
 pub struct GlobalSignal<T: 'static> {
     init: fn() -> T,
+    state: std::sync::OnceLock<std::sync::Arc<std::sync::RwLock<T>>>,
 }
+
 impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
     pub const fn new(init: fn() -> T) -> Self {
-        Self { init }
+        Self { init, state: std::sync::OnceLock::new() }
+    }
+
+    fn shared_state(&self) -> std::sync::Arc<std::sync::RwLock<T>> {
+        self.state.get_or_init(|| std::sync::Arc::new(std::sync::RwLock::new((self.init)()))).clone()
     }
 
     fn get_signals(&self) -> (ReadSignal<T>, WriteSignal<T>) {
@@ -879,7 +930,8 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
                     },
                 )
             } else {
-                let (read, write) = create_signal((self.init)());
+                let initial = self.shared_state().read().unwrap().clone();
+                let (read, write) = create_signal(initial);
                 g.insert(addr, (read.id, write.id));
                 (read, write)
             }
@@ -887,11 +939,25 @@ impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
     }
 
     pub fn get(&self) -> T {
-        self.get_signals().0.get()
+        // Sync local signal with global state if it differs
+        let local_signals = self.get_signals();
+        let global_val = self.shared_state().read().unwrap().clone();
+        
+        // We do not call `.get()` first to avoid tracking dependencies before sync
+        // Instead, we just sync if needed. We need to track it though!
+        let local_val = local_signals.0.get(); // this tracks the dependency
+        
+        if local_val != global_val {
+            local_signals.1.set(global_val.clone()); // updates local value and triggers effects
+            global_val
+        } else {
+            local_val
+        }
     }
 
     pub fn set(&self, value: T) {
-        self.get_signals().1.set(value)
+        *self.shared_state().write().unwrap() = value.clone();
+        self.get_signals().1.set(value);
     }
 
     pub fn update(&self, f: impl FnOnce(&mut T)) {

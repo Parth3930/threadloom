@@ -2,8 +2,10 @@
 license = "MIT"
 description = "A meticulously crafted Rust full-stack framework."
 name = "threadloom-dom"
-version = "0.1.12"
+version = "0.1.13"
 edition = "2021"
+repository = "https://github.com/Parth3930/threadloom"
+homepage = "https://github.com/Parth3930/threadloom"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

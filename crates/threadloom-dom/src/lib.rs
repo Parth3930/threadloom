@@ -117,6 +117,19 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             }
             Ok(el.into())
         }
+        View::KeyedList(children) => {
+            let el = document.create_element("div")?;
+            el.set_attribute("data-th-keyed-list", "true")?;
+            use wasm_bindgen::JsCast;
+            for (key, child) in children {
+                let child_node = render_view(document, child)?;
+                if let Some(child_el) = child_node.dyn_ref::<Element>() {
+                    let _ = child_el.set_attribute("data-th-key", &key);
+                }
+                el.append_child(&child_node)?;
+            }
+            Ok(el.into())
+        }
         View::None => Ok(document.create_text_node("").into()),
     }
 }
@@ -140,10 +153,56 @@ pub fn tick() -> Result<(), JsValue> {
                 let mut comp = compute.borrow_mut();
                 comp()
             });
-            let new_node = render_view(&document, view)?;
-            if let Some(parent) = old_node.parent_node() {
-                parent.replace_child(&new_node, &old_node)?;
-                boundary_updates.push((id, new_node, compute));
+
+            let mut handled = false;
+            if let View::KeyedList(children) = &view {
+                use wasm_bindgen::JsCast;
+                if let Some(old_el) = old_node.dyn_ref::<web_sys::Element>() {
+                    if old_el.has_attribute("data-th-keyed-list") {
+                        handled = true;
+
+                        let mut old_nodes = std::collections::HashMap::new();
+                        let mut current_child = old_node.first_child();
+                        while let Some(child) = current_child {
+                            if let Some(child_el) = child.dyn_ref::<web_sys::Element>() {
+                                if let Some(key) = child_el.get_attribute("data-th-key") {
+                                    old_nodes.insert(key, child.clone());
+                                }
+                            }
+                            current_child = child.next_sibling();
+                        }
+
+                        // Temporarily hold children in an array to append them in order after clearing
+                        let mut new_ordered_children = Vec::new();
+
+                        for (key, child_view) in children {
+                            if let Some(existing_node) = old_nodes.remove(key) {
+                                new_ordered_children.push(existing_node);
+                            } else {
+                                let new_child = render_view(&document, child_view.clone())?;
+                                if let Some(child_el) = new_child.dyn_ref::<web_sys::Element>() {
+                                    let _ = child_el.set_attribute("data-th-key", key);
+                                }
+                                new_ordered_children.push(new_child);
+                            }
+                        }
+
+                        old_el.set_inner_html("");
+                        for child in new_ordered_children {
+                            old_el.append_child(&child)?;
+                        }
+
+                        boundary_updates.push((id, old_node.clone(), compute.clone()));
+                    }
+                }
+            }
+
+            if !handled {
+                let new_node = render_view(&document, view)?;
+                if let Some(parent) = old_node.parent_node() {
+                    parent.replace_child(&new_node, &old_node)?;
+                    boundary_updates.push((id, new_node, compute));
+                }
             }
         }
     }
@@ -412,7 +471,10 @@ macro_rules! navigate {
 macro_rules! animate {
     ($selector:expr, $config:expr) => {
         if let Some(_) = $crate::web_sys::window() {
-            let script = format!("if (window.gsap) {{ gsap.to('{}', {}) }}", $selector, $config);
+            let script = format!(
+                "if (window.gsap) {{ gsap.to('{}', {}) }}",
+                $selector, $config
+            );
             if let Err(e) = $crate::js_sys::eval(&script) {
                 $crate::web_sys::console::error_2(&"GSAP animate! error:".into(), &e);
             }
@@ -420,7 +482,10 @@ macro_rules! animate {
     };
     (from $selector:expr, $config:expr) => {
         if let Some(_) = $crate::web_sys::window() {
-            let script = format!("if (window.gsap) {{ gsap.from('{}', {}) }}", $selector, $config);
+            let script = format!(
+                "if (window.gsap) {{ gsap.from('{}', {}) }}",
+                $selector, $config
+            );
             if let Err(e) = $crate::js_sys::eval(&script) {
                 $crate::web_sys::console::error_2(&"GSAP animate! from error:".into(), &e);
             }
@@ -428,7 +493,10 @@ macro_rules! animate {
     };
     (fromTo $selector:expr, $from:expr, $to:expr) => {
         if let Some(_) = $crate::web_sys::window() {
-            let script = format!("if (window.gsap) {{ gsap.fromTo('{}', {}, {}) }}", $selector, $from, $to);
+            let script = format!(
+                "if (window.gsap) {{ gsap.fromTo('{}', {}, {}) }}",
+                $selector, $from, $to
+            );
             if let Err(e) = $crate::js_sys::eval(&script) {
                 $crate::web_sys::console::error_2(&"GSAP animate! fromTo error:".into(), &e);
             }
@@ -436,7 +504,10 @@ macro_rules! animate {
     };
     (timeline $script:expr) => {
         if let Some(_) = $crate::web_sys::window() {
-            let script = format!("if (window.gsap) {{ let tl = gsap.timeline(); {} }}", $script);
+            let script = format!(
+                "if (window.gsap) {{ let tl = gsap.timeline(); {} }}",
+                $script
+            );
             if let Err(e) = $crate::js_sys::eval(&script) {
                 $crate::web_sys::console::error_2(&"GSAP animate! timeline error:".into(), &e);
             }

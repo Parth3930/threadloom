@@ -1,10 +1,11 @@
 [package]
 license = "MIT"
 name = "distaff"
-version = "0.1.25"
+version = "0.1.26"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
-
+repository = "https://github.com/Parth3930/threadloom"
+homepage = "https://github.com/Parth3930/threadloom"
 exclude = [
     "template/target/**",
     "template/node_modules/**",

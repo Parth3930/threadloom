@@ -54,31 +54,44 @@ pub fn generate_routes() {
     collect_routes(pages_dir, "", &[], &mut routes);
 
     let mut routes_rs = String::new();
-    routes_rs.push_str("use threadloom_core::View;\n\n");
-    routes_rs.push_str("pub fn render_route(path: &str) -> View {\n");
-    routes_rs.push_str("    match path {\n");
+    routes_rs.push_str("use threadloom_core::View;\n");
+    routes_rs.push_str("use threadloom_macro::threadloom;\n");
+    routes_rs.push_str("use threadloom_ui::components::navigation::{Route, RouteProps, Router, RouterProps};\n\n");
+    routes_rs.push_str("pub fn app_router() -> View {\n");
+    routes_rs.push_str("    threadloom! {\n");
+    routes_rs.push_str("        Router() {\n");
 
     for (url_path, module_path, layouts) in routes {
         let mut page_expr = format!("crate::pages::{}::page::page()", module_path);
         for layout_mod in layouts.iter().rev() {
             page_expr = format!("crate::pages::{}::layout(threadloom_core::IntoView::into_view({}))", layout_mod, page_expr);
         }
+        
+        let component_prop = if layouts.is_empty() {
+            format!("crate::pages::{}::page::page", module_path)
+        } else {
+            format!("move || {}", page_expr)
+        };
+        
         if url_path == "/index" {
-            routes_rs.push_str(&format!("        \"/\" | \"/index\" | \"/index/\" => {},\n", page_expr));
+            routes_rs.push_str(&format!("            Route(path=\"/\", component={})\n", component_prop));
+            routes_rs.push_str(&format!("            Route(path=\"/index\", component={})\n", component_prop));
         } else if url_path.ends_with("/index") {
             let base_path = url_path.strip_suffix("/index").unwrap();
-            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" | \"{}\" | \"{}/\" => {},\n", base_path, base_path, url_path, url_path, page_expr));
+            routes_rs.push_str(&format!("            Route(path=\"{}\", component={})\n", base_path, component_prop));
+            routes_rs.push_str(&format!("            Route(path=\"{}/\", component={})\n", base_path, component_prop));
+            routes_rs.push_str(&format!("            Route(path=\"{}\", component={})\n", url_path, component_prop));
         } else {
-            routes_rs.push_str(&format!("        \"{}\" | \"{}/\" => {},\n", url_path, url_path, page_expr));
+            routes_rs.push_str(&format!("            Route(path=\"{}\", component={})\n", url_path, component_prop));
         }
     }
 
     if pages_dir.join("not_found/page.rs").exists() {
-        routes_rs.push_str("        _ => crate::pages::not_found::page::page(),\n");
+        routes_rs.push_str("            Route(path=\"*\", component=crate::pages::not_found::page::page)\n");
     } else {
-        routes_rs.push_str("        _ => threadloom_macro::threadloom! { div { \"404 Not Found\" } }\n");
+        routes_rs.push_str("            Route(path=\"*\", component=move || threadloom_core::element(\"div\").child(\"404 Not Found\").into_view())\n");
     }
-    routes_rs.push_str("    }\n}\n");
+    routes_rs.push_str("        }\n    }\n}\n");
 
     let current = fs::read_to_string("src/routes.rs").unwrap_or_default();
     if current != routes_rs {

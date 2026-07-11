@@ -146,3 +146,72 @@ pub fn Hamburger(props: HamburgerProps) -> View {
 pub fn hamburger(open: bool, on_toggle: impl Into<Callback>, extra_class: impl Into<OptClass>) -> View {
     Hamburger(HamburgerProps { open, on_toggle: on_toggle.into(), extra_class: extra_class.into(), ..Default::default() })
 }
+
+/// Properties for the Route component.
+#[derive(Default)]
+pub struct RouteProps {
+    /// The path to match.
+    pub path: String,
+    /// The component to render if matched.
+    pub component: crate::ViewCallback,
+    /// Optional middleware. If it returns Some(View), that is rendered instead.
+    pub middleware: crate::MiddlewareCallback,
+    pub children: Vec<View>,
+}
+
+/// Renders a Route component that conditionally displays its component based on the current path.
+#[allow(non_snake_case)]
+pub fn Route(props: RouteProps) -> View {
+    use threadloom_core::ReadSignal;
+    
+    threadloom_core::dyn_node(move || {
+        let current_path = if let Some(sig) = threadloom_core::use_context::<ReadSignal<String>>() {
+            sig.get()
+        } else {
+            String::new()
+        };
+
+        let path = props.path.trim_end_matches('/');
+        let cur = current_path.trim_end_matches('/');
+        
+        let mut is_match = path == cur;
+        if props.path == "/" && current_path.is_empty() {
+            is_match = true;
+        }
+
+        if is_match {
+            if let Some(mw) = props.middleware.0.as_ref() {
+                if let Some(view) = mw() {
+                    return view;
+                }
+            }
+            if let Some(comp) = props.component.0.as_ref() {
+                comp()
+            } else {
+                threadloom_core::fragment(props.children.clone())
+            }
+        } else {
+            threadloom_core::View::None
+        }
+    })
+}
+
+pub fn route(path: impl Into<String>, children: Vec<View>) -> View {
+    Route(RouteProps { path: path.into(), children, ..Default::default() })
+}
+
+/// Properties for the Router component.
+#[derive(Default)]
+pub struct RouterProps {
+    pub children: Vec<View>,
+}
+
+/// A declarative router wrapper.
+#[allow(non_snake_case)]
+pub fn Router(props: RouterProps) -> View {
+    threadloom_core::fragment(props.children)
+}
+
+pub fn router(children: Vec<View>) -> View {
+    Router(RouterProps { children })
+}

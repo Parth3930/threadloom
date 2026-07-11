@@ -13,3 +13,9 @@ Handles efficient DOM patching and event binding in the browser. Powers the reac
 ## License
 
 [MIT](../../LICENSE)
+
+---
+
+## Links
+
+- [Threadloom GitHub Repository](https://github.com/Parth3930/threadloom)

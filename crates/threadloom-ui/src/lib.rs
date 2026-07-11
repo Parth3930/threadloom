@@ -108,3 +108,37 @@ impl From<(String, String)> for OptTuple {
 impl From<()> for OptTuple {
     fn from(_: ()) -> Self { OptTuple(None) }
 }
+
+/// A callback that returns a View.
+#[derive(Clone)]
+pub struct ViewCallback(pub Option<Rc<dyn Fn() -> View>>);
+
+impl Default for ViewCallback {
+    fn default() -> Self { ViewCallback(None) }
+}
+impl<F: Fn() -> View + 'static> From<F> for ViewCallback {
+    fn from(f: F) -> Self { ViewCallback(Some(Rc::new(f))) }
+}
+impl From<Rc<dyn Fn() -> View>> for ViewCallback {
+    fn from(rc: Rc<dyn Fn() -> View>) -> Self { ViewCallback(Some(rc)) }
+}
+impl From<()> for ViewCallback {
+    fn from(_: ()) -> Self { ViewCallback(None) }
+}
+
+/// A callback for route middleware that optionally returns a View to render instead of the component.
+#[derive(Clone)]
+pub struct MiddlewareCallback(pub Option<Rc<dyn Fn() -> Option<View>>>);
+
+impl Default for MiddlewareCallback {
+    fn default() -> Self { MiddlewareCallback(None) }
+}
+impl<F: Fn() -> Option<View> + 'static> From<F> for MiddlewareCallback {
+    fn from(f: F) -> Self { MiddlewareCallback(Some(Rc::new(f))) }
+}
+impl From<Rc<dyn Fn() -> Option<View>>> for MiddlewareCallback {
+    fn from(rc: Rc<dyn Fn() -> Option<View>>) -> Self { MiddlewareCallback(Some(rc)) }
+}
+impl From<()> for MiddlewareCallback {
+    fn from(_: ()) -> Self { MiddlewareCallback(None) }
+}

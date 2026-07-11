@@ -1,6 +1,6 @@
 [package]
 name = "threadloom-core"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2024"
 description = "Core primitives and reactivity engine for the Threadloom framework. Best used with the Distaff CLI tool."
 license = "MIT"

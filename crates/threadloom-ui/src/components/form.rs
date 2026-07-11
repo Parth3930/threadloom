@@ -1,5 +1,6 @@
 use std::rc::Rc;
-use threadloom_core::{element, text, View, IntoView};
+use std::collections::HashMap;
+use threadloom_core::{element, text, View, IntoView, create_signal, ReadSignal, WriteSignal, dyn_node, fragment};
 use crate::{Callback, Callback1, OptClass};
 
 /// Properties for the Button component.
@@ -411,3 +412,148 @@ pub fn select(options: Vec<(String, String)>, selected_value: impl Into<String>,
         ..Default::default()
     })
 }
+
+/// Properties for the Form component.
+#[derive(Default)]
+pub struct FormProps {
+    pub id: String,
+    pub class: OptClass,
+    pub on_submit: Callback,
+    pub children: Vec<View>,
+}
+
+/// Renders a Form component that prevents default browser submission.
+#[allow(non_snake_case)]
+pub fn Form(props: FormProps) -> View {
+    let mut class_str = "tl-form".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    let mut b = element("form").attr("class", class_str);
+    if !props.id.is_empty() {
+        b = b.attr("id", props.id);
+    }
+    if let Some(f) = props.on_submit.0 {
+        let f_clone = f.clone();
+        b = b.on("submit", move || f_clone());
+        b = b.attr("onsubmit", "event.preventDefault();");
+    } else {
+        b = b.attr("onsubmit", "event.preventDefault();");
+    }
+    for child in props.children { b = b.child(child); }
+    b.into_view()
+}
+
+pub fn form(on_submit: impl Into<Callback>) -> View {
+    Form(FormProps { on_submit: on_submit.into(), ..Default::default() })
+}
+
+/// A lightweight context for managing form validation state.
+pub struct FormContext {
+    pub errors: ReadSignal<HashMap<String, String>>,
+    set_errors: WriteSignal<HashMap<String, String>>,
+}
+
+impl FormContext {
+    pub fn new() -> Rc<Self> {
+        let (errors, set_errors) = create_signal(HashMap::new());
+        Rc::new(Self { errors, set_errors })
+    }
+    
+    pub fn set_error(&self, field: &str, err: &str) {
+        let mut map = self.errors.get();
+        map.insert(field.to_string(), err.to_string());
+        self.set_errors.set(map);
+    }
+    
+    pub fn clear_error(&self, field: &str) {
+        let mut map = self.errors.get();
+        map.remove(field);
+        self.set_errors.set(map);
+    }
+    
+    pub fn clear_all(&self) {
+        self.set_errors.set(HashMap::new());
+    }
+    
+    pub fn get_error(&self, field: &str) -> Option<String> {
+        self.errors.get().get(field).cloned()
+    }
+    
+    pub fn has_errors(&self) -> bool {
+        !self.errors.get().is_empty()
+    }
+}
+
+/// Properties for the FormField component.
+#[derive(Default)]
+pub struct FormFieldProps {
+    pub id: String,
+    pub label: OptClass,
+    pub type_: OptClass,
+    pub placeholder: OptClass,
+    pub context: Option<Rc<FormContext>>,
+    pub on_input: Callback,
+    pub children: Vec<View>,
+}
+
+/// A composite field component that wraps an Input with a Label and an automatic Error message.
+#[allow(non_snake_case)]
+pub fn FormField(props: FormFieldProps) -> View {
+    let input_id = props.id.clone();
+    
+    let label_view = if let Some(l) = props.label.0 {
+        Label(LabelProps {
+            text: l,
+            r#for: input_id.clone(),
+            ..Default::default()
+        })
+    } else {
+        View::None
+    };
+
+    let on_in = props.on_input;
+    let ctx_clone = props.context.clone();
+    let id_clone = input_id.clone();
+    
+    let cb = Callback(Some(Rc::new(move || {
+        // Clear error on input
+        if let Some(ctx) = &ctx_clone {
+            ctx.clear_error(&id_clone);
+        }
+        if let Some(f) = on_in.0.as_ref() {
+            f();
+        }
+    })));
+
+    let input_view = Input(InputProps {
+        id: input_id.clone(),
+        type_: props.type_,
+        placeholder: props.placeholder.0.unwrap_or_default(),
+        on_input: cb,
+        class: OptClass(Some("w-full".to_string())),
+        ..Default::default()
+    });
+
+    let error_view = if let Some(ctx) = props.context {
+        let id_for_err = input_id.clone();
+        dyn_node(move || {
+            if let Some(err) = ctx.get_error(&id_for_err) {
+                element("p").attr("class", "text-destructive text-xs mt-1 font-medium").child(err).into_view()
+            } else {
+                View::None
+            }
+        })
+    } else {
+        View::None
+    };
+
+    let mut wrapper = element("div").attr("class", "tl-form-field flex flex-col gap-1.5 w-full");
+    wrapper = wrapper.child(label_view).child(input_view).child(error_view);
+    
+    for child in props.children { wrapper = wrapper.child(child); }
+    
+    wrapper.into_view()
+}
+

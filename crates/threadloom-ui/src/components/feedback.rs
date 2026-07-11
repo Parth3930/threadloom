@@ -173,3 +173,53 @@ pub fn Tooltip(props: TooltipProps) -> View {
 pub fn tooltip(content: View, tooltip_text: impl Into<String>) -> View {
     Tooltip(TooltipProps { tooltip_text: tooltip_text.into(), children: vec![content], ..Default::default() })
 }
+
+/// Properties for Suspense component.
+#[derive(Default)]
+pub struct SuspenseProps {
+    /// Signal indicating if the resource is loading.
+    pub loading: Option<threadloom_core::ReadSignal<bool>>,
+    /// View to show while loading.
+    pub fallback: Option<View>,
+    /// Children to render when not loading.
+    pub children: Vec<View>,
+}
+
+/// Renders a Suspense component.
+#[allow(non_snake_case)]
+pub fn Suspense(props: SuspenseProps) -> View {
+    threadloom_core::dyn_node(move || {
+        let is_loading = props.loading.as_ref().map(|s| s.get()).unwrap_or(false);
+        if is_loading {
+            props.fallback.clone().unwrap_or(threadloom_core::View::Text("Loading...".into()))
+        } else {
+            threadloom_core::fragment(props.children.clone())
+        }
+    })
+}
+
+/// Properties for ErrorBoundary component.
+#[derive(Default)]
+pub struct ErrorBoundaryProps {
+    /// Signal holding an optional error string.
+    pub error: Option<threadloom_core::ReadSignal<Option<String>>>,
+    /// Children to render when no error.
+    pub children: Vec<View>,
+}
+
+/// Renders an ErrorBoundary component.
+#[allow(non_snake_case)]
+pub fn ErrorBoundary(props: ErrorBoundaryProps) -> View {
+    threadloom_core::dyn_node(move || {
+        let has_err = props.error.as_ref().map(|s| s.get()).unwrap_or(None);
+        if let Some(e) = has_err {
+            element("div")
+                .attr("class", "tl-error-boundary")
+                .child(text(format!("Error: {}", e)))
+                .into_view()
+        } else {
+            threadloom_core::fragment(props.children.clone())
+        }
+    })
+}
+
