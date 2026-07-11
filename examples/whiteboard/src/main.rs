@@ -17,7 +17,7 @@ pub mod db;
 #[cfg(target_arch = "wasm32")]
 #[threadloom_macro::wasm_main]
 fn main() {
-    routes::render_route(&path_sig.get())
+    routes::app_router()
 }
 
 #[cfg(not(target_arch = "wasm32"))]

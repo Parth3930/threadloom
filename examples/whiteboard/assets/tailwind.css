@@ -2070,14 +2070,6 @@ select.tl-input {
   min-height: 1.5rem;
 }
 
-.min-h-\[100px\] {
-  min-height: 100px;
-}
-
-.min-h-\[2\.5rem\] {
-  min-height: 2.5rem;
-}
-
 .min-h-\[60vh\] {
   min-height: 60vh;
 }
@@ -2616,6 +2608,10 @@ select.tl-input {
 
 .\!border-none {
   border-style: none !important;
+}
+
+.border-none {
+  border-style: none;
 }
 
 .\!border-primary {
@@ -3639,14 +3635,6 @@ select.tl-input {
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
 
-.placeholder\:text-muted-foreground::-moz-placeholder {
-  color: var(--muted-foreground);
-}
-
-.placeholder\:text-muted-foreground::placeholder {
-  color: var(--muted-foreground);
-}
-
 .hover\:scale-105:hover {
   --tw-scale-x: 1.05;
   --tw-scale-y: 1.05;
@@ -3687,6 +3675,10 @@ select.tl-input {
 
 .hover\:bg-muted-foreground:hover {
   background-color: var(--muted-foreground);
+}
+
+.hover\:bg-transparent:hover {
+  background-color: transparent;
 }
 
 .hover\:\!text-foreground:hover {
@@ -3740,21 +3732,6 @@ select.tl-input {
 
 .focus\:ring-offset-2:focus {
   --tw-ring-offset-width: 2px;
-}
-
-.focus-visible\:outline-none:focus-visible {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-}
-
-.focus-visible\:ring-1:focus-visible {
-  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
-  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
-  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
-}
-
-.focus-visible\:ring-ring:focus-visible {
-  --tw-ring-color: var(--ring);
 }
 
 .group:hover .group-hover\:text-blue-300 {

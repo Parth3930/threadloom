@@ -5,7 +5,7 @@ use threadloom_ui::*;
 pub fn page() -> View {
     let (error_msg, set_error_msg) = create_signal(String::new());
     let (rooms, set_rooms) = create_signal(Vec::<crate::api::list_rooms::route::RoomInfo>::new());
-    let (_rooms_loaded, set_rooms_loaded) = create_signal(false);
+    let (rooms_loading, set_rooms_loading) = create_signal(true);
     let (confirm_room, set_confirm_room) =
         create_signal(Option::<crate::api::list_rooms::route::RoomInfo>::None);
 
@@ -15,7 +15,7 @@ pub fn page() -> View {
             // Try the cookie cache first — no network needed.
             if let Some(cached) = crate::store::load_cached_rooms() {
                 set_rooms.set(cached);
-                set_rooms_loaded.set(true);
+                set_rooms_loading.set(false);
                 let _ = threadloom_dom::tick();
                 return; // cache hit: skip the backend entirely
             }
@@ -24,7 +24,7 @@ pub fn page() -> View {
             let tok = crate::store::AuthState::get();
             if tok.is_empty() {
                 set_rooms.set(vec![]);
-                set_rooms_loaded.set(true);
+                set_rooms_loading.set(false);
                 let _ = threadloom_dom::tick();
                 return;
             }
@@ -46,11 +46,7 @@ pub fn page() -> View {
                     web_sys::console::error_1(&format!("Failed to fetch rooms: {}", e).into());
                 }
             }
-            set_rooms_loaded.set(true);
-            // Flush pending dynamic boundaries (the rooms list block) so the UI
-            // re-renders. set_rooms.set() only marks the boundary dirty; tick()
-            // is what actually re-evaluates it. Without this the console logs
-            // "Fetched N rooms" but the DOM stays empty.
+            set_rooms_loading.set(false);
             let _ = threadloom_dom::tick();
         });
     }
@@ -171,60 +167,59 @@ pub fn page() -> View {
             }
 
             // Your Rooms List
-            { move || {
-                let room_list = rooms.get();
-
-                let mut section = threadloom_core::element("div")
-                    .attr("class", "w-full max-w-md mt-6 flex flex-col gap-2 min-h-[100px]");
-
-                if !room_list.is_empty() {
-                    let heading = threadloom_core::element("p")
-                        .attr("class", "text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1")
-                        .child("Your Rooms");
-                    section = section.child(heading);
-
-                    for room in room_list.iter() {
-                        let room_id = room.id.clone();
-                        let room_name = room.name.clone();
-                        let href = format!("/board?room={}", room_id);
-
-                        // Row container (not an anchor, so the delete button
-                        // doesn't trigger navigation).
-                        let mut row = threadloom_core::element("div")
-                            .attr("class", "flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors");
-
-                        // Main link: name only
-                        let link = threadloom_core::element("a")
-                            .attr("href", href)
-                            .attr("class", "flex items-center justify-between flex-1 min-w-0")
-                            .child(
-                                threadloom_core::element("span")
-                                    .attr("class", "text-sm font-medium truncate")
-                                    .child(room_name.clone())
-                            );
-                        row = row.child(link);
-
-                        // Delete button — opens a confirmation modal instead of
-                        // deleting immediately.
-                        let del_room = room.clone();
-                        let set_confirm_room = set_confirm_room;
-                        let del_btn = threadloom_core::element("button")
-                            .attr("type", "button")
-                            .attr("title", "Delete room")
-                            .attr("class", "ml-3 shrink-0 text-muted-foreground hover:text-destructive transition-colors")
-                            .child("🗑️")
-                            .on("click", move || {
-                                set_confirm_room.set(Some(del_room.clone()));
-                                let _ = threadloom_dom::tick();
-                            });
-                        row = row.child(del_btn);
-
-                        section = section.child(row);
+            {
+                let fallback = threadloom_core::element("p").attr("class", "text-sm text-muted-foreground text-center py-4").child("Loading rooms...").into_view();
+                let rooms_for = rooms;
+                let set_confirm_room_clone = set_confirm_room;
+                threadloom! {
+                    Section(row=false, class="w-full max-w-md mt-6") {
+                        Suspense(loading=Some(rooms_loading), fallback=Some(fallback)) {
+                            { move || {
+                                let room_list = rooms_for.get();
+                                if room_list.is_empty() {
+                                    threadloom_core::element("div").into_view()
+                                } else {
+                                    threadloom! {
+                                        Section(row=false, class="flex flex-col gap-2") {
+                                            Text(variant="p", class="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1") { "Your Rooms" }
+                                            { threadloom_core::For(threadloom_core::ForProps {
+                                                each: Box::new(move || rooms_for.get()),
+                                                key: |r: &crate::api::list_rooms::route::RoomInfo| r.id.clone(),
+                                                view: move |room| {
+                                                    let room_id = room.id.clone();
+                                                    let room_name = room.name.clone();
+                                                    let href = format!("/board?room={}", room_id);
+                                                    let del_room = room.clone();
+                                                    let scr = set_confirm_room_clone;
+                                                    
+                                                    threadloom! {
+                                                        Row(items="center", justify="between", class="px-4 py-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors") {
+                                                            { threadloom_core::element("a")
+                                                                .attr("href", href)
+                                                                .attr("class", "flex items-center justify-between flex-1 min-w-0")
+                                                                .child(threadloom_core::element("span").attr("class", "text-sm font-medium truncate").child(room_name))
+                                                                .into_view() }
+                                                            Button(
+                                                                label="🗑️",
+                                                                primary=false,
+                                                                class="ml-3 shrink-0 text-muted-foreground hover:text-destructive transition-colors bg-transparent border-none p-0 shadow-none hover:bg-transparent",
+                                                                on_click=move || {
+                                                                    scr.set(Some(del_room.clone()));
+                                                                    let _ = threadloom_dom::tick();
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }) }
+                                        }
+                                    }.into_view()
+                                }
+                            }}
+                        }
                     }
                 }
-
-                section.into_view()
-            }}
+            }
 
             { move || {
                 let target = confirm_room.get();

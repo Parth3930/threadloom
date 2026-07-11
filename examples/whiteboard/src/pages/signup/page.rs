@@ -4,6 +4,8 @@ use threadloom_ui::*;
 
 pub fn page() -> View {
     let (error_msg, set_error_msg) = create_signal(String::new());
+    let form_ctx = FormContext::new();
+    let form_ctx_submit = form_ctx.clone();
 
     threadloom! {
         Section(row=false, height="screen", width="full", class="bg-background text-foreground flex flex-col items-center justify-center relative px-4") {
@@ -23,40 +25,57 @@ pub fn page() -> View {
                     "Sign up to save your whiteboard sessions"
                 }
 
-                Column(items="center", gap=4, class="w-full mt-4") {
-                    Input(
+                Form(class="w-full mt-4 flex flex-col items-center gap-4", on_submit=move || {
+                    form_ctx_submit.clear_all();
+                    set_error_msg.set(String::new());
+                    
+                    let username = threadloom_dom::get_value!("signup_username");
+                    let password = threadloom_dom::get_value!("signup_password");
+                    
+                    let mut has_err = false;
+                    if username.trim().is_empty() {
+                        form_ctx_submit.set_error("signup_username", "Username is required");
+                        has_err = true;
+                    }
+                    if password.len() < 6 {
+                        form_ctx_submit.set_error("signup_password", "Password must be at least 6 characters");
+                        has_err = true;
+                    }
+                    
+                    if has_err {
+                        let _ = threadloom_dom::tick();
+                        return;
+                    }
+                    
+                    threadloom_dom::wasm_bindgen_futures::spawn_local(async move {
+                        match crate::api::signup::route::signup(crate::api::signup::route::AuthArgs { username, password }).await {
+                            Ok(token) => {
+                                threadloom_dom::set_cookie!("auth_token", token.clone(), 60*60*24*7);
+                                crate::store::AuthState::set(token);
+                                threadloom_dom::redirect!("/");
+                            },
+                            Err(e) => set_error_msg.set(e),
+                        }
+                        let _ = threadloom_dom::tick();
+                    });
+                }) {
+                    FormField(
                         id="signup_username",
                         placeholder="Username",
-                        class="w-full"
+                        context=form_ctx.clone()
                     ) {}
                     
-                    { threadloom_core::element("input")
-                        .attr("type", "password")
-                        .attr("id", "signup_password")
-                        .attr("placeholder", "Password (min 6 chars)")
-                        .attr("class", "flex w-full rounded-none border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground min-h-[2.5rem]")
-                        .into_view() }
+                    FormField(
+                        id="signup_password",
+                        type_="password",
+                        placeholder="Password",
+                        context=form_ctx.clone()
+                    ) {}
 
                     Button(
                         label="Sign Up",
                         primary=true,
-                        class="w-full py-2 flex items-center justify-center text-sm font-semibold",
-                        on_click=move || {
-                            let username = threadloom_dom::get_value!("signup_username");
-                            let password = threadloom_dom::get_value!("signup_password");
-                            
-                            threadloom_dom::wasm_bindgen_futures::spawn_local(async move {
-                                match crate::api::signup::route::signup(crate::api::signup::route::AuthArgs { username, password }).await {
-                                    Ok(token) => {
-                                        threadloom_dom::set_cookie!("auth_token", token.clone(), 60*60*24*7);
-                                        crate::store::AuthState::set(token);
-                                        threadloom_dom::redirect!("/");
-                                    },
-                                    Err(e) => set_error_msg.set(e),
-                                }
-                                let _ = threadloom_dom::tick();
-                            });
-                        }
+                        class="w-full py-2 flex items-center justify-center text-sm font-semibold mt-2"
                     )
                 }
 
