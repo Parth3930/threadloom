@@ -8,8 +8,27 @@ struct RowData {
     label: std::rc::Rc<String>,
 }
 
-fn app() -> View {
+pub fn app() -> threadloom_core::View {
     let (rows, set_rows) = create_signal(Vec::<RowData>::new());
+    
+    let remove_cb = std::rc::Rc::new({
+        let rows = rows.clone();
+        let set_rows = set_rows.clone();
+        move |e: threadloom_dom::web_sys::Event| {
+            use wasm_bindgen::JsCast;
+            let target = e.target().unwrap().unchecked_into::<threadloom_dom::web_sys::Element>();
+            if let Some(tr) = target.closest("tr").unwrap() {
+                if let Some(row_id) = tr.get_attribute("data-row-id") {
+                    if let Ok(id) = row_id.parse::<usize>() {
+                        let mut new_rows = rows.get();
+                        new_rows.retain(|r| r.id != id);
+                        set_rows.set(new_rows);
+                    }
+                }
+            }
+        }
+    }) as std::rc::Rc<dyn Fn(threadloom_dom::web_sys::Event)>;
+
     let (next_id, set_next_id) = create_signal(1);
 
     let create_rows = move |count: usize| {
@@ -99,22 +118,20 @@ fn app() -> View {
                         threadloom_core::map_keyed(
                             rows,
                             |row| row.id,
-                            move |row_sig| {
-                                let id = row_sig.get().id;
-                                let id_str = row_sig.get().id_str;
-                                element("tr").attr("key", id_str.clone())
-                                    .child(element("td").attr("class", "col-md-1").child(id_str.clone()))
-                                    .child(element("td").attr("class", "col-md-4").child(element("a").attr("class", "lbl").child(
-                                        threadloom_core::View::DynamicRcText(std::rc::Rc::new(move || row_sig.get().label.clone()))
-                                    )))
-                                    .child(element("td").attr("class", "col-md-1").child(
-                                        element("a").attr("class", "remove").on("click", move || {
-                                            let mut new_rows = rows.get();
-                                            new_rows.retain(|r| r.id != id);
-                                            set_rows.set(new_rows);
-                                        }).child(element("span").attr("class", "glyphicon glyphicon-remove").attr("aria-hidden", "true"))
-                                    ))
-                                    .child(element("td").attr("class", "col-md-6"))
+                            {
+                                let remove_cb = remove_cb.clone();
+                                move |row_sig| {
+                                    let id_str = row_sig.get().id_str;
+                                    element("tr").attr("key", id_str.clone()).attr("data-row-id", id_str.clone())
+                                        .child(element("td").attr("class", "col-md-1").child(id_str.clone()))
+                                        .child(element("td").attr("class", "col-md-4").child(element("a").attr("class", "lbl").child(
+                                            threadloom_core::View::DynamicRcText(std::rc::Rc::new(move || row_sig.get().label.clone()))
+                                        )))
+                                        .child(element("td").attr("class", "col-md-1").child(
+                                            element("a").attr("class", "remove").on_obj_rc("click", remove_cb.clone()).child(element("span").attr("class", "glyphicon glyphicon-remove").attr("aria-hidden", "true"))
+                                        ))
+                                        .child(element("td").attr("class", "col-md-6"))
+                                }
                             }
                         )
                     }

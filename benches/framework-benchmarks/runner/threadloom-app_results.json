@@ -1,32 +1,32 @@
 {
   "create_1000": {
-    "min": 197,
-    "median": 429,
-    "max": 769
+    "min": 191,
+    "median": 669.5,
+    "max": 908
   },
   "create_10000": {
-    "min": 1060,
-    "median": 1086.5,
-    "max": 1192
+    "min": 1049,
+    "median": 1076.5,
+    "max": 1648
   },
   "append_1000": {
-    "min": 183,
-    "median": 189,
-    "max": 214
+    "min": 180,
+    "median": 191,
+    "max": 359
   },
   "update_every_10th": {
-    "min": 228,
-    "median": 232,
-    "max": 271
+    "min": 229,
+    "median": 235.5,
+    "max": 361
   },
   "swap_rows": {
-    "min": 97,
-    "median": 104,
-    "max": 112
+    "min": 98,
+    "median": 111,
+    "max": 145
   },
   "clear": {
     "min": 97,
-    "median": 105,
+    "median": 107.5,
     "max": 118
   }
 }

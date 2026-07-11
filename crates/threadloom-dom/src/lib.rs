@@ -30,9 +30,60 @@ pub fn mount(view: View, container: &Element) -> Result<(), JsValue> {
     Ok(())
 }
 
+pub fn mount_to_body(view: View) {
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+    let body = document.body().unwrap();
+    
+    setup_global_listeners(&document);
+
+    let node = render_view(&document, view).unwrap();
+    body.append_child(&node).unwrap();
+}
+
 thread_local! {
     static ELEMENT_CACHE: std::cell::RefCell<std::collections::HashMap<String, web_sys::Element>> = std::cell::RefCell::new(std::collections::HashMap::new());
     static STRING_CACHE: std::cell::RefCell<std::collections::HashMap<String, wasm_bindgen::JsValue>> = std::cell::RefCell::new(std::collections::HashMap::new());
+    
+    static GLOBAL_EVENTS: std::cell::RefCell<std::collections::HashMap<String, std::collections::HashMap<u32, std::rc::Rc<dyn Fn(web_sys::Event)>>>> = std::cell::RefCell::new(std::collections::HashMap::new());
+    static NEXT_EVENT_ID: std::cell::Cell<u32> = std::cell::Cell::new(1);
+    static GLOBAL_LISTENERS_SETUP: std::cell::Cell<bool> = std::cell::Cell::new(false);
+}
+
+fn setup_global_listeners(document: &Document) {
+    if GLOBAL_LISTENERS_SETUP.with(|s| s.get()) { return; }
+    GLOBAL_LISTENERS_SETUP.with(|s| s.set(true));
+
+    let window = web_sys::window().unwrap();
+    let events = ["click", "input", "change", "keydown"];
+    for event_name in events {
+        let event_name_str = event_name.to_string();
+        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::Event| {
+            use wasm_bindgen::JsCast;
+            if let Some(target) = e.target() {
+                if let Ok(el) = target.dyn_into::<web_sys::Element>() {
+                    let attr_name = format!("data-th-evt-{}", event_name_str);
+                    let mut current = Some(el);
+                    while let Some(node) = current {
+                        if let Some(id_str) = node.get_attribute(&attr_name) {
+                            if let Ok(id) = id_str.parse::<u32>() {
+                                let cb = GLOBAL_EVENTS.with(|e| {
+                                    e.borrow().get(&event_name_str).and_then(|m| m.get(&id).cloned())
+                                });
+                                if let Some(cb) = cb {
+                                    cb(e.clone());
+                                    let _ = crate::tick();
+                                }
+                            }
+                        }
+                        current = node.parent_element();
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(web_sys::Event)>);
+        window.add_event_listener_with_callback(event_name, closure.as_ref().unchecked_ref()).unwrap();
+        closure.forget();
+    }
 }
 
 fn get_interned_string(s: &str) -> wasm_bindgen::JsValue {
@@ -124,9 +175,6 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         }
                     }
                     AttributeValue::Dynamic(f) => {
-                        // Evaluate once initially to set the attr, then register a reactive effect
-                        // that re-runs (and calls set_attribute again) whenever any signal read
-                        // inside the closure changes.
                         let el_clone = el.clone();
                         let k_clone = k.clone();
                         let f_rc = f.clone();
@@ -136,7 +184,6 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                         } else if let AttributeValue::RcString(s) = &val {
                             let _ = el.set_attribute(k_interned, s);
                         }
-                        // Reactive update effect
                         create_effect(move || {
                             let val = f_rc();
                             if let AttributeValue::String(s) = val {
@@ -166,6 +213,23 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                             closure.forget();
                         }
                     }
+                    AttributeValue::EventObj(cb) => {
+                        let id = NEXT_EVENT_ID.with(|id| {
+                            let val = id.get();
+                            id.set(val + 1);
+                            val
+                        });
+                        GLOBAL_EVENTS.with(|e| {
+                            let mut map = e.borrow_mut();
+                            map.entry(k.to_string()).or_default().insert(id, cb.clone());
+                        });
+                        let attr_name = format!("data-th-evt-{}", k);
+                        let attr_name_interned = get_interned_string(&attr_name);
+                        let id_str = get_interned_string(&id.to_string());
+                        
+                        let _ = js_sys::Reflect::set(&el, &attr_name_interned, &id_str);
+                        let _ = el.set_attribute(&attr_name, &id.to_string());
+                    }
                 }
             }
             for child in children {
@@ -190,7 +254,6 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             Ok(node)
         }
         View::Fragment(children) => {
-            // Very simple stub: return a div wrapping the fragment to avoid complex multi-node tracking
             let el = document.create_element("div")?;
             for child in children {
                 let child_node = render_view(document, child)?;
@@ -271,8 +334,6 @@ fn patch_node(document: &Document, dom_node: &Node, new_view: View) -> Result<No
             }
         }
         View::DynamicNode(_) => {
-            // Dynamic nodes handle their own updates via boundaries.
-            // We just assume the DOM node is the root of that boundary.
             Ok(dom_node.clone())
         }
         View::Element {
@@ -364,6 +425,9 @@ fn patch_node(document: &Document, dom_node: &Node, new_view: View) -> Result<No
                                         );
                                         closure.forget();
                                     }
+                                }
+                                AttributeValue::EventObj(_) => {
+                                    // Handled globally via attributes
                                 }
                             }
                         }

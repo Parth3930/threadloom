@@ -524,6 +524,7 @@ pub enum AttributeValue {
     Bool(bool),
     Dynamic(Rc<dyn Fn() -> AttributeValue>),
     Event(Rc<dyn Fn()>),
+    EventObj(Rc<dyn Fn(web_sys::Event)>),
 }
 
 impl std::fmt::Debug for AttributeValue {
@@ -534,6 +535,7 @@ impl std::fmt::Debug for AttributeValue {
             Self::Bool(b) => write!(f, "Bool({})", b),
             Self::Dynamic(_) => write!(f, "Dynamic(..)"),
             Self::Event(_) => write!(f, "Event(..)"),
+            Self::EventObj(_) => write!(f, "EventObj(..)"),
         }
     }
 }
@@ -706,6 +708,7 @@ pub fn render_to_string(view: &View) -> String {
                         }
                     }
                     AttributeValue::Event(_) => continue,
+                    AttributeValue::EventObj(_) => continue,
                 };
                 html.push_str(&format!(" {}=\"{}\"", k, val_str.replace("\"", "&quot;")));
             }
@@ -813,13 +816,35 @@ impl ElementBuilder {
             children: vec![],
         }
     }
-    pub fn attr(mut self, key: impl Into<Cow<'static, str>>, value: impl Into<AttributeValue>) -> Self {
+    pub fn attr(
+        mut self,
+        key: impl Into<Cow<'static, str>>,
+        value: impl Into<AttributeValue>,
+    ) -> Self {
         self.attrs.push((key.into(), value.into()));
         self
     }
-    pub fn on(mut self, key: impl Into<Cow<'static, str>>, f: impl Fn() + 'static) -> Self {
+    pub fn on(mut self, event: impl Into<Cow<'static, str>>, cb: impl Fn() + 'static) -> Self {
         self.attrs
-            .push((key.into(), AttributeValue::Event(Rc::new(f))));
+            .push((event.into(), AttributeValue::Event(Rc::new(cb))));
+        self
+    }
+    pub fn on_obj(
+        mut self,
+        event: impl Into<Cow<'static, str>>,
+        cb: impl Fn(web_sys::Event) + 'static,
+    ) -> Self {
+        self.attrs
+            .push((event.into(), AttributeValue::EventObj(Rc::new(cb))));
+        self
+    }
+    pub fn on_obj_rc(
+        mut self,
+        event: impl Into<Cow<'static, str>>,
+        cb: Rc<dyn Fn(web_sys::Event)>,
+    ) -> Self {
+        self.attrs
+            .push((event.into(), AttributeValue::EventObj(cb)));
         self
     }
     pub fn child(mut self, child: impl IntoView) -> Self {
@@ -848,7 +873,9 @@ where
     K: Eq + std::hash::Hash + Clone + std::fmt::Display + 'static,
     V: IntoView + 'static,
 {
-    let cache = Rc::new(RefCell::new(HashMap::<K, (WriteSignal<T>, View, String)>::new()));
+    let cache = Rc::new(RefCell::new(
+        HashMap::<K, (WriteSignal<T>, View, String)>::new(),
+    ));
 
     let compute = move || {
         let items = list.get();

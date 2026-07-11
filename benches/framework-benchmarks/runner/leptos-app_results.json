@@ -1,0 +1,32 @@
+{
+  "create_1000": {
+    "min": 404,
+    "median": 540.5,
+    "max": 996
+  },
+  "create_10000": {
+    "min": 2545,
+    "median": 2582,
+    "max": 2728
+  },
+  "append_1000": {
+    "min": 232,
+    "median": 247,
+    "max": 264
+  },
+  "update_every_10th": {
+    "min": 257,
+    "median": 264.5,
+    "max": 285
+  },
+  "swap_rows": {
+    "min": 83,
+    "median": 96.5,
+    "max": 104
+  },
+  "clear": {
+    "min": 138,
+    "median": 150.5,
+    "max": 159
+  }
+}
