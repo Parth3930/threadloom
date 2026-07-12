@@ -99,6 +99,20 @@ async fn ws_handler(ws: WebSocketUpgrade, State(tx): State<broadcast::Sender<Str
 }
 
 async fn handle_socket(mut socket: WebSocket, tx: broadcast::Sender<String>) {
+    let patches = {
+        if let Ok(guard) = crate::hot_reload::PENDING_PATCHES.lock() {
+            guard.clone()
+        } else {
+            Vec::new()
+        }
+    };
+
+    for patch in patches {
+        if socket.send(Message::Text(patch)).await.is_err() {
+            return;
+        }
+    }
+
     let mut rx = tx.subscribe();
     while let Ok(msg) = rx.recv().await {
         if socket.send(Message::Text(msg)).await.is_err() {
@@ -110,58 +124,82 @@ async fn handle_socket(mut socket: WebSocket, tx: broadcast::Sender<String>) {
 async fn hmr_script() -> &'static str {
     r#"
     const ws = new WebSocket(`ws://${location.host}/__distaff/ws`);
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'reload') {
-            window.location.reload();
-        } else if (msg.type === 'css_refresh') {
-            // Hot patch already updated the DOM — just re-fetch tailwind.css so new
-            // arbitrary-value classes (e.g. mt-[10rem]) get their CSS rules compiled in.
-            const existing = document.querySelector('link[href*="tailwind.css"]');
-            if (existing) {
-                const newLink = existing.cloneNode();
-                newLink.href = existing.href.split('?')[0] + '?t=' + Date.now();
-                existing.parentNode.insertBefore(newLink, existing.nextSibling);
-                newLink.onload = () => existing.remove();
-            }
-        } else if (msg.type === 'patch') {
+    
+    let pendingPatches = [];
+    let patchTimer = null;
+
+    const flushPatches = () => {
+        if (!document.querySelector('[data-th-id]')) {
+            patchTimer = setTimeout(flushPatches, 50);
+            return;
+        }
+        patchTimer = null;
+        const patchesToRun = pendingPatches;
+        pendingPatches = [];
+        patchesToRun.forEach(msg => {
             console.log('Tier 1 Hot Patching DOM', msg.data);
             let success = true;
             
             const getExactEls = (path) => {
-                // path is now "line-index-..." or "index" (if no line was found)
-                const parts = path.split('-');
-                let regex;
-                if (parts.length > 1 && !isNaN(parts[0])) {
-                    // e.g. path="36-0-1" -> matches ":36:\\d+-0-1$"
-                    const line = parts[0];
-                    const rest = parts.slice(1).join('-');
-                    regex = new RegExp(':' + line + ':\\d+-' + rest + '$');
-                } else {
-                    regex = new RegExp('(?::\\d+-|^hot-)' + path + '$');
-                }
-                return Array.from(document.querySelectorAll(`[data-th-id$="-${parts.slice(1).join('-')}"]`))
-                            .filter(el => regex.test(el.getAttribute('data-th-id')));
+                // path is "<macroLine>-<idx>-<idx>..." (e.g. "49-0-2-0"). The diff derives it
+                // from the macro's start line, while the live runtime data-th-id is
+                // "<file>:<LINE>:<COL>-<macroLine>-<idx>..." — the same path string, just
+                // prefixed by the per-element source location. The preview renderer instead
+                // emits "hot-<macroLine>-<idx>...". All three forms share the full
+                // "<macroLine>-<idx>..." path as a suffix; match by that full path to avoid
+                // cross-macro collisions (e.g. "49-0" would match "80-0" when matching only
+                // on "-0").
+                return Array.from(document.querySelectorAll(`[data-th-id$="-${path}"]`));
             };
 
+            // Extract the path portion from a data-th-id (handles both runtime
+            // `<file>:<LINE>:<COL>-<path>` and preview `hot-<path>` forms).
+            // Normalizes both to the same "<macroLine>-<idx>..." format used by
+            // diff paths.  For runtime IDs the COL segment (first segment after
+            // the last colon) is stripped so that sibling/child matching is
+            // consistent across runtime and preview.
+            const pathOf = (id) => {
+                if (!id) return '';
+                if (id.startsWith('hot-')) return id.slice(4);
+                const idx = id.lastIndexOf(':');
+                const afterColon = idx >= 0 ? id.slice(idx + 1) : id;
+                const parts = afterColon.split('-');
+                // Strip the COL segment (first element after last colon)
+                return parts.slice(1).join('-');
+            };
+            // Convert a diff path to its full normalized form — just the identity,
+            // since diff paths already are "<macroLine>-<idx>...".  The full path
+            // (including the macro line) is used as the suffix for selectors and as
+            // the prefix for shiftIds / refPath matching, so elements from different
+            // macros don't collide.
+            const suffixOf = (diffPath) => diffPath;
+
             const shiftIds = (parentPath, startIndex, delta) => {
-                const prefix = parentPath === "" ? "hot-" : "hot-" + parentPath + "-";
-                const els = document.querySelectorAll(`[data-th-id^="${prefix}"]`);
+                const parentSuffix = suffixOf(parentPath);   // runtime path of the parent
+                const prefix = parentSuffix === '' ? '' : parentSuffix + '-';
+                const els = document.querySelectorAll('[data-th-id]');
                 const elsArray = Array.from(els).map(el => {
                     const id = el.getAttribute('data-th-id');
-                    if (!id) return null;
-                    const suffix = id.substring(prefix.length);
+                    const pathPart = pathOf(id);
+                    if (!pathPart.startsWith(prefix)) return null;
+                    const suffix = pathPart.slice(prefix.length);
                     const parts = suffix.split('-');
                     const index = parseInt(parts[0], 10);
+                    if (isNaN(index)) return null;
                     return { el, id, index, remainder: parts.slice(1).join('-') };
-                }).filter(item => item !== null && !isNaN(item.index));
-                
+                }).filter(item => item !== null);
+
                 elsArray.sort((a, b) => (b.index - a.index) * Math.sign(delta));
-                
+
                 elsArray.forEach(item => {
                     if (item.index >= startIndex) {
                         const newIndex = item.index + delta;
-                        const newId = prefix + newIndex + (item.remainder ? "-" + item.remainder : "");
+                        const newPathPart = (parentSuffix === '' ? '' : parentSuffix + '-') + newIndex + (item.remainder ? '-' + item.remainder : '');
+                        const oldId = item.id;
+                        const oldPath = pathOf(oldId);
+                        // Reconstruct preserving the original prefix (hot- / file:line:col-)
+                        // by splicing newPathPart into the exact position pathOf occupies in oldId.
+                        const newId = oldId.slice(0, oldId.length - oldPath.length) + newPathPart;
                         item.el.setAttribute('data-th-id', newId);
                     }
                 });
@@ -205,10 +243,11 @@ async fn hmr_script() -> &'static str {
                             template.innerHTML = patch.html;
                             const newEl = template.content.firstChild;
                             
-                            const prefix = patch.parent_path === "" ? "hot-" : "hot-" + patch.parent_path + "-";
-                            const refChildId = prefix + (patch.index + 1);
-                            
-                            const refChild = Array.from(parentEl.children).find(c => c.getAttribute('data-th-id') === refChildId);
+                            const refPath = (suffixOf(patch.parent_path) === '' ? '' : suffixOf(patch.parent_path) + '-') + (patch.index + 1);
+                            const refChild = Array.from(parentEl.children).find(c => {
+                                const cid = c.getAttribute('data-th-id');
+                                return cid && pathOf(cid) === refPath;
+                            });
                             
                             if (refChild) {
                                 parentEl.insertBefore(newEl, refChild);
@@ -501,6 +540,26 @@ async fn hmr_script() -> &'static str {
             
             if (!success) {
                 window.location.reload(); // Fallback if any patch failed
+            }
+        });
+    };
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'reload') {
+            window.location.reload();
+        } else if (msg.type === 'css_refresh') {
+            const existing = document.querySelector('link[href*="tailwind.css"]');
+            if (existing) {
+                const newLink = existing.cloneNode();
+                newLink.href = existing.href.split('?')[0] + '?t=' + Date.now();
+                existing.parentNode.insertBefore(newLink, existing.nextSibling);
+                newLink.onload = () => existing.remove();
+            }
+        } else if (msg.type === 'patch') {
+            pendingPatches.push(msg);
+            if (!patchTimer) {
+                flushPatches();
             }
         }
     };

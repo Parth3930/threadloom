@@ -1,7 +1,7 @@
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::path::Path;
 use std::process::{Child, Command};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast;
@@ -15,6 +15,12 @@ lazy_static::lazy_static! {
     static ref FRONTEND_PROCESSES: Mutex<Vec<Child>> = Mutex::new(Vec::new());
     static ref FILE_CACHE: Mutex<std::collections::HashMap<String, String>> = Mutex::new(std::collections::HashMap::new());
     static ref IS_BUILDING: AtomicBool = AtomicBool::new(false);
+    static ref BUILD_COUNT: AtomicI32 = AtomicI32::new(0);
+    static ref BUILD_QUEUED: AtomicBool = AtomicBool::new(false);
+    pub static ref PENDING_PATCHES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    /// After a reload is sent (by watcher or build thread), incoming dist/
+    /// events are skipped for this duration to absorb trailing writes.
+    static ref DIST_COOLDOWN: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 }
 
 pub fn kill_child(child: &mut std::process::Child) {
@@ -237,9 +243,6 @@ pub fn spawn_watcher<P: AsRef<Path>>(
 
         tracing::debug!("Started hot reloader for {:?}", path);
         
-        let mut last_build_time = std::time::Instant::now().checked_sub(std::time::Duration::from_secs(10)).unwrap_or_else(std::time::Instant::now);
-        let mut last_was_hot_patch = false;
-
         for res in notify_rx {
             match res {
                 Ok(events) => {
@@ -249,6 +252,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
 
                     let mut needs_backend = false;
                     let mut needs_reload = false;
+                    let mut needs_assets_refresh = false;
                     let mut triggering_files = Vec::new();
 
                     for event in &events {
@@ -259,12 +263,30 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                             || p_normalized.ends_with("/dist")
                             || p_normalized.starts_with("dist/")
                             || p_normalized == "dist"
-                            || p_normalized.contains("/assets/")
+                        {
+                            // Skip dist/ events while any background build is
+                            // running (BUILD_COUNT > 0) and for 3s after the
+                            // last reload (DIST_COOLDOWN).
+                            if BUILD_COUNT.load(Ordering::SeqCst) > 0 {
+                                continue;
+                            }
+                            if let Ok(guard) = DIST_COOLDOWN.lock() {
+                                if let Some(cooldown) = *guard {
+                                    if std::time::Instant::now() < cooldown {
+                                        continue;
+                                    }
+                                }
+                            }
+                            needs_reload = true;
+                            continue;
+                        }
+
+                        if p_normalized.contains("/assets/")
                             || p_normalized.ends_with("/assets")
                             || p_normalized.starts_with("assets/")
                             || p_normalized == "assets"
                         {
-                            needs_reload = true;
+                            needs_assets_refresh = true;
                             continue;
                         }
 
@@ -277,7 +299,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         }
                     }
 
-                    if !needs_backend && !needs_reload && triggering_files.is_empty() {
+                    if !needs_backend && !needs_reload && !needs_assets_refresh && triggering_files.is_empty() {
                         continue;
                     }
 
@@ -350,19 +372,47 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                                     let clean = p.replace("\\", "/");
                                     let short = clean.split("/./").last().unwrap_or(&clean);
                                     println!("{} {}", "[💫] hot reload:".cyan(), short);
-                                    let _ = tx.send(patch.to_string());
-                                    // Bump last_build_time so the tailwind.css write that follows
-                                    // (triggered by this same .rs save) doesn't fire a css_refresh
-                                    // immediately — wait for tailwind to finish first.
-                                    last_build_time = std::time::Instant::now();
-                                    last_was_hot_patch = true;
                                     
-                                    // ponytail: Spawn background rebuild so app.wasm is updated for the next hard reload
-                                    std::thread::spawn(|| {
-                                        let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
-                                        let mut cmd = adapter.build_command();
-                                        let _ = cmd.output();
-                                    });
+                                    let patch_str = patch.to_string();
+                                    if let Ok(mut guard) = PENDING_PATCHES.lock() {
+                                        guard.push(patch_str.clone());
+                                    }
+                                    let _ = tx.send(patch_str);
+                                    
+                                    let reload_tx = tx.clone();
+                                    
+                                    // If a build is already running, just queue another one.
+                                    if BUILD_COUNT.load(Ordering::SeqCst) > 0 {
+                                        BUILD_QUEUED.store(true, Ordering::SeqCst);
+                                    } else {
+                                        BUILD_COUNT.store(1, Ordering::SeqCst);
+                                        std::thread::spawn(move || {
+                                            loop {
+                                                let adapter = crate::adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+                                                let mut cmd = adapter.build_command();
+                                                let ok = cmd.output().map_or(false, |o| o.status.success());
+                                                
+                                                // If another change happened during build, build again.
+                                                if BUILD_QUEUED.swap(false, Ordering::SeqCst) {
+                                                    continue;
+                                                }
+                                                
+                                                std::thread::sleep(Duration::from_millis(1500));
+                                                
+                                                BUILD_COUNT.store(0, Ordering::SeqCst);
+                                                
+                                                if let Ok(mut guard) = DIST_COOLDOWN.lock() {
+                                                    *guard = Some(std::time::Instant::now() + Duration::from_secs(3));
+                                                }
+                                                if ok {
+                                                    if let Ok(mut guard) = PENDING_PATCHES.lock() {
+                                                        guard.clear();
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                        });
+                                    }
                                 } else {
                                     tracing::debug!("Hot patch failed: attempt_hot_patch returned None for {:?}", p);
                                     handled_via_patch = false;
@@ -384,6 +434,7 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                         && !triggering_files.is_empty()
                         && !needs_backend
                         && !needs_reload
+                        && !needs_assets_refresh
                     {
                         println!("{} full WASM", "[🏗️] rebuild:".yellow());
                         let adapter =
@@ -393,38 +444,24 @@ pub fn spawn_watcher<P: AsRef<Path>>(
                             Ok(status) if status.success() => {
                                 println!("{} frontend", "[🔄] reload:".green());
                                 let _ = tx.send(r#"{"type": "reload"}"#.to_string());
-                                // Mark as hot-patch-equivalent so that when Tailwind subsequently
-                                // writes tailwind.css with new arbitrary-value classes (e.g. mt-[15rem]),
-                                // the css_refresh signal fires instead of being silently skipped.
-                                last_was_hot_patch = true;
                             }
                             _ => {
                                 tracing::error!("WASM rebuild failed!");
                             }
                         }
-                        last_build_time = std::time::Instant::now();
                     }
 
                     if needs_reload {
-                        let elapsed = last_build_time.elapsed().as_secs();
-                        if elapsed > 5 {
-                            // Cold change: full reload
-                            tracing::debug!("Build output changed — sending reload signal");
-                            last_was_hot_patch = false;
-                            let _ = tx.send(r#"{"type": "reload"}"#.to_string());
-                        } else if last_was_hot_patch {
-                            // Hot patch already applied to DOM — just refresh CSS so new arbitrary-value
-                            // classes (e.g. mt-[10rem]) get their rules without blowing away the page.
-                            tracing::debug!("Hot patch CSS refresh — sending css_refresh signal");
-                            last_was_hot_patch = false;
-                            let _ = tx.send(r#"{"type": "css_refresh"}"#.to_string());
-                        } else {
-                            // CSS changed after a full WASM rebuild — refresh CSS so any new
-                            // arbitrary-value classes generated by Tailwind take effect.
-                            // css_refresh is always safe (just re-fetches the stylesheet).
-                            tracing::debug!("Post-rebuild CSS refresh — sending css_refresh signal");
-                            let _ = tx.send(r#"{"type": "css_refresh"}"#.to_string());
+                        let _ = tx.send(r#"{"type": "reload"}"#.to_string());
+                        // Set cooldown to absorb trailing dist/ writes from the same build.
+                        if let Ok(mut guard) = DIST_COOLDOWN.lock() {
+                            *guard = Some(std::time::Instant::now() + Duration::from_secs(3));
                         }
+                    }
+
+                    if needs_assets_refresh {
+                        tracing::debug!("assets/ changed — sending css_refresh signal");
+                        let _ = tx.send(r#"{"type": "css_refresh"}"#.to_string());
                     }
 
                     IS_BUILDING.store(false, Ordering::SeqCst);

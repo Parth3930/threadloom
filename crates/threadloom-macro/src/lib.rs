@@ -128,7 +128,7 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                                         self.counter += 1;
                                         let inner = i.clone();
                                         *i = syn::parse_quote_spanned! { span=>
-                                            ::threadloom_core::IntoView::into_view(#inner).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #child_path))
+                                            ::threadloom_core::IntoView::into_view(#inner).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", line!(), "-", #child_path))
                                         };
                                     }
                                 }
@@ -180,14 +180,14 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                             children: vec![#(#children_tokens),*],
                             ..::std::default::Default::default()
                         })
-                    ).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
+                    ).with_attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", line!(), "-", #path))
                 }
             } else {
                 let mut builder = quote! { ::threadloom_core::element(#tag_name_str) };
 
                 // Inject stable ID for hot reloading
                 builder = quote! {
-                    #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", #path))
+                    #builder.attr("data-th-id", concat!(file!(), ":", line!(), ":", column!(), "-", line!(), "-", #path))
                 };
 
                 for attr in &el.attrs {

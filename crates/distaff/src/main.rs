@@ -34,6 +34,9 @@ enum Commands {
         desktop: bool,
         #[arg(long)]
         android: bool,
+        /// Show verbose debug logs
+        #[arg(long)]
+        verbose: bool,
     },
     /// Alias for Dev
     Run {
@@ -43,6 +46,9 @@ enum Commands {
         desktop: bool,
         #[arg(long)]
         android: bool,
+        /// Show verbose debug logs
+        #[arg(long)]
+        verbose: bool,
     },
     /// Build the project for production
     Build {
@@ -455,16 +461,23 @@ async fn main() -> anyhow::Result<()> {
 
     use colored::Colorize;
 
+    let cli = Cli::parse();
+    let verbose = matches!(&cli.command, Commands::Dev { verbose: true, .. } | Commands::Run { verbose: true, .. });
+    let level = if verbose { tracing::Level::DEBUG } else { tracing::Level::INFO };
+
     tracing_subscriber::fmt()
         .without_time()
         .with_target(false)
         .with_level(false)
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(level)
         .init();
-    let cli = Cli::parse();
+
+    if verbose {
+        println!("{} verbose logging enabled — use RUST_LOG=trace for even more detail", "[🔍] debug:".yellow());
+    }
 
     match &cli.command {
-        Commands::Dev { port, desktop, android } | Commands::Run { port, desktop, android } => {
+        Commands::Dev { port, desktop, android, .. } | Commands::Run { port, desktop, android, .. } => {
 
             if matches!(cli.command, Commands::Run { .. }) {
                 check_update();
