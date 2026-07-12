@@ -6211,7 +6211,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-core"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "serde",
  "serde_json",
@@ -6235,7 +6235,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-dom"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "js-sys",
  "reqwasm",

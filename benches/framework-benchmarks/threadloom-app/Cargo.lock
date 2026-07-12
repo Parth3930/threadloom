@@ -434,7 +434,7 @@ dependencies = [
 
 [[package]]
 name = "threadloom-macro"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "proc-macro2",
  "quote",

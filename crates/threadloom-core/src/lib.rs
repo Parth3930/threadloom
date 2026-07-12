@@ -125,10 +125,6 @@ impl NodeId {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             if let Some(sub_id) = g.current_subscriber {
-                println!(
-                    "record_read: {} is subscribing to {}",
-                    sub_id.index, self.index
-                );
                 if let Some(node) = &mut g.nodes[self.index] {
                     node.subscribers.insert(sub_id);
                 }
@@ -141,7 +137,6 @@ impl NodeId {
     }
 
     fn mark_dirty(&self) {
-        println!("mark_dirty called on {}", self.index);
         let mut stack = vec![*self];
         while let Some(current) = stack.pop() {
             let (is_effect, subscribers, should_push, has_compute) = GRAPH.with(|g| {
@@ -157,13 +152,6 @@ impl NodeId {
                         } else {
                             node.state = State::Dirty;
                         }
-                        println!(
-                            "node {} is now {:?} (is_effect: {}, has_compute: {})",
-                            current.index,
-                            node.state,
-                            is_effect,
-                            node.compute.is_some()
-                        );
                         (is_effect, subs, true, node.compute.is_some())
                     } else {
                         (false, vec![], false, false)

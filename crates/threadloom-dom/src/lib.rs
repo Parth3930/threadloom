@@ -128,12 +128,12 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
             attrs,
             children,
         } => {
-            let tag_str = tag.to_string();
+            let tag_str: &str = tag.as_ref();
             let is_svg = tag == "svg" || tag == "path" || tag == "circle" || tag == "rect" || tag == "g" || tag == "line";
             
             let el = ELEMENT_CACHE.with(|c| {
                 let mut cache = c.borrow_mut();
-                if let Some(template) = cache.get(&tag_str) {
+                if let Some(template) = cache.get(tag_str) {
                     template.clone_node().unwrap().unchecked_into::<web_sys::Element>()
                 } else {
                     let el = if is_svg {
@@ -141,7 +141,7 @@ fn render_view(document: &Document, view: View) -> Result<Node, JsValue> {
                     } else {
                         document.create_element(tag.as_ref()).unwrap()
                     };
-                    cache.insert(tag_str, el.clone());
+                    cache.insert(tag.to_string(), el.clone());
                     el
                 }
             });
