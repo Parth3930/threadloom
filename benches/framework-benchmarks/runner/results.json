@@ -1,32 +1,58 @@
 {
-  "create_1000": {
-    "min": 204,
-    "median": 328,
-    "max": 395
+  "threadloom": {
+    "create_1000": { "min": 196, "median": 268.5, "max": 397 },
+    "create_10000": { "min": 1036, "median": 1058.5, "max": 1212 },
+    "append_1000": { "min": 172, "median": 183, "max": 208 },
+    "update_every_10th": { "min": 222, "median": 229, "max": 270 },
+    "swap_rows": { "min": 96, "median": 97, "max": 104 },
+    "clear": { "min": 97, "median": 98, "max": 110 }
   },
-  "create_10000": {
-    "min": 1219,
-    "median": 1319.5,
-    "max": 1528
+  "dioxus": {
+    "create_1000": { "min": 185, "median": 308, "max": 475 },
+    "create_10000": { "min": 686, "median": 725, "max": 819 },
+    "append_1000": { "min": 145, "median": 146, "max": 180 },
+    "update_every_10th": { "min": 222, "median": 222, "max": 236 },
+    "swap_rows": { "min": 82, "median": 86.5, "max": 118 },
+    "clear": { "min": 90, "median": 94.5, "max": 111 }
   },
-  "append_1000": {
-    "min": 242,
-    "median": 263,
-    "max": 296
+  "nextjs": {
+    "create_1000": { "min": 133, "median": 206.5, "max": 407 },
+    "create_10000": { "min": 1097, "median": 1175.5, "max": 1311 },
+    "append_1000": { "min": 202, "median": 229.5, "max": 252 },
+    "update_every_10th": { "min": 256, "median": 276, "max": 332 },
+    "swap_rows": { "min": 187, "median": 201, "max": 371 },
+    "clear": { "min": 149, "median": 215.5, "max": 648 }
   },
-  "update_every_10th": {
-    "min": 278,
-    "median": 294,
-    "max": 347
+  "yew": {
+    "create_1000": { "min": 183, "median": 279.5, "max": 377 },
+    "create_10000": { "min": 1121, "median": 1257, "max": 1365 },
+    "append_1000": { "min": 228, "median": 242.5, "max": 302 },
+    "update_every_10th": { "min": 264, "median": 284.5, "max": 320 },
+    "swap_rows": { "min": 125, "median": 138, "max": 153 },
+    "clear": { "min": 138, "median": 146, "max": 160 }
   },
-  "swap_rows": {
-    "min": 139,
-    "median": 145.5,
-    "max": 160
+  "react": {
+    "create_1000": { "min": 230, "median": 330.5, "max": 475 },
+    "create_10000": { "min": 1197, "median": 1268, "max": 1499 },
+    "append_1000": { "min": 181, "median": 209, "max": 236 },
+    "update_every_10th": { "min": 249, "median": 254, "max": 278 },
+    "swap_rows": { "min": 166, "median": 180, "max": 188 },
+    "clear": { "min": 138, "median": 208, "max": 305 }
   },
-  "clear": {
-    "min": 146,
-    "median": 159.5,
-    "max": 180
+  "tanstack": {
+    "create_1000": { "min": 170, "median": 316.5, "max": 482 },
+    "create_10000": { "min": 1284, "median": 1343.5, "max": 1479 },
+    "append_1000": { "min": 206, "median": 230, "max": 250 },
+    "update_every_10th": { "min": 241, "median": 250.5, "max": 268 },
+    "swap_rows": { "min": 173, "median": 179.5, "max": 187 },
+    "clear": { "min": 153, "median": 211.5, "max": 326 }
+  },
+  "leptos": {
+    "create_1000": { "min": 370, "median": 535, "max": 607 },
+    "create_10000": { "min": 2572, "median": 2628.5, "max": 2785 },
+    "append_1000": { "min": 236, "median": 242.5, "max": 291 },
+    "update_every_10th": { "min": 249, "median": 263.5, "max": 277 },
+    "swap_rows": { "min": 81, "median": 90, "max": 104 },
+    "clear": { "min": 139, "median": 142.5, "max": 151 }
   }
 }
