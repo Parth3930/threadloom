@@ -1,6 +1,6 @@
 [package]
 name = "threadloom-ui"
-version = "0.1.12"
+version = "0.1.13"
 edition = "2024"
 description = "A meticulously crafted, Tailwind-ready UI component library for the Threadloom framework. To serve and build, use the Distaff CLI tool."
 license = "MIT"
@@ -12,8 +12,8 @@ keywords = ["ui", "framework", "components", "webassembly", "threadloom"]
 categories = ["gui", "web-programming", "wasm"]
 
 [dependencies]
-threadloom-core = { path = "../threadloom-core", version = "*" }
-threadloom-macro = { path = "../threadloom-macro", version = "*" }
+threadloom-core = { path = "../threadloom-core", version = "0.1.13" }
+threadloom-macro = { path = "../threadloom-macro", version = "0.1.14" }
 
 [target.wasm32-unknown-unknown.dependencies]
 js-sys = "0.3.103"
