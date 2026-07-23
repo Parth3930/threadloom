@@ -557,3 +557,95 @@ pub fn FormField(props: FormFieldProps) -> View {
     wrapper.into_view()
 }
 
+/// Properties for the Switch component.
+#[derive(Default)]
+pub struct SwitchProps {
+    /// Whether the switch is currently on.
+    pub checked: bool,
+    /// Callback triggered when toggled.
+    pub on_change: Callback,
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a Switch component.
+#[allow(non_snake_case)]
+pub fn Switch(props: SwitchProps) -> View {
+    let mut class_str = "tl-switch".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    
+    let mut b = element("button")
+        .attr("type", "button")
+        .attr("role", "switch")
+        .attr("aria-checked", if props.checked { "true" } else { "false" })
+        .attr("class", class_str);
+        
+    if let Some(f) = props.on_change.0 {
+        b = b.on("click", move || f());
+    }
+    
+    b = b.child(element("span").attr("class", "tl-switch-thumb"));
+    b.into_view()
+}
+
+pub fn switch(checked: bool, on_change: impl Into<Callback>) -> View {
+    Switch(SwitchProps { checked, on_change: on_change.into(), ..Default::default() })
+}
+
+/// Properties for the Slider component.
+#[derive(Default)]
+pub struct SliderProps {
+    /// The HTML id attribute.
+    pub id: String,
+    /// Current value.
+    pub value: String,
+    /// Minimum value.
+    pub min: String,
+    /// Maximum value.
+    pub max: String,
+    /// Callback triggered on input change.
+    pub on_input: Callback,
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a Slider component using a native range input styled to match the design system.
+#[allow(non_snake_case)]
+pub fn Slider(props: SliderProps) -> View {
+    let mut class_str = "tl-slider-native".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    
+    let mut b = element("input")
+        .attr("type", "range")
+        .attr("class", class_str)
+        .attr("value", props.value);
+        
+    if !props.id.is_empty() {
+        b = b.attr("id", props.id);
+    }
+    if !props.min.is_empty() {
+        b = b.attr("min", props.min);
+    }
+    if !props.max.is_empty() {
+        b = b.attr("max", props.max);
+    }
+        
+    if let Some(f) = props.on_input.0 {
+        b = b.on("input", move || f());
+    }
+    
+    b.into_view()
+}
+
+pub fn slider(value: impl Into<String>, min: impl Into<String>, max: impl Into<String>, on_input: impl Into<Callback>) -> View {
+    Slider(SliderProps { value: value.into(), min: min.into(), max: max.into(), on_input: on_input.into(), ..Default::default() })
+}
+

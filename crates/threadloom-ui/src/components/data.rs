@@ -260,3 +260,138 @@ pub fn Badge(props: BadgeProps) -> View {
         .child(text(props.label))
         .into_view()
 }
+
+/// Properties for the Avatar component.
+#[derive(Default)]
+pub struct AvatarProps {
+    /// URL of the image. If empty or None, fallback is used.
+    pub src: OptClass,
+    /// Fallback string (e.g. initials) to display if image fails or is missing.
+    pub fallback: String,
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders an Avatar component.
+#[allow(non_snake_case)]
+pub fn Avatar(props: AvatarProps) -> View {
+    let mut class_str = "tl-avatar".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    
+    let mut b = element("div").attr("class", class_str);
+    
+    if let Some(src) = props.src.0.as_ref().filter(|s| !s.is_empty()) {
+        b = b.child(element("img")
+            .attr("src", src.clone())
+            .attr("class", "tl-avatar-image")
+            .attr("alt", props.fallback));
+    } else {
+        b = b.child(element("div")
+            .attr("class", "tl-avatar-fallback")
+            .child(text(props.fallback)));
+    }
+    b.into_view()
+}
+
+pub fn avatar(src: impl Into<OptClass>, fallback: impl Into<String>) -> View {
+    Avatar(AvatarProps { src: src.into(), fallback: fallback.into(), ..Default::default() })
+}
+
+/// Properties for the Progress component.
+#[derive(Default)]
+pub struct ProgressProps {
+    /// Progress value from 0 to 100.
+    pub value: f32,
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a Progress component.
+#[allow(non_snake_case)]
+pub fn Progress(props: ProgressProps) -> View {
+    let mut class_str = "tl-progress".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    let val = props.value.clamp(0.0, 100.0);
+    
+    element("div")
+        .attr("class", class_str)
+        .attr("role", "progressbar")
+        .attr("aria-valuenow", val.to_string())
+        .attr("aria-valuemin", "0")
+        .attr("aria-valuemax", "100")
+        .child(
+            element("div")
+                .attr("class", "tl-progress-indicator")
+                .attr("style", format!("transform: translateX(-{}%)", 100.0 - val))
+        ).into_view()
+}
+
+pub fn progress(value: f32) -> View {
+    Progress(ProgressProps { value, ..Default::default() })
+}
+
+/// Properties for the Skeleton component.
+#[derive(Default)]
+pub struct SkeletonProps {
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a Skeleton component.
+#[allow(non_snake_case)]
+pub fn Skeleton(props: SkeletonProps) -> View {
+    let mut class_str = "tl-skeleton".to_string();
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    
+    element("div").attr("class", class_str).into_view()
+}
+
+pub fn skeleton(class: impl Into<OptClass>) -> View {
+    Skeleton(SkeletonProps { class: class.into(), ..Default::default() })
+}
+
+/// Properties for the Separator component.
+#[derive(Default)]
+pub struct SeparatorProps {
+    /// Orientation: "horizontal" (default) or "vertical".
+    pub orientation: OptClass,
+    /// Custom class to append.
+    pub class: OptClass,
+    pub children: Vec<View>,
+}
+
+/// Renders a Separator component.
+#[allow(non_snake_case)]
+pub fn Separator(props: SeparatorProps) -> View {
+    let is_vertical = props.orientation.0.as_deref() == Some("vertical");
+    let mut class_str = if is_vertical {
+        "tl-separator tl-separator-vertical".to_string()
+    } else {
+        "tl-separator tl-separator-horizontal".to_string()
+    };
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+    
+    element("div")
+        .attr("class", class_str)
+        .attr("role", "separator")
+        .into_view()
+}
+
+pub fn separator(orientation: impl Into<OptClass>) -> View {
+    Separator(SeparatorProps { orientation: orientation.into(), ..Default::default() })
+}

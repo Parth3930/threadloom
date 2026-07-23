@@ -1,6 +1,6 @@
 [package]
 name = "threadloom-ui"
-version = "0.1.13"
+version = "0.1.15"
 edition = "2024"
 description = "A meticulously crafted, Tailwind-ready UI component library for the Threadloom framework. To serve and build, use the Distaff CLI tool."
 license = "MIT"
