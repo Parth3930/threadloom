@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/banner.png" alt="Threadloom — Next generation cross-platform tooling" width="100%" />
+</p>
+
 # Threadloom ⚡ — Full-Stack Rust Framework for Web, Desktop & Android
 
 > **Threadloom** is a full-stack Rust framework for building reactive, cross-platform applications — web (WASM), desktop, and Android — from a single Rust codebase. No JavaScript. No TypeScript. No context-switching.
