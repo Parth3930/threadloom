@@ -60,6 +60,7 @@ impl Parse for Element {
 }
 
 struct Attribute {
+    prefix: Option<String>,
     name: Ident,
     value: Expr,
     is_event: bool,
@@ -67,20 +68,28 @@ struct Attribute {
 
 impl Parse for Attribute {
     fn parse(input: ParseStream) -> Result<Self> {
-        let name = Ident::parse_any(input)?;
-        let name_str = name.to_string();
-        let is_event = name_str.starts_with("on_");
+        let first = Ident::parse_any(input)?;
+        let first_str = first.to_string();
+        
+        let (prefix, name, name_str) = if input.peek(Token![:]) {
+            input.parse::<Token![:]>()?;
+            let second = Ident::parse_any(input)?;
+            let name_str = second.to_string();
+            (Some(first_str.clone()), second, name_str)
+        } else {
+            (None, first, first_str.clone())
+        };
+
+        let is_event = prefix.as_deref() == Some("on") || name_str.starts_with("on_");
 
         let value = if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
             input.parse::<Expr>()?
         } else {
-            // IDE Recovery: if user is typing an attribute but hasn't finished,
-            // pretend the value is `()` so parsing continues and AST is built.
             syn::parse_quote!(())
         };
 
-        Ok(Attribute { name, value, is_event })
+        Ok(Attribute { prefix, name, value, is_event })
     }
 }
 
@@ -194,8 +203,34 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                     let name_str = attr.name.to_string();
                     let value = &attr.value;
                     let span = value.span();
-                    if attr.is_event {
-                        let event_name = name_str.strip_prefix("on_").unwrap();
+                    if attr.prefix.as_deref() == Some("bind") {
+                        if name_str == "value" {
+                            builder = quote::quote_spanned! {span=> 
+                                #builder
+                                .attr("value", { let (r, _) = (#value).clone(); move || r.get() })
+                                .on("input", { let (_, w) = (#value).clone(); move |e| {
+                                    use ::wasm_bindgen::JsCast;
+                                    let val = e.target().unwrap().unchecked_into::<::web_sys::HtmlInputElement>().value();
+                                    w.set(val);
+                                }})
+                            };
+                        } else if name_str == "checked" {
+                            builder = quote::quote_spanned! {span=> 
+                                #builder
+                                .attr("checked", { let (r, _) = (#value).clone(); move || r.get() })
+                                .on("change", { let (_, w) = (#value).clone(); move |e| {
+                                    use ::wasm_bindgen::JsCast;
+                                    let val = e.target().unwrap().unchecked_into::<::web_sys::HtmlInputElement>().checked();
+                                    w.set(val);
+                                }})
+                            };
+                        }
+                    } else if attr.is_event {
+                        let event_name = if attr.prefix.as_deref() == Some("on") {
+                            name_str.as_str()
+                        } else {
+                            name_str.strip_prefix("on_").unwrap()
+                        };
                         builder = quote::quote_spanned! {span=> #builder.on(#event_name, #value) };
                     } else {
                         builder = quote::quote_spanned! {span=> #builder.attr(#name_str, #value) };

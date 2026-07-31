@@ -5,6 +5,18 @@
 
 `threadloom-core` provides the foundational reactivity engine, virtual DOM primitives, and state management systems for the **Threadloom** Rust framework.
 
+## Project Structure
+
+The codebase is organized into several modular files under `src/`:
+
+- **`signal.rs`**: Core reactivity system (`Graph`, `NodeId`, signals, memos, effects).
+- **`dom.rs`**: UI boundaries, View definitions, elements, and dynamic node mapping.
+- **`context.rs`**: Dependency injection and hierarchical context stack logic.
+- **`resource.rs`**: Asynchronous resource fetching and action primitives.
+- **`rpc.rs`**: Client-side RPC invocation to interact with the backend.
+- **`hydration.rs`**: Serialization and deserialization of the signal graph for SSR hydration.
+- **`lib.rs`**: Exports the public API of all internal modules.
+
 ## Usage
 
 This library is the underlying powerhouse of the Threadloom framework and is best utilized by running the **Distaff CLI tool**, which provides the optimal developer experience with zero configuration.

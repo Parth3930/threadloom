@@ -1,0 +1,879 @@
+use std::any::Any;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static NEXT_RUNTIME_ID: AtomicUsize = AtomicUsize::new(1);
+thread_local! {
+    static RUNTIME_ID: usize = NEXT_RUNTIME_ID.fetch_add(1, Ordering::Relaxed);
+    pub(crate) static GRAPH: RefCell<Graph> = RefCell::new(Graph::new());
+    pub(crate) static CURRENT_OWNER: RefCell<Option<NodeId>> = RefCell::new(None);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct NodeId {
+    runtime_id: usize,
+    index: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum State {
+    Clean,
+    Check,
+    Dirty,
+}
+
+type ComputeFn = Rc<RefCell<dyn FnMut() -> bool>>;
+
+struct Node {
+    id: NodeId,
+    state: State,
+    sources: HashMap<NodeId, usize>,
+    subscribers: HashSet<NodeId>,
+    compute: Option<ComputeFn>,
+    is_effect: bool,
+    version: usize,
+    value: Option<Box<dyn std::any::Any>>,
+    owned: Vec<NodeId>,
+    cleanups: Vec<Box<dyn FnOnce()>>,
+}
+
+struct Graph {
+    nodes: Vec<Option<Node>>,
+    next_id: usize,
+    current_subscriber: Option<NodeId>,
+    pending_effects: HashSet<NodeId>,
+    pub pending_boundaries: HashSet<NodeId>,
+    is_batching: bool,
+}
+
+impl Graph {
+    fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            next_id: 0,
+            current_subscriber: None,
+            pending_effects: HashSet::new(),
+            pending_boundaries: HashSet::new(),
+            is_batching: false,
+        }
+    }
+}
+
+impl NodeId {
+    pub fn runtime_id(&self) -> usize {
+        self.runtime_id
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn test_new(runtime_id: usize, index: usize) -> Self {
+        Self { runtime_id, index }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new(false, None, None)
+    }
+
+    fn set_compute(&self, compute: ComputeFn) {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(node) = &mut g.nodes[self.index] {
+                node.compute = Some(compute);
+            }
+        });
+    }
+
+    pub fn dispose(&self) {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            
+            // Run cleanups and dispose owned nodes
+            if let Some(node) = &mut g.nodes[self.index] {
+                for cleanup in node.cleanups.drain(..) {
+                    cleanup();
+                }
+                let owned = std::mem::take(&mut node.owned);
+                for child in owned {
+                    child.dispose_inner(&mut g);
+                }
+            }
+            self.dispose_inner(&mut g);
+        });
+    }
+
+    pub fn dispose_children(&self) {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(node) = &mut g.nodes[self.index] {
+                for cleanup in node.cleanups.drain(..) {
+                    cleanup();
+                }
+                let owned = std::mem::take(&mut node.owned);
+                for child in owned {
+                    child.dispose_inner(&mut g);
+                }
+            }
+        });
+    }
+
+    fn dispose_inner(&self, g: &mut Graph) {
+        let sources = g.nodes[self.index].as_ref().map(|n| n.sources.clone()).unwrap_or_default();
+        for (source, _) in sources {
+            if let Some(s) = &mut g.nodes[source.index] {
+                s.subscribers.remove(self);
+            }
+        }
+        
+        let subscribers = g.nodes[self.index].as_ref().map(|n| n.subscribers.clone()).unwrap_or_default();
+        for sub in subscribers {
+            if let Some(s) = &mut g.nodes[sub.index] {
+                s.sources.remove(self);
+            }
+        }
+        
+        if let Some(node) = &mut g.nodes[self.index] {
+            for cleanup in node.cleanups.drain(..) {
+                cleanup();
+            }
+            let owned = std::mem::take(&mut node.owned);
+            for child in owned {
+                child.dispose_inner(g);
+            }
+        }
+        
+        g.nodes[self.index] = None;
+    }
+
+    pub(crate) fn new(
+        is_effect: bool,
+        compute: Option<ComputeFn>,
+        value: Option<Box<dyn std::any::Any>>,
+    ) -> Self {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let index = g.next_id;
+            let runtime_id = RUNTIME_ID.with(|id| *id);
+            let id = NodeId { runtime_id, index };
+            g.next_id += 1;
+            g.nodes.push(Some(Node {
+                id,
+                state: State::Clean,
+                sources: HashMap::new(),
+                subscribers: HashSet::new(),
+                compute,
+                is_effect,
+                version: 0,
+                value,
+                owned: Vec::new(),
+                cleanups: Vec::new(),
+            }));
+            
+            CURRENT_OWNER.with(|o| {
+                if let Some(owner) = *o.borrow() {
+                    if let Some(owner_node) = &mut g.nodes[owner.index] {
+                        owner_node.owned.push(id);
+                    }
+                }
+            });
+            
+            id
+        })
+    }
+
+    fn record_read(&self) {
+        let current_runtime = RUNTIME_ID.with(|id| *id);
+        if self.runtime_id != current_runtime {
+            // [ponytail] Simple fix: just return without panic. True cross-thread sync requires Arc<RwLock>.
+            return;
+        }
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(sub_id) = g.current_subscriber {
+                if let Some(node) = &mut g.nodes[self.index] {
+                    node.subscribers.insert(sub_id);
+                }
+                let version = g.nodes[self.index].as_ref().unwrap().version;
+                if let Some(sub_node) = &mut g.nodes[sub_id.index] {
+                    sub_node.sources.insert(*self, version);
+                }
+            }
+        });
+    }
+
+    fn mark_dirty(&self) {
+        let mut stack = vec![*self];
+        while let Some(current) = stack.pop() {
+            let (is_effect, subscribers, should_push, has_compute) = GRAPH.with(|g| {
+                let mut g = g.borrow_mut();
+                if let Some(node) = g.nodes[current.index].as_mut() {
+                    let state = node.state;
+                    let is_effect = node.is_effect;
+                    let subs = node.subscribers.iter().copied().collect::<Vec<_>>();
+
+                    if current == *self || state == State::Clean {
+                        if current != *self {
+                            node.state = State::Check;
+                        } else {
+                            node.state = State::Dirty;
+                        }
+                        (is_effect, subs, true, node.compute.is_some())
+                    } else {
+                        (false, vec![], false, false)
+                    }
+                } else {
+                    (false, vec![], false, false)
+                }
+            });
+
+            if should_push {
+                if is_effect {
+                    if has_compute {
+                        GRAPH.with(|g| g.borrow_mut().pending_effects.insert(current));
+                    } else {
+                        GRAPH.with(|g| g.borrow_mut().pending_boundaries.insert(current));
+                    }
+                }
+                for sub in subscribers {
+                    stack.push(sub);
+                }
+            }
+        }
+    }
+
+    fn clear_sources(&self) {
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let sources = g.nodes[self.index].as_ref().unwrap().sources.clone();
+            for (source, _) in sources {
+                if let Some(s) = &mut g.nodes[source.index] {
+                    s.subscribers.remove(self);
+                }
+            }
+            if let Some(node) = &mut g.nodes[self.index] {
+                node.sources.clear();
+            }
+        });
+    }
+
+    fn update_if_necessary(&self) -> usize {
+        let state = GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().state);
+        if state == State::Clean {
+            return GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().version);
+        }
+        if state == State::Check {
+            let sources = GRAPH.with(|g| {
+                g.borrow().nodes[self.index]
+                    .as_ref()
+                    .unwrap()
+                    .sources
+                    .clone()
+            });
+            for (source, old_version) in sources {
+                let new_version = source.update_if_necessary();
+                if new_version > old_version {
+                    GRAPH.with(|g| {
+                        g.borrow_mut().nodes[self.index].as_mut().unwrap().state = State::Dirty
+                    });
+                    break;
+                }
+            }
+        }
+
+        let state = GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().state);
+
+        if state == State::Dirty {
+            let compute = GRAPH.with(|g| {
+                g.borrow().nodes[self.index]
+                    .as_ref()
+                    .unwrap()
+                    .compute
+                    .clone()
+            });
+            if let Some(compute) = compute {
+                self.clear_sources();
+                
+                // Dispose children and run cleanups before re-running
+                GRAPH.with(|g| {
+                    let mut g = g.borrow_mut();
+                    let node = g.nodes[self.index].as_mut().unwrap();
+                    for cleanup in node.cleanups.drain(..) {
+                        cleanup();
+                    }
+                    let owned = std::mem::take(&mut node.owned);
+                    for child in owned {
+                        child.dispose_inner(&mut g);
+                    }
+                });
+
+                let prev_sub = GRAPH.with(|g| {
+                    let mut g = g.borrow_mut();
+                    let prev = g.current_subscriber;
+                    g.current_subscriber = Some(*self);
+                    prev
+                });
+                
+                let prev_owner = CURRENT_OWNER.with(|o| {
+                    let mut o = o.borrow_mut();
+                    let prev = *o;
+                    *o = Some(*self);
+                    prev
+                });
+
+                let changed = {
+                    let mut c = compute.borrow_mut();
+                    c()
+                };
+                
+                CURRENT_OWNER.with(|o| *o.borrow_mut() = prev_owner);
+
+                GRAPH.with(|g| {
+                    let mut g = g.borrow_mut();
+                    g.current_subscriber = prev_sub;
+                    let node = g.nodes[self.index].as_mut().unwrap();
+                    node.state = State::Clean;
+                    if changed {
+                        node.version += 1;
+                    }
+                });
+            } else {
+                GRAPH.with(|g| {
+                    let mut g = g.borrow_mut();
+                    let node = g.nodes[self.index].as_mut().unwrap();
+                    node.state = State::Clean;
+                    node.version += 1;
+                });
+            }
+        } else {
+            GRAPH.with(|g| g.borrow_mut().nodes[self.index].as_mut().unwrap().state = State::Clean);
+        }
+
+        GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().version)
+    }
+
+    pub fn track<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.dispose_children();
+        let prev_sub = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let prev = g.current_subscriber;
+            g.current_subscriber = Some(*self);
+
+            // Clear old sources before re-tracking
+            let sources = g.nodes[self.index].as_ref().unwrap().sources.clone();
+            for (source, _) in sources {
+                if let Some(s) = &mut g.nodes[source.index] {
+                    s.subscribers.remove(self);
+                }
+            }
+            if let Some(node) = &mut g.nodes[self.index] {
+                node.sources.clear();
+            }
+
+            prev
+        });
+        
+        let prev_owner = CURRENT_OWNER.with(|o| {
+            let mut o = o.borrow_mut();
+            let prev = *o;
+            *o = Some(*self);
+            prev
+        });
+
+        let result = f();
+        
+        CURRENT_OWNER.with(|o| *o.borrow_mut() = prev_owner);
+
+        GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            g.current_subscriber = prev_sub;
+            g.nodes[self.index].as_mut().unwrap().state = State::Clean;
+        });
+
+        result
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        GRAPH.with(|g| {
+            let state = g.borrow().nodes[self.index].as_ref().unwrap().state;
+            state == State::Dirty || state == State::Check
+        })
+    }
+}
+
+pub fn take_pending_boundaries() -> Vec<NodeId> {
+    GRAPH.with(|g| {
+        let mut g = g.borrow_mut();
+        let boundaries: Vec<_> = g.pending_boundaries.iter().copied().collect();
+        g.pending_boundaries.clear();
+        boundaries
+    })
+}
+
+pub fn run_effects() {
+    let is_batching = GRAPH.with(|g| g.borrow().is_batching);
+    if is_batching {
+        return;
+    }
+    GRAPH.with(|g| g.borrow_mut().is_batching = true);
+
+    loop {
+        let effects: Vec<NodeId> = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let effects: Vec<_> = g.pending_effects.iter().copied().collect();
+            g.pending_effects.clear();
+            effects
+        });
+
+        if effects.is_empty() {
+            break;
+        }
+
+        for effect in effects {
+            effect.update_if_necessary();
+        }
+    }
+
+    GRAPH.with(|g| g.borrow_mut().is_batching = false);
+}
+// ---------------------------------------------------------
+// PUBLIC API
+// ---------------------------------------------------------
+
+pub struct ReadSignal<T> {
+    id: NodeId,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> Copy for ReadSignal<T> {}
+impl<T> Clone for ReadSignal<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+pub struct WriteSignal<T> {
+    id: NodeId,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> Copy for WriteSignal<T> {}
+impl<T> Clone for WriteSignal<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+pub fn create_signal<T: Clone + 'static>(initial: T) -> (ReadSignal<T>, WriteSignal<T>) {
+    let id = NodeId::new(false, None, Some(Box::new(initial)));
+    (
+        ReadSignal {
+            id,
+            _marker: std::marker::PhantomData,
+        },
+        WriteSignal {
+            id,
+            _marker: std::marker::PhantomData,
+        },
+    )
+}
+
+impl<T: Clone + 'static> ReadSignal<T> {
+    pub fn get(&self) -> T {
+        self.id.record_read();
+        GRAPH.with(|g| {
+            let g = g.borrow();
+            let node = g.nodes[self.id.index].as_ref().expect("Attempted to read a disposed signal");
+            node.value
+                .as_ref()
+                .unwrap()
+                .downcast_ref::<T>()
+                .unwrap()
+                .clone()
+        })
+    }
+}
+
+impl<T: Clone + PartialEq + 'static> WriteSignal<T> {
+    pub fn set(&self, new_value: T) {
+        let changed = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let node = g.nodes[self.id.index].as_mut().unwrap();
+            let val = node.value.as_mut().unwrap().downcast_mut::<T>().unwrap();
+            if *val == new_value {
+                false
+            } else {
+                *val = new_value;
+                true
+            }
+        });
+        if changed {
+            self.id.mark_dirty();
+            run_effects();
+        }
+    }
+    pub fn update(&self, f: impl FnOnce(&mut T)) {
+        let changed = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let node = g.nodes[self.id.index].as_mut().unwrap();
+            let val = node.value.as_mut().unwrap().downcast_mut::<T>().unwrap();
+            let old_val = val.clone();
+            f(val);
+            *val != old_val
+        });
+        if changed {
+            self.id.mark_dirty();
+            run_effects();
+        }
+    }
+}
+
+pub fn create_effect<F>(mut f: F)
+where
+    F: FnMut() + 'static,
+{
+    let compute: ComputeFn = Rc::new(RefCell::new(move || {
+        f();
+        true
+    }));
+
+    let id = NodeId::new(true, Some(compute.clone()), None);
+
+    id.mark_dirty();
+    run_effects();
+}
+
+pub fn on_cleanup(f: impl FnOnce() + 'static) {
+    CURRENT_OWNER.with(|o| {
+        if let Some(owner_id) = *o.borrow() {
+            GRAPH.with(|g| {
+                let mut g = g.borrow_mut();
+                if let Some(node) = &mut g.nodes[owner_id.index] {
+                    node.cleanups.push(Box::new(f));
+                }
+            });
+        }
+    });
+}
+
+pub struct Memo<T> {
+    id: NodeId,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> Copy for Memo<T> {}
+impl<T> Clone for Memo<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+pub fn create_memo<T, F>(mut f: F) -> Memo<T>
+where
+    F: FnMut() -> T + 'static,
+    T: Clone + PartialEq + 'static,
+{
+    let id = NodeId::new_empty();
+
+    GRAPH.with(|g| {
+        g.borrow_mut().nodes[id.index].as_mut().unwrap().value = Some(Box::new(None::<T>));
+    });
+
+    let compute: ComputeFn = Rc::new(RefCell::new(move || {
+        let new_value = f();
+        let changed = GRAPH.with(|g| {
+            let mut g = g.borrow_mut();
+            let node = g.nodes[id.index].as_mut().unwrap();
+            let val_any = node.value.as_mut().unwrap();
+            let val = val_any.downcast_mut::<Option<T>>().unwrap();
+            match val {
+                Some(old_value) if *old_value == new_value => false,
+                _ => {
+                    *val = Some(new_value);
+                    true
+                }
+            }
+        });
+        changed
+    }));
+
+    id.set_compute(compute);
+    id.mark_dirty();
+    id.update_if_necessary();
+
+    Memo {
+        id,
+        _marker: std::marker::PhantomData,
+    }
+}
+
+impl<T: Clone + 'static> Memo<T> {
+    pub fn get(&self) -> T {
+        self.id.update_if_necessary();
+        self.id.record_read();
+        GRAPH.with(|g| {
+            let g = g.borrow();
+            let node = g.nodes[self.id.index].as_ref().unwrap();
+            node.value
+                .as_ref()
+                .unwrap()
+                .downcast_ref::<Option<T>>()
+                .unwrap()
+                .clone()
+                .unwrap()
+        })
+    }
+}
+#[macro_export]
+macro_rules! create_store {
+    ($vis:vis $name:ident, $type:ty, $init:expr) => {
+        $vis struct $name;
+        impl $name {
+            fn store() -> ($crate::ReadSignal<$type>, $crate::WriteSignal<$type>) {
+                thread_local! {
+                    static STORE: ($crate::ReadSignal<$type>, $crate::WriteSignal<$type>) = $crate::create_signal($init);
+                }
+                STORE.with(|s| *s)
+            }
+            $vis fn get() -> $type {
+                Self::store().0.get()
+            }
+            $vis fn set(val: $type) {
+                Self::store().1.set(val)
+            }
+            $vis fn update(f: impl FnOnce(&mut $type)) {
+                let mut val = Self::get();
+                f(&mut val);
+                Self::set(val);
+            }
+        }
+    };
+}
+// ---------------------------------------------------------
+// NEW FEATURES
+// ---------------------------------------------------------
+
+pub struct Signal;
+impl Signal {
+    pub fn computed<T, F>(f: F) -> Memo<T>
+    where
+        F: FnMut() -> T + 'static,
+        T: Clone + PartialEq + 'static,
+    {
+        create_memo(f)
+    }
+}
+
+pub struct GlobalSignal<T: 'static> {
+    init: fn() -> T,
+    state: std::sync::OnceLock<std::sync::Arc<std::sync::RwLock<T>>>,
+}
+
+impl<T: Clone + PartialEq + 'static> GlobalSignal<T> {
+    pub const fn new(init: fn() -> T) -> Self {
+        Self {
+            init,
+            state: std::sync::OnceLock::new(),
+        }
+    }
+
+    fn shared_state(&self) -> std::sync::Arc<std::sync::RwLock<T>> {
+        self.state
+            .get_or_init(|| std::sync::Arc::new(std::sync::RwLock::new((self.init)())))
+            .clone()
+    }
+
+    fn get_signals(&self) -> (ReadSignal<T>, WriteSignal<T>) {
+        thread_local! {
+            static GLOBALS: RefCell<HashMap<usize, (NodeId, NodeId)>> = RefCell::new(HashMap::new());
+        }
+        let addr = self as *const _ as usize;
+        GLOBALS.with(|g| {
+            let mut g = g.borrow_mut();
+            if let Some(&(r, w)) = g.get(&addr) {
+                (
+                    ReadSignal {
+                        id: r,
+                        _marker: std::marker::PhantomData,
+                    },
+                    WriteSignal {
+                        id: w,
+                        _marker: std::marker::PhantomData,
+                    },
+                )
+            } else {
+                let initial = self.shared_state().read().unwrap().clone();
+                let (read, write) = create_signal(initial);
+                g.insert(addr, (read.id, write.id));
+                (read, write)
+            }
+        })
+    }
+
+    pub fn get(&self) -> T {
+        // Sync local signal with global state if it differs
+        let local_signals = self.get_signals();
+        let global_val = self.shared_state().read().unwrap().clone();
+
+        // We do not call `.get()` first to avoid tracking dependencies before sync
+        // Instead, we just sync if needed. We need to track it though!
+        let local_val = local_signals.0.get(); // this tracks the dependency
+
+        if local_val != global_val {
+            local_signals.1.set(global_val.clone()); // updates local value and triggers effects
+            global_val
+        } else {
+            local_val
+        }
+    }
+
+    pub fn set(&self, value: T) {
+        *self.shared_state().write().unwrap() = value.clone();
+        self.get_signals().1.set(value);
+    }
+
+    pub fn update(&self, f: impl FnOnce(&mut T)) {
+        let mut val = self.get();
+        f(&mut val);
+        self.set(val);
+    }
+}
+#[derive(serde::Serialize)]
+struct NodeExport {
+    id: usize,
+    state: String,
+    is_effect: bool,
+    version: usize,
+    subscribers: Vec<usize>,
+    sources: Vec<usize>,
+}
+
+pub fn export_graph() -> String {
+    GRAPH.with(|g| {
+        let g = g.borrow();
+        let mut exports = Vec::new();
+        for (i, node_opt) in g.nodes.iter().enumerate() {
+            if let Some(node) = node_opt {
+                let state_str = match node.state {
+                    State::Clean => "Clean",
+                    State::Check => "Check",
+                    State::Dirty => "Dirty",
+                }
+                .to_string();
+
+                exports.push(NodeExport {
+                    id: i,
+                    state: state_str,
+                    is_effect: node.is_effect,
+                    version: node.version,
+                    subscribers: node.subscribers.iter().map(|id| id.index).collect(),
+                    sources: node.sources.keys().map(|id| id.index).collect(),
+                });
+            }
+        }
+        serde_json::to_string(&exports).unwrap_or_else(|_| "[]".to_string())
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn __threadloom_graph() -> String {
+    export_graph()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_diamond_problem() {
+        let (read_sig, write_sig) = create_signal(1);
+
+        let a_run_count = Rc::new(RefCell::new(0));
+        let b_run_count = Rc::new(RefCell::new(0));
+        let c_run_count = Rc::new(RefCell::new(0));
+
+        let arc = a_run_count.clone();
+        let read_a = read_sig.clone();
+        let memo_a = create_memo(move || {
+            *arc.borrow_mut() += 1;
+            read_a.get() * 2
+        });
+
+        let brc = b_run_count.clone();
+        let read_b = read_sig.clone();
+        let memo_b = create_memo(move || {
+            *brc.borrow_mut() += 1;
+            read_b.get() * 3
+        });
+
+        let crc = c_run_count.clone();
+        let memo_a_c = memo_a.clone();
+        let memo_b_c = memo_b.clone();
+        create_effect(move || {
+            *crc.borrow_mut() += 1;
+            let _: i32 = memo_a_c.get() + memo_b_c.get();
+        });
+
+        assert_eq!(*a_run_count.borrow(), 1);
+        assert_eq!(*b_run_count.borrow(), 1);
+        assert_eq!(*c_run_count.borrow(), 1);
+
+        write_sig.set(2);
+
+        assert_eq!(*a_run_count.borrow(), 2);
+        assert_eq!(*b_run_count.borrow(), 2);
+        assert_eq!(*c_run_count.borrow(), 2); // Effect runs EXACTLY ONCE for diamond!
+    }
+
+    #[test]
+    fn test_conditional_subscription() {
+        let (read_a, write_a) = create_signal(true);
+        let (read_b, write_b) = create_signal(10);
+
+        let run_count = Rc::new(RefCell::new(0));
+        let rc = run_count.clone();
+        let read_a_c = read_a.clone();
+        let read_b_c = read_b.clone();
+
+        create_effect(move || {
+            *rc.borrow_mut() += 1;
+            if read_a_c.get() {
+                let _: i32 = read_b_c.get();
+            }
+        });
+
+        assert_eq!(*run_count.borrow(), 1);
+
+        // changing B triggers effect when A is true
+        write_b.set(20);
+        assert_eq!(*run_count.borrow(), 2);
+
+        // turning A off triggers effect (reads A)
+        write_a.set(false);
+        assert_eq!(*run_count.borrow(), 3);
+
+        // changing B now should NOT trigger effect because it's unsubscribed
+        write_b.set(30);
+        assert_eq!(*run_count.borrow(), 3); // Does not run!
+
+        // turning A back on triggers effect, and resubscribes to B
+        write_a.set(true);
+        assert_eq!(*run_count.borrow(), 4);
+
+        // changing B now triggers effect again
+        write_b.set(40);
+        assert_eq!(*run_count.borrow(), 5);
+    }
+
+    #[test]
+    fn test_thread_safety_invariants() {
+        fn assert_send<T: Send>() {}
+
+        // Prove that NodeId can safely cross thread boundaries
+        assert_send::<NodeId>();
+    }
+}
