@@ -152,6 +152,8 @@ pub fn hamburger(open: bool, on_toggle: impl Into<Callback>, extra_class: impl I
 pub struct RouteProps {
     /// The path to match.
     pub path: String,
+    /// If true, matches any path that starts with `path` instead of exact match.
+    pub prefix: bool,
     /// The component to render if matched.
     pub component: crate::ViewCallback,
     /// Optional middleware. If it returns Some(View), that is rendered instead.
@@ -174,7 +176,11 @@ pub fn Route(props: RouteProps) -> View {
         let path = props.path.trim_end_matches('/');
         let cur = current_path.trim_end_matches('/');
         
-        let mut is_match = path == cur;
+        let mut is_match = if props.prefix {
+            cur == path || cur.starts_with(&format!("{}/", path))
+        } else {
+            path == cur
+        };
         if props.path == "/" && current_path.is_empty() {
             is_match = true;
         }
