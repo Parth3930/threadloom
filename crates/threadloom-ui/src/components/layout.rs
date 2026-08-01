@@ -1948,7 +1948,9 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
         }
     };
 
-    let mut sidebar_container = element("aside").attr("class", sidebar_class_fn);
+    let mut sidebar_container = element("aside")
+        .attr("id", "__app-sidebar".to_string())
+        .attr("class", sidebar_class_fn);
 
     if let Some(sidebar) = props.sidebar {
         sidebar_container = sidebar_container.child(sidebar);
