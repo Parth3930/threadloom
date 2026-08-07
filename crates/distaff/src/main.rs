@@ -52,13 +52,8 @@ enum Commands {
     },
     /// Build the project for production
     Build {
-        #[arg(long)]
-        desktop: bool,
-        #[arg(long)]
-        android: bool,
-        /// Setup project for Vercel serverless deployment
-        #[arg(long)]
-        vercel: bool,
+        #[command(subcommand)]
+        command: BuildCommand,
     },
     /// Initialize a new project
     Init,
@@ -66,6 +61,18 @@ enum Commands {
     Update,
     /// Show help information
     Help,
+}
+
+#[derive(Subcommand)]
+pub enum BuildCommand {
+    /// Build the web project for production
+    Web,
+    /// Build the desktop app
+    Desktop,
+    /// Build the android app
+    Android,
+    /// Setup project for Vercel serverless deployment
+    Vercel,
 }
 
 fn check_update() {
@@ -669,28 +676,29 @@ async fn main() -> anyhow::Result<()> {
                 std::process::exit(0);
             }
         }
-        Commands::Build { desktop, android, vercel } => {
-            if *vercel {
-                use colored::Colorize;
-                println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
+        Commands::Build { command } => {
+            match command {
+                BuildCommand::Vercel => {
+                    use colored::Colorize;
+                    println!("{} Setting up Vercel serverless deployment...", "[🚀] vercel:".green());
 
-                // 1. Create api/ directory
-                let api_dir = std::path::Path::new("api");
-                if !api_dir.exists() {
-                    std::fs::create_dir(api_dir)?;
-                }
+                    // 1. Create api/ directory
+                    let api_dir = std::path::Path::new("api");
+                    if !api_dir.exists() {
+                        let _ = std::fs::create_dir(api_dir);
+                    }
 
-                // Read Cargo.toml to get package name
-                let cargo_toml = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
-                let pkg_name = if let Some(name_line) = cargo_toml.lines().find(|l| l.starts_with("name = ")) {
-                    name_line.replace("name = ", "").replace("\"", "").trim().to_string()
-                } else {
-                    "distaff_landing".to_string()
-                };
-                let safe_pkg_name = pkg_name.replace("-", "_");
+                    // Read Cargo.toml to get package name
+                    let cargo_toml = std::fs::read_to_string("Cargo.toml").unwrap_or_default();
+                    let pkg_name = if let Some(name_line) = cargo_toml.lines().find(|l| l.starts_with("name = ")) {
+                        name_line.replace("name = ", "").replace("\"", "").trim().to_string()
+                    } else {
+                        "distaff_landing".to_string()
+                    };
+                    let safe_pkg_name = pkg_name.replace("-", "_");
 
-                // 2. Write api/index.rs (vercel_runtime v2: TCP listener, no AWS Lambda env vars needed)
-                let index_content = format!(r#"use {}::api_routes;
+                    // 2. Write api/index.rs (vercel_runtime v2: TCP listener, no AWS Lambda env vars needed)
+                    let index_content = format!(r#"use {}::api_routes;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {{
@@ -699,21 +707,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {{
     threadloom::server_types::lambda_adapter::run(server).await
 }}
 "#, safe_pkg_name);
-                std::fs::write("api/index.rs", index_content)?;
-                println!("{} Created api/index.rs", "[+]".green());
+                    let _ = std::fs::write("api/index.rs", index_content);
+                    println!("{} Created api/index.rs", "[+]".green());
 
-                // 3. Write vercel.json
-                let vercel_json = r#"{
+                    // 3. Write vercel.json
+                    let vercel_json = r#"{
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }"#;
-                std::fs::write("vercel.json", vercel_json)?;
-                println!("{} Created vercel.json", "[+]".green());
+                    let _ = std::fs::write("vercel.json", vercel_json);
+                    println!("{} Created vercel.json", "[+]".green());
 
-                // 3.5 Write build_vercel.sh
-                let build_script = format!(r#"#!/bin/bash
+                    // 3.5 Write build_vercel.sh
+                    let build_script = format!(r#"#!/bin/bash
 set -e
 
 if ! command -v rustup &> /dev/null; then
@@ -728,121 +736,121 @@ curl -sL https://github.com/trunk-rs/trunk/releases/download/v0.20.1/trunk-x86_6
 ./trunk build --release
 cargo build --bin index --features lambda --release --target-dir target/vercel
 "#);
-                std::fs::write("build_vercel.sh", build_script)?;
-                println!("{} Created build_vercel.sh", "[+]".green());
-                
-                // Update package.json if it exists
-                if let Ok(pkg_json) = std::fs::read_to_string("package.json") {
-                    if pkg_json.contains("\"build:css\"") && !pkg_json.contains("\"build\":") {
-                        let updated = pkg_json.replace(
-                            "\"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\",",
-                            "\"build\": \"bash build_vercel.sh\",\n    \"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\","
-                        );
-                        std::fs::write("package.json", updated)?;
-                    }
-                }
-
-                // 4. Update Cargo.toml
-                if !cargo_toml.is_empty() {
-                    let mut updated_toml = cargo_toml.clone();
-
-                    // Add lambda feature to top-level [features]
-                    if !updated_toml.contains("lambda = [\"threadloom/lambda\"]") {
-                        if let Some(features_idx) = updated_toml.find("[features]") {
-                            updated_toml.insert_str(features_idx + 10, "\nlambda = [\"threadloom/lambda\"]");
+                    let _ = std::fs::write("build_vercel.sh", build_script);
+                    println!("{} Created build_vercel.sh", "[+]".green());
+                    
+                    // Update package.json if it exists
+                    if let Ok(pkg_json) = std::fs::read_to_string("package.json") {
+                        if pkg_json.contains("\"build:css\"") && !pkg_json.contains("\"build\":") {
+                            let updated = pkg_json.replace(
+                                "\"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\",",
+                                "\"build\": \"bash build_vercel.sh\",\n    \"build:css\": \"tailwindcss -i ./src/input.css -o ./assets/tailwind.css\","
+                            );
+                            let _ = std::fs::write("package.json", updated);
                         }
                     }
 
-                    // Enable lambda in threadloom cfg dependency
-                    if updated_toml.contains("features = [\"actix\"]") {
-                        updated_toml = updated_toml.replace("features = [\"actix\"]", "features = [\"actix\", \"lambda\"]");
-                    } else if !updated_toml.contains("lambda") {
-                        updated_toml = updated_toml.replace(
-                            "threadloom = { path = \"../crates/threadloom\" }",
-                            "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
-                        );
-                    }
+                    // 4. Update Cargo.toml
+                    if !cargo_toml.is_empty() {
+                        let mut updated_toml = cargo_toml.clone();
 
-                    // Add tokio as a direct dep in non-wasm section (needed for #[tokio::main] macro)
-                    if !updated_toml.contains("tokio = ") {
-                        let tokio_dep = "tokio = { version = \"1\", features = [\"full\"] }\n";
-                        if let Some(idx) = updated_toml.find("[target.'cfg(not(target_arch") {
-                            // find the end of that section header line
-                            if let Some(newline) = updated_toml[idx..].find('\n') {
-                                let insert_at = idx + newline + 1;
-                                updated_toml.insert_str(insert_at, tokio_dep);
+                        // Add lambda feature to top-level [features]
+                        if !updated_toml.contains("lambda = [\"threadloom/lambda\"]") {
+                            if let Some(features_idx) = updated_toml.find("[features]") {
+                                updated_toml.insert_str(features_idx + 10, "\nlambda = [\"threadloom/lambda\"]");
                             }
                         }
-                    }
 
-                    // Add [lib]
-                    if !updated_toml.contains("[lib]") {
-                        updated_toml.push_str("\n\n[lib]\npath = \"src/lib.rs\"\n");
-                    }
+                        // Enable lambda in threadloom cfg dependency
+                        if updated_toml.contains("features = [\"actix\"]") {
+                            updated_toml = updated_toml.replace("features = [\"actix\"]", "features = [\"actix\", \"lambda\"]");
+                        } else if !updated_toml.contains("lambda") {
+                            updated_toml = updated_toml.replace(
+                                "threadloom = { path = \"../crates/threadloom\" }",
+                                "threadloom = { path = \"../crates/threadloom\", features = [\"actix\", \"lambda\"] }"
+                            );
+                        }
 
-                    // Add [[bin]] index
-                    if !updated_toml.contains("[[bin]]\nname = \"index\"") {
-                        updated_toml.push_str("\n[[bin]]\nname = \"index\"\npath = \"api/index.rs\"\n");
-                    }
+                        // Add tokio as a direct dep in non-wasm section (needed for #[tokio::main] macro)
+                        if !updated_toml.contains("tokio = ") {
+                            let tokio_dep = "tokio = { version = \"1\", features = [\"full\"] }\n";
+                            if let Some(idx) = updated_toml.find("[target.'cfg(not(target_arch") {
+                                // find the end of that section header line
+                                if let Some(newline) = updated_toml[idx..].find('\n') {
+                                    let insert_at = idx + newline + 1;
+                                    updated_toml.insert_str(insert_at, tokio_dep);
+                                }
+                            }
+                        }
 
-                    if updated_toml != cargo_toml {
-                        std::fs::write("Cargo.toml", &updated_toml)?;
-                        println!("{} Updated Cargo.toml with Vercel targets and lambda feature", "[+]".green());
-                    }
-                }
+                        // Add [lib]
+                        if !updated_toml.contains("[lib]") {
+                            updated_toml.push_str("\n\n[lib]\npath = \"src/lib.rs\"\n");
+                        }
 
-                // 5. Ensure src/lib.rs exists
-                let lib_rs = std::path::Path::new("src/lib.rs");
-                if !lib_rs.exists() {
-                    let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
-                    let mut lib_content = String::new();
-                    for line in main_rs.lines() {
-                        if line.starts_with("pub mod ") || line.starts_with("mod ") {
-                            lib_content.push_str(&line.replace("mod ", "pub mod "));
-                            lib_content.push('\n');
+                        // Add [[bin]] index
+                        if !updated_toml.contains("[[bin]]\nname = \"index\"") {
+                            updated_toml.push_str("\n[[bin]]\nname = \"index\"\npath = \"api/index.rs\"\n");
+                        }
+
+                        if updated_toml != cargo_toml {
+                            let _ = std::fs::write("Cargo.toml", &updated_toml);
+                            println!("{} Updated Cargo.toml with Vercel targets and lambda feature", "[+]".green());
                         }
                     }
-                    if lib_content.is_empty() {
-                        lib_content.push_str("pub mod api;\npub mod api_routes;\n");
-                    }
-                    std::fs::write(lib_rs, lib_content)?;
-                    println!("{} Generated src/lib.rs for serverless compilation", "[+]".green());
-                }
 
-                // 6. Write IDE settings to make rust-analyzer aware of lambda feature
-                // VS Code
-                let vscode_dir = std::path::Path::new(".vscode");
-                if !vscode_dir.exists() {
-                    std::fs::create_dir(vscode_dir)?;
-                }
-                let settings_path = vscode_dir.join("settings.json");
-                let existing = std::fs::read_to_string(&settings_path).unwrap_or_default();
-                if !existing.contains("rust-analyzer.cargo.features") {
-                    let new_settings = if existing.trim().is_empty() || existing.trim() == "{}" {
-                        r#"{
+                    // 5. Ensure src/lib.rs exists
+                    let lib_rs = std::path::Path::new("src/lib.rs");
+                    if !lib_rs.exists() {
+                        let main_rs = std::fs::read_to_string("src/main.rs").unwrap_or_default();
+                        let mut lib_content = String::new();
+                        for line in main_rs.lines() {
+                            if line.starts_with("pub mod ") || line.starts_with("mod ") {
+                                lib_content.push_str(&line.replace("mod ", "pub mod "));
+                                lib_content.push('\n');
+                            }
+                        }
+                        if lib_content.is_empty() {
+                            lib_content.push_str("pub mod api;\npub mod api_routes;\n");
+                        }
+                        let _ = std::fs::write(lib_rs, lib_content);
+                        println!("{} Generated src/lib.rs for serverless compilation", "[+]".green());
+                    }
+
+                    // 6. Write IDE settings to make rust-analyzer aware of lambda feature
+                    // VS Code
+                    let vscode_dir = std::path::Path::new(".vscode");
+                    if !vscode_dir.exists() {
+                        let _ = std::fs::create_dir(vscode_dir);
+                    }
+                    let settings_path = vscode_dir.join("settings.json");
+                    let existing = std::fs::read_to_string(&settings_path).unwrap_or_default();
+                    if !existing.contains("rust-analyzer.cargo.features") {
+                        let new_settings = if existing.trim().is_empty() || existing.trim() == "{}" {
+                            r#"{
   "rust-analyzer.cargo.features": ["lambda"],
   "tailwindCSS.experimental.classRegex": [
-    "class\\s*=\\s*\"([^\"]*)\""
+    "class\s*=\s*\"([^\"]*)\""
   ],
   "tailwindCSS.includeLanguages": {
     "rust": "html"
   }
 }"#.to_string()
-                    } else {
-                        existing.replacen("{", "{\n  \"rust-analyzer.cargo.features\": [\"lambda\"],", 1)
-                    };
-                    std::fs::write(&settings_path, new_settings)?;
-                    println!("{} Updated .vscode/settings.json for rust-analyzer", "[+]".green());
-                }
+                        } else {
+                            existing.replacen("{", "{\n  \"rust-analyzer.cargo.features\": [\"lambda\"],", 1)
+                        };
+                        let _ = std::fs::write(&settings_path, new_settings);
+                        println!("{} Updated .vscode/settings.json for rust-analyzer", "[+]".green());
+                    }
 
-                // Zed IDE
-                let zed_dir = std::path::Path::new(".zed");
-                if !zed_dir.exists() {
-                    std::fs::create_dir(zed_dir)?;
-                }
-                let zed_settings_path = zed_dir.join("settings.json");
-                if !zed_settings_path.exists() || !std::fs::read_to_string(&zed_settings_path).unwrap_or_default().contains("lambda") {
-                    let zed_settings = r#"{
+                    // Zed IDE
+                    let zed_dir = std::path::Path::new(".zed");
+                    if !zed_dir.exists() {
+                        let _ = std::fs::create_dir(zed_dir);
+                    }
+                    let zed_settings_path = zed_dir.join("settings.json");
+                    if !zed_settings_path.exists() || !std::fs::read_to_string(&zed_settings_path).unwrap_or_default().contains("lambda") {
+                        let zed_settings = r#"{
   "lsp": {
     "rust-analyzer": {
       "initialization_options": {
@@ -854,95 +862,107 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
   }
 }
 "#;
-                    std::fs::write(&zed_settings_path, zed_settings)?;
-                    println!("{} Updated .zed/settings.json for rust-analyzer (Zed IDE)", "[+]".green());
-                }
-
-                println!("{} Vercel setup complete! Run `vercel deploy` to push.", "[✅] vercel:".green());
-                return Ok(());
-            }
-
-            println!("{} production", "[🏗️] build:".yellow());
-            let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
-                Box::new(plugins::TailwindPlugin),
-                Box::new(plugins::AutoModPlugin),
-                Box::new(plugins::SvgToComponentPlugin),
-            ];
-            for p in &mut plugins {
-                if let Err(e) = p.on_build_start() {
-                    tracing::error!("Plugin {} failed on build start: {}", p.name(), e);
-                }
-            }
-            let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
-            let mut build_cmd = adapter.build_command();
-            match build_cmd.status() {
-                Ok(status) if status.success() => {}
-                Ok(_) => {
-                    tracing::error!("Build failed. Please check the errors above.");
-                    std::process::exit(1);
-                }
-                Err(e) => {
-                    tracing::error!("Failed to execute build command ({:?}). Is it installed? Error: {}", build_cmd.get_program(), e);
-                    std::process::exit(1);
-                }
-            }
-
-            if *android {
-                if let Err(e) = setup_android() {
-                    tracing::error!("Failed to setup android project: {}", e);
-                    std::process::exit(1);
-                }
-                if let Err(e) = generate_android_icons() {
-                    tracing::warn!("Failed to generate android launcher icon: {}", e);
-                }
-                println!("{} building android app", "[📱] android:".blue());
-                
-                let mut cmd = if cfg!(windows) {
-                    let mut c = std::process::Command::new("cmd");
-                    c.args(["/C", "gradle"]);
-                    c
-                } else {
-                    std::process::Command::new("gradle")
-                };
-                
-                let status = cmd
-                    .current_dir("android")
-                    .args(["assembleRelease"])
-                    .status()?;
-                    
-                if status.success() {
-                    println!("{} Android APK built in android/app/build/outputs/apk/release/", "[✅] android:".green());
-                } else {
-                    tracing::error!("Failed to build android app");
-                }
-            }
-
-            if *desktop {
-                println!("{} building desktop app", "[💻] desktop:".blue());
-                let status = std::process::Command::new("cargo")
-                    .args(["build", "--release", "--bin", "desktop", "--features", "desktop"])
-                    .status()?;
-                if status.success() {
-                    println!("{} Desktop app built in target/release/", "[✅] desktop:".green());
-                    
-                    convert_svg_to_icons();
-                    
-                    println!("{} packaging installer", "[📦] package:".blue());
-                    let packager_status = std::process::Command::new("cargo")
-                        .args(["packager", "--release"])
-                        .status();
-                    
-                    if let Ok(p) = packager_status {
-                        if p.success() {
-                            println!("{} Installer generated successfully", "[✅] package:".green());
-                        } else {
-                            tracing::error!("Failed to generate installer");
-                        }
-                    } else {
-                        tracing::warn!("cargo-packager not found. Install it with: cargo install cargo-packager");
+                        let _ = std::fs::write(&zed_settings_path, zed_settings);
+                        println!("{} Updated .zed/settings.json for rust-analyzer (Zed IDE)", "[+]".green());
                     }
-                } else {
-                    tracing::error!("Failed to build desktop app");
+
+                    println!("{} Vercel setup complete! Run `vercel deploy` to push.", "[✅] vercel:".green());
+                }
+                BuildCommand::Web | BuildCommand::Android | BuildCommand::Desktop => {
+                    use colored::Colorize;
+                    println!("{} production", "[🏗️] build:".yellow());
+                    let mut plugins: Vec<Box<dyn plugins::DistaffPlugin + Send>> = vec![
+                        Box::new(plugins::TailwindPlugin),
+                        Box::new(plugins::AutoModPlugin),
+                        Box::new(plugins::SvgToComponentPlugin),
+                    ];
+                    for p in &mut plugins {
+                        if let Err(e) = p.on_build_start() {
+                            tracing::error!("Plugin {} failed on build start: {}", p.name(), e);
+                        }
+                    }
+                    let adapter = adapter::FrameworkAdapter::detect(std::path::Path::new("."));
+                    let mut build_cmd = adapter.build_command();
+                    match build_cmd.status() {
+                        Ok(status) if status.success() => {
+                            println!("{} Web built successfully", "[✅] web:".green());
+                        }
+                        Ok(_) => {
+                            tracing::error!("Build failed. Please check the errors above.");
+                            std::process::exit(1);
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to execute build command ({:?}). Is it installed? Error: {}", build_cmd.get_program(), e);
+                            std::process::exit(1);
+                        }
+                    }
+
+                    if matches!(command, BuildCommand::Android) {
+                        if let Err(e) = setup_android() {
+                            tracing::error!("Failed to setup android project: {}", e);
+                            std::process::exit(1);
+                        }
+                        if let Err(e) = generate_android_icons() {
+                            tracing::warn!("Failed to generate android launcher icon: {}", e);
+                        }
+                        println!("{} building android app", "[📱] android:".blue());
+                        
+                        let mut cmd = if cfg!(windows) {
+                            let mut c = std::process::Command::new("cmd");
+                            c.args(["/C", "gradle"]);
+                            c
+                        } else {
+                            std::process::Command::new("gradle")
+                        };
+                        
+                        let status = cmd
+                            .current_dir("android")
+                            .args(["assembleRelease"])
+                            .status();
+                            
+                        if let Ok(status) = status {
+                            if status.success() {
+                                println!("{} Android APK built in android/app/build/outputs/apk/release/", "[✅] android:".green());
+                            } else {
+                                tracing::error!("Failed to build android app");
+                            }
+                        } else {
+                            tracing::error!("Failed to run gradle for android");
+                        }
+                    }
+
+                    if matches!(command, BuildCommand::Desktop) {
+                        println!("{} building desktop app", "[💻] desktop:".blue());
+                        let status = std::process::Command::new("cargo")
+                            .args(["build", "--release", "--bin", "desktop", "--features", "desktop"])
+                            .status();
+                        if let Ok(status) = status {
+                            if status.success() {
+                                println!("{} Desktop app built in target/release/", "[✅] desktop:".green());
+                                
+                                convert_svg_to_icons();
+                                
+                                println!("{} packaging installer", "[📦] package:".blue());
+                                let packager_status = std::process::Command::new("cargo")
+                                    .args(["packager", "--release"])
+                                    .status();
+                                
+                                if let Ok(p) = packager_status {
+                                    if p.success() {
+                                        println!("{} Installer generated successfully", "[✅] package:".green());
+                                    } else {
+                                        tracing::error!("Failed to generate installer");
+                                    }
+                                } else {
+                                    tracing::warn!("cargo-packager not found. Install it with: cargo install cargo-packager");
+                                }
+                            } else {
+                                tracing::error!("Failed to build desktop app");
+                            }
+                        } else {
+                            tracing::error!("Failed to run cargo build for desktop");
+                        }
+                    }
                 }
             }
         }
