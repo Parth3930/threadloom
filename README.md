@@ -2,18 +2,27 @@
   <img src="./assets/banner.png" alt="Threadloom — Next generation cross-platform tooling" width="100%" />
 </p>
 
-# Threadloom ⚡ — Full-Stack Rust Framework for Web, Desktop & Android
+<h1 align="center">Threadloom ⚡</h1>
 
-> **Threadloom** is a full-stack Rust framework for building reactive, cross-platform applications — web (WASM), desktop, and Android — from a single Rust codebase. No JavaScript. No TypeScript. No context-switching.
+<p align="center">
+  <strong>Full-Stack Rust Framework for Web, Desktop & Android</strong>
+</p>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Parth3930/threadloom?style=for-the-badge&color=yellow)](https://github.com/Parth3930/threadloom/stargazers)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square)](https://www.rust-lang.org)
-[![WASM](https://img.shields.io/badge/target-WebAssembly-654ff0?style=flat-square)](https://webassembly.org)
+<p align="center">
+  <a href="https://github.com/Parth3930/threadloom/stargazers"><img src="https://img.shields.io/github/stars/Parth3930/threadloom?style=for-the-badge&color=F6E15C&logo=github" alt="GitHub Stars" /></a>
+  <a href="https://www.producthunt.com/products/threadloom/launches/threadloom"><img src="https://img.shields.io/badge/Product%20Hunt-Threadloom-EA532A?style=for-the-badge&logo=producthunt" alt="Product Hunt" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=for-the-badge&logo=rust" alt="Rust" /></a>
+  <a href="https://webassembly.org"><img src="https://img.shields.io/badge/target-WebAssembly-654ff0?style=for-the-badge&logo=webassembly" alt="WASM" /></a>
+</p>
 
-**⭐ Support the project:** If you find Threadloom interesting, please consider starring it on GitHub!
+<p align="center">
+  <em>Threadloom lets you write your <strong>UI</strong>, your <strong>API</strong>, your <strong>desktop app</strong>, and your <strong>Android app</strong> entirely in Rust. No JavaScript. No TypeScript. No context-switching.</em>
+</p>
 
-**Keywords:** Rust web framework, full-stack Rust, Rust WASM framework, Rust frontend framework, Rust UI framework, Rust desktop app framework, Rust Android framework, cross-platform Rust, reactive signals Rust, WebAssembly frontend, Vercel Rust deployment, JSX-like Rust macro, Yew alternative.
+<p align="center">
+  <strong>⭐ Support the project:</strong> If you find Threadloom interesting, please consider starring it on GitHub!
+</p>
 
 ---
 
