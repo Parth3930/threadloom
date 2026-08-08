@@ -226,10 +226,17 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                             };
                         }
                     } else if attr.is_event {
-                        let event_name = if attr.prefix.as_deref() == Some("on") {
+                        let event_name_raw = if attr.prefix.as_deref() == Some("on") {
                             name_str.as_str()
                         } else {
                             name_str.strip_prefix("on_").unwrap()
+                        };
+                        let event_name = if event_name_raw == "mouse_leave" {
+                            "mouseleave"
+                        } else if event_name_raw == "mouse_enter" {
+                            "mouseenter"
+                        } else {
+                            event_name_raw
                         };
                         builder = quote::quote_spanned! {span=> #builder.on(#event_name, #value) };
                     } else {

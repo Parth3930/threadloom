@@ -9,7 +9,7 @@ pub(crate) fn setup_global_listeners(document: &Document) {
     GLOBAL_LISTENERS_SETUP.with(|s| s.set(true));
 
     let window = web_sys::window().unwrap();
-    let events = ["click", "input", "change", "keydown"];
+    let events = ["click", "input", "change", "keydown", "mouseleave"];
     for event_name in events {
         let event_name_str = event_name.to_string();
         let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::Event| {
@@ -38,8 +38,13 @@ pub(crate) fn setup_global_listeners(document: &Document) {
             }
         })
             as Box<dyn FnMut(web_sys::Event)>);
+        let use_capture = event_name == "mouseleave" || event_name == "mouseenter";
         window
-            .add_event_listener_with_callback(event_name, closure.as_ref().unchecked_ref())
+            .add_event_listener_with_callback_and_bool(
+                event_name,
+                closure.as_ref().unchecked_ref(),
+                use_capture,
+            )
             .unwrap();
         closure.forget();
     }
