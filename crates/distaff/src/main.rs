@@ -57,6 +57,8 @@ enum Commands {
     },
     /// Initialize a new project
     Init,
+    /// Start the Model Context Protocol (MCP) server for AI assistants
+    Mcp,
     /// Update distaff to the latest version
     Update,
     /// Show help information
@@ -968,6 +970,10 @@ cargo build --bin index --features lambda --release --target-dir target/vercel
         }
         Commands::Init => {
             init::init_project()?;
+        }
+        Commands::Mcp => {
+            let server = threadloom_mcp::McpServer::new();
+            server.run_stdio().await?;
         }
         Commands::Update => {
             println!("Updating distaff to the latest version...");

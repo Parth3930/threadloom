@@ -1,7 +1,7 @@
 [package]
 license = "MIT"
 name = "distaff"
-version = "0.1.30"
+version = "0.1.31"
 edition = "2021"
 description = "Vite-equivalent dev tool for Threadloom (and other Rust frameworks)"
 repository = "https://github.com/Parth3930/threadloom"
@@ -45,3 +45,4 @@ walkdir = "2.5.0"
 colored = "3.1.1"
 resvg = "0.41.0"
 image = { version = "0.25.10", features = ["ico"] }
+threadloom-mcp = { path = "../threadloom-mcp", version = "0.1.0" }

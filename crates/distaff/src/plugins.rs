@@ -146,7 +146,10 @@ impl SvgToComponentPlugin {
             ));
         }
         tracing::debug!("SVG plugin: generated {} component(s) → src/generated_svg.rs", svgs.len());
-        std::fs::write("src/generated_svg.rs", out)?;
+        let existing = std::fs::read_to_string("src/generated_svg.rs").unwrap_or_default();
+        if existing != out {
+            std::fs::write("src/generated_svg.rs", out)?;
+        }
         Ok(())
     }
 }

@@ -1,0 +1,19 @@
+[package]
+name = "threadloom-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Model Context Protocol (MCP) server for Threadloom & Distaff"
+repository = "https://github.com/Parth3930/threadloom"
+license = "MIT"
+
+[[bin]]
+name = "threadloom-mcp"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.32", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

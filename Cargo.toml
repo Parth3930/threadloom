@@ -11,6 +11,7 @@ members = [
 
     "crates/threadloom-desktop", "crates/threadloom-ui",
     "crates/threadloom-android",
+    "crates/threadloom-mcp",
     "examples/*"
 , "benches/framework-benchmarks/leptos-app", ]
 [profile.dev]

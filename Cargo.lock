@@ -1643,6 +1643,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.118",
+ "threadloom-mcp",
  "tokio",
  "tokio-tungstenite 0.21.0",
  "tower-http 0.5.2",
@@ -6256,6 +6257,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
+]
+
+[[package]]
+name = "threadloom-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

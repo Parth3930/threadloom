@@ -1,0 +1,25 @@
+{
+  "name": "threadloom-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for Threadloom and Distaff",
+  "bin": {
+    "threadloom-mcp": "./bin/threadloom-mcp.js"
+  },
+  "main": "./bin/threadloom-mcp.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Parth3930/threadloom.git",
+    "directory": "crates/threadloom-mcp"
+  },
+  "keywords": [
+    "threadloom",
+    "distaff",
+    "mcp",
+    "ai",
+    "model-context-protocol",
+    "rust",
+    "wasm"
+  ],
+  "author": "Parth",
+  "license": "MIT"
+}
