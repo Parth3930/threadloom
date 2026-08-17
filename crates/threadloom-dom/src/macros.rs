@@ -286,8 +286,13 @@ macro_rules! animate {
 #[macro_export]
 macro_rules! redirect {
     ($url:expr) => {
-        if let Some(w) = $crate::web_sys::window() {
-            let _ = w.location().assign($url);
+        {
+            let target: &str = $url;
+            if target.starts_with('/') && !target.starts_with("//") {
+                $crate::navigate!(target);
+            } else if let Some(w) = $crate::web_sys::window() {
+                let _ = w.location().assign(target);
+            }
         }
     };
 }

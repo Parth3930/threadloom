@@ -27,7 +27,7 @@ threadloom-ui = { path = "../../crates/threadloom-ui" }
 threadloom-server = { path = "../../crates/threadloom-server" }
 threadloom-scheduler = { path = "../../crates/threadloom-scheduler" }
 threadloom-desktop = { path = "../../crates/threadloom-desktop", optional = true }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History", "HtmlCanvasElement", "CanvasRenderingContext2d", "MouseEvent", "WebSocket", "MessageEvent", "ErrorEvent", "Event", "HtmlImageElement", "Storage", "KeyboardEvent"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Location", "Response", "console", "History", "HtmlCanvasElement", "CanvasRenderingContext2d", "MouseEvent", "WebSocket", "MessageEvent", "ErrorEvent", "Event", "HtmlImageElement", "Storage", "KeyboardEvent", "DomRect"] }
 wasm-bindgen-futures = "0.4"
 reqwasm = "0.5"
 futures-util = "0.3.32"

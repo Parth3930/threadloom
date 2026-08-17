@@ -607,7 +607,7 @@ async fn main() -> anyhow::Result<()> {
 
                 println!("{} building desktop window", "[💻] desktop:".blue());
                 let build_status = std::process::Command::new("cargo")
-                    .args(["build", "--bin", "desktop", "--features", "desktop"])
+                    .args(["build", "--bin", "desktop", "--features", "desktop", "--target-dir", "target/desktop"])
                     .status()?;
                 if !build_status.success() {
                     tracing::error!("Failed to build desktop app");
@@ -616,14 +616,18 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 println!("{} starting desktop window", "[💻] desktop:".blue());
-                let mut bin_path = std::path::PathBuf::from("target/debug/desktop");
+                let mut bin_path = std::path::PathBuf::from("target/desktop/debug/desktop");
                 if cfg!(windows) { bin_path.set_extension("exe"); }
                 if !bin_path.exists() {
-                    bin_path = std::path::PathBuf::from("../target/debug/desktop");
+                    bin_path = std::path::PathBuf::from("../target/desktop/debug/desktop");
                     if cfg!(windows) { bin_path.set_extension("exe"); }
                 }
                 if !bin_path.exists() {
-                    bin_path = std::path::PathBuf::from("../../target/debug/desktop");
+                    bin_path = std::path::PathBuf::from("../../target/desktop/debug/desktop");
+                    if cfg!(windows) { bin_path.set_extension("exe"); }
+                }
+                if !bin_path.exists() {
+                    bin_path = std::path::PathBuf::from("target/debug/desktop");
                     if cfg!(windows) { bin_path.set_extension("exe"); }
                 }
                 let mut cmd = tokio::process::Command::new(bin_path);

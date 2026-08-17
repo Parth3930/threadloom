@@ -88,64 +88,69 @@ impl NodeId {
     }
 
     pub fn dispose(&self) {
+        let mut cleanups = Vec::new();
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
-            
-            // Run cleanups and dispose owned nodes
             if let Some(node) = &mut g.nodes[self.index] {
-                for cleanup in node.cleanups.drain(..) {
-                    cleanup();
-                }
+                cleanups.extend(node.cleanups.drain(..));
                 let owned = std::mem::take(&mut node.owned);
                 for child in owned {
-                    child.dispose_inner(&mut g);
+                    child.dispose_inner(&mut g, &mut cleanups);
                 }
             }
-            self.dispose_inner(&mut g);
+            self.dispose_inner(&mut g, &mut cleanups);
         });
+        for cleanup in cleanups {
+            cleanup();
+        }
     }
 
     pub fn dispose_children(&self) {
+        let mut cleanups = Vec::new();
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             if let Some(node) = &mut g.nodes[self.index] {
-                for cleanup in node.cleanups.drain(..) {
-                    cleanup();
-                }
+                cleanups.extend(node.cleanups.drain(..));
                 let owned = std::mem::take(&mut node.owned);
                 for child in owned {
-                    child.dispose_inner(&mut g);
+                    child.dispose_inner(&mut g, &mut cleanups);
                 }
             }
         });
+        for cleanup in cleanups {
+            cleanup();
+        }
     }
 
-    fn dispose_inner(&self, g: &mut Graph) {
-        let sources = g.nodes[self.index].as_ref().map(|n| n.sources.clone()).unwrap_or_default();
+    fn dispose_inner(&self, g: &mut Graph, cleanups: &mut Vec<Box<dyn FnOnce()>>) {
+        let sources = g.nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.sources.clone()).unwrap_or_default();
         for (source, _) in sources {
-            if let Some(s) = &mut g.nodes[source.index] {
+            if let Some(Some(s)) = g.nodes.get_mut(source.index) {
                 s.subscribers.remove(self);
             }
         }
         
-        let subscribers = g.nodes[self.index].as_ref().map(|n| n.subscribers.clone()).unwrap_or_default();
+        let subscribers = g.nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.subscribers.clone()).unwrap_or_default();
         for sub in subscribers {
-            if let Some(s) = &mut g.nodes[sub.index] {
+            if let Some(Some(s)) = g.nodes.get_mut(sub.index) {
                 s.sources.remove(self);
             }
         }
         
-        if let Some(node) = &mut g.nodes[self.index] {
-            for cleanup in node.cleanups.drain(..) {
-                cleanup();
-            }
-            let owned = std::mem::take(&mut node.owned);
-            for child in owned {
-                child.dispose_inner(g);
-            }
+        let owned = if let Some(Some(node)) = g.nodes.get_mut(self.index) {
+            cleanups.extend(node.cleanups.drain(..));
+            node.compute = None;
+            node.sources.clear();
+            node.subscribers.clear();
+            node.state = State::Clean;
+            std::mem::take(&mut node.owned)
+        } else {
+            Vec::new()
+        };
+
+        for child in owned {
+            child.dispose_inner(g, cleanups);
         }
-        
-        g.nodes[self.index] = None;
     }
 
     pub(crate) fn new(
@@ -193,12 +198,12 @@ impl NodeId {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             if let Some(sub_id) = g.current_subscriber {
-                if let Some(node) = &mut g.nodes[self.index] {
+                if let Some(Some(node)) = g.nodes.get_mut(self.index) {
                     node.subscribers.insert(sub_id);
-                }
-                let version = g.nodes[self.index].as_ref().unwrap().version;
-                if let Some(sub_node) = &mut g.nodes[sub_id.index] {
-                    sub_node.sources.insert(*self, version);
+                    let version = node.version;
+                    if let Some(Some(sub_node)) = g.nodes.get_mut(sub_id.index) {
+                        sub_node.sources.insert(*self, version);
+                    }
                 }
             }
         });
@@ -209,7 +214,7 @@ impl NodeId {
         while let Some(current) = stack.pop() {
             let (is_effect, subscribers, should_push, has_compute) = GRAPH.with(|g| {
                 let mut g = g.borrow_mut();
-                if let Some(node) = g.nodes[current.index].as_mut() {
+                if let Some(Some(node)) = g.nodes.get_mut(current.index) {
                     let state = node.state;
                     let is_effect = node.is_effect;
                     let subs = node.subscribers.iter().copied().collect::<Vec<_>>();
@@ -247,67 +252,77 @@ impl NodeId {
     fn clear_sources(&self) {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
-            let sources = g.nodes[self.index].as_ref().unwrap().sources.clone();
+            let sources = g.nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.sources.clone()).unwrap_or_default();
             for (source, _) in sources {
-                if let Some(s) = &mut g.nodes[source.index] {
+                if let Some(Some(s)) = g.nodes.get_mut(source.index) {
                     s.subscribers.remove(self);
                 }
             }
-            if let Some(node) = &mut g.nodes[self.index] {
+            if let Some(Some(node)) = g.nodes.get_mut(self.index) {
                 node.sources.clear();
             }
         });
     }
 
     fn update_if_necessary(&self) -> usize {
-        let state = GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().state);
+        let state = GRAPH.with(|g| g.borrow().nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.state));
+        let state = match state {
+            Some(s) => s,
+            None => return 0,
+        };
         if state == State::Clean {
-            return GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().version);
+            return GRAPH.with(|g| g.borrow().nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.version).unwrap_or(0));
         }
         if state == State::Check {
             let sources = GRAPH.with(|g| {
-                g.borrow().nodes[self.index]
-                    .as_ref()
-                    .unwrap()
-                    .sources
-                    .clone()
+                g.borrow().nodes.get(self.index)
+                    .and_then(|n| n.as_ref())
+                    .map(|n| n.sources.clone())
+                    .unwrap_or_default()
             });
             for (source, old_version) in sources {
                 let new_version = source.update_if_necessary();
                 if new_version > old_version {
                     GRAPH.with(|g| {
-                        g.borrow_mut().nodes[self.index].as_mut().unwrap().state = State::Dirty
+                        if let Some(Some(node)) = g.borrow_mut().nodes.get_mut(self.index) {
+                            node.state = State::Dirty;
+                        }
                     });
                     break;
                 }
             }
         }
 
-        let state = GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().state);
+        let state = GRAPH.with(|g| g.borrow().nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.state));
+        let state = match state {
+            Some(s) => s,
+            None => return 0,
+        };
 
         if state == State::Dirty {
             let compute = GRAPH.with(|g| {
-                g.borrow().nodes[self.index]
-                    .as_ref()
-                    .unwrap()
-                    .compute
-                    .clone()
+                g.borrow().nodes.get(self.index)
+                    .and_then(|n| n.as_ref())
+                    .and_then(|n| n.compute.clone())
             });
             if let Some(compute) = compute {
                 self.clear_sources();
                 
                 // Dispose children and run cleanups before re-running
+                let mut cleanups = Vec::new();
                 GRAPH.with(|g| {
                     let mut g = g.borrow_mut();
-                    let node = g.nodes[self.index].as_mut().unwrap();
-                    for cleanup in node.cleanups.drain(..) {
-                        cleanup();
-                    }
-                    let owned = std::mem::take(&mut node.owned);
-                    for child in owned {
-                        child.dispose_inner(&mut g);
+                    if let Some(Some(node)) = g.nodes.get_mut(self.index) {
+                        cleanups.extend(node.cleanups.drain(..));
+                        let owned = std::mem::take(&mut node.owned);
+                        for child in owned {
+                            child.dispose_inner(&mut g, &mut cleanups);
+                        }
                     }
                 });
+                for cleanup in cleanups {
+                    cleanup();
+                }
 
                 let prev_sub = GRAPH.with(|g| {
                     let mut g = g.borrow_mut();
@@ -333,25 +348,31 @@ impl NodeId {
                 GRAPH.with(|g| {
                     let mut g = g.borrow_mut();
                     g.current_subscriber = prev_sub;
-                    let node = g.nodes[self.index].as_mut().unwrap();
-                    node.state = State::Clean;
-                    if changed {
-                        node.version += 1;
+                    if let Some(Some(node)) = g.nodes.get_mut(self.index) {
+                        node.state = State::Clean;
+                        if changed {
+                            node.version += 1;
+                        }
                     }
                 });
             } else {
                 GRAPH.with(|g| {
                     let mut g = g.borrow_mut();
-                    let node = g.nodes[self.index].as_mut().unwrap();
-                    node.state = State::Clean;
-                    node.version += 1;
+                    if let Some(Some(node)) = g.nodes.get_mut(self.index) {
+                        node.state = State::Clean;
+                        node.version += 1;
+                    }
                 });
             }
         } else {
-            GRAPH.with(|g| g.borrow_mut().nodes[self.index].as_mut().unwrap().state = State::Clean);
+            GRAPH.with(|g| {
+                if let Some(Some(node)) = g.borrow_mut().nodes.get_mut(self.index) {
+                    node.state = State::Clean;
+                }
+            });
         }
 
-        GRAPH.with(|g| g.borrow().nodes[self.index].as_ref().unwrap().version)
+        GRAPH.with(|g| g.borrow().nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.version).unwrap_or(0))
     }
 
     pub fn track<R>(&self, f: impl FnOnce() -> R) -> R {
@@ -362,13 +383,13 @@ impl NodeId {
             g.current_subscriber = Some(*self);
 
             // Clear old sources before re-tracking
-            let sources = g.nodes[self.index].as_ref().unwrap().sources.clone();
+            let sources = g.nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.sources.clone()).unwrap_or_default();
             for (source, _) in sources {
-                if let Some(s) = &mut g.nodes[source.index] {
+                if let Some(Some(s)) = g.nodes.get_mut(source.index) {
                     s.subscribers.remove(self);
                 }
             }
-            if let Some(node) = &mut g.nodes[self.index] {
+            if let Some(Some(node)) = g.nodes.get_mut(self.index) {
                 node.sources.clear();
             }
 
@@ -389,7 +410,9 @@ impl NodeId {
         GRAPH.with(|g| {
             let mut g = g.borrow_mut();
             g.current_subscriber = prev_sub;
-            g.nodes[self.index].as_mut().unwrap().state = State::Clean;
+            if let Some(Some(node)) = g.nodes.get_mut(self.index) {
+                node.state = State::Clean;
+            }
         });
 
         result
@@ -397,8 +420,8 @@ impl NodeId {
 
     pub fn is_dirty(&self) -> bool {
         GRAPH.with(|g| {
-            let state = g.borrow().nodes[self.index].as_ref().unwrap().state;
-            state == State::Dirty || state == State::Check
+            let state = g.borrow().nodes.get(self.index).and_then(|n| n.as_ref()).map(|n| n.state);
+            state == Some(State::Dirty) || state == Some(State::Check)
         })
     }
 }
@@ -485,13 +508,12 @@ impl<T: Clone + 'static> ReadSignal<T> {
         self.id.record_read();
         GRAPH.with(|g| {
             let g = g.borrow();
-            let node = g.nodes[self.id.index].as_ref().expect("Attempted to read a disposed signal");
+            let node = g.nodes.get(self.id.index).and_then(|n| n.as_ref()).expect("Attempted to read a non-existent signal");
             node.value
                 .as_ref()
-                .unwrap()
-                .downcast_ref::<T>()
-                .unwrap()
-                .clone()
+                .and_then(|v| v.downcast_ref::<T>())
+                .cloned()
+                .expect("Signal value type mismatch")
         })
     }
 }
@@ -500,14 +522,19 @@ impl<T: Clone + PartialEq + 'static> WriteSignal<T> {
     pub fn set(&self, new_value: T) {
         let changed = GRAPH.with(|g| {
             let mut g = g.borrow_mut();
-            let node = g.nodes[self.id.index].as_mut().unwrap();
-            let val = node.value.as_mut().unwrap().downcast_mut::<T>().unwrap();
-            if *val == new_value {
-                false
-            } else {
-                *val = new_value;
-                true
+            if let Some(Some(node)) = g.nodes.get_mut(self.id.index) {
+                if let Some(val_any) = node.value.as_mut() {
+                    if let Some(val) = val_any.downcast_mut::<T>() {
+                        if *val == new_value {
+                            return false;
+                        } else {
+                            *val = new_value;
+                            return true;
+                        }
+                    }
+                }
             }
+            false
         });
         if changed {
             self.id.mark_dirty();
@@ -517,11 +544,16 @@ impl<T: Clone + PartialEq + 'static> WriteSignal<T> {
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         let changed = GRAPH.with(|g| {
             let mut g = g.borrow_mut();
-            let node = g.nodes[self.id.index].as_mut().unwrap();
-            let val = node.value.as_mut().unwrap().downcast_mut::<T>().unwrap();
-            let old_val = val.clone();
-            f(val);
-            *val != old_val
+            if let Some(Some(node)) = g.nodes.get_mut(self.id.index) {
+                if let Some(val_any) = node.value.as_mut() {
+                    if let Some(val) = val_any.downcast_mut::<T>() {
+                        let old_val = val.clone();
+                        f(val);
+                        return *val != old_val;
+                    }
+                }
+            }
+            false
         });
         if changed {
             self.id.mark_dirty();
@@ -550,7 +582,7 @@ pub fn on_cleanup(f: impl FnOnce() + 'static) {
         if let Some(owner_id) = *o.borrow() {
             GRAPH.with(|g| {
                 let mut g = g.borrow_mut();
-                if let Some(node) = &mut g.nodes[owner_id.index] {
+                if let Some(Some(node)) = g.nodes.get_mut(owner_id.index) {
                     node.cleanups.push(Box::new(f));
                 }
             });
@@ -578,23 +610,29 @@ where
     let id = NodeId::new_empty();
 
     GRAPH.with(|g| {
-        g.borrow_mut().nodes[id.index].as_mut().unwrap().value = Some(Box::new(None::<T>));
+        if let Some(Some(node)) = g.borrow_mut().nodes.get_mut(id.index) {
+            node.value = Some(Box::new(None::<T>));
+        }
     });
 
     let compute: ComputeFn = Rc::new(RefCell::new(move || {
         let new_value = f();
         let changed = GRAPH.with(|g| {
             let mut g = g.borrow_mut();
-            let node = g.nodes[id.index].as_mut().unwrap();
-            let val_any = node.value.as_mut().unwrap();
-            let val = val_any.downcast_mut::<Option<T>>().unwrap();
-            match val {
-                Some(old_value) if *old_value == new_value => false,
-                _ => {
-                    *val = Some(new_value);
-                    true
+            if let Some(Some(node)) = g.nodes.get_mut(id.index) {
+                if let Some(val_any) = node.value.as_mut() {
+                    if let Some(val) = val_any.downcast_mut::<Option<T>>() {
+                        return match val {
+                            Some(old_value) if *old_value == new_value => false,
+                            _ => {
+                                *val = Some(new_value);
+                                true
+                            }
+                        };
+                    }
                 }
             }
+            false
         });
         changed
     }));
@@ -615,14 +653,12 @@ impl<T: Clone + 'static> Memo<T> {
         self.id.record_read();
         GRAPH.with(|g| {
             let g = g.borrow();
-            let node = g.nodes[self.id.index].as_ref().unwrap();
+            let node = g.nodes.get(self.id.index).and_then(|n| n.as_ref()).expect("Attempted to read a disposed memo");
             node.value
                 .as_ref()
-                .unwrap()
-                .downcast_ref::<Option<T>>()
-                .unwrap()
-                .clone()
-                .unwrap()
+                .and_then(|v| v.downcast_ref::<Option<T>>())
+                .and_then(|opt| opt.clone())
+                .expect("Memo value not computed or type mismatch")
         })
     }
 }

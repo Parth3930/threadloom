@@ -19,20 +19,27 @@ pub fn run_android_app() {
     let mut event_loop_builder = EventLoopBuilder::new();
     
     let event_loop = event_loop_builder.build();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = match WindowBuilder::new().build(&event_loop) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("[Threadloom Android] Failed to create window: {:?}", e);
+            return;
+        }
+    };
 
-    // In dev mode, we would load localhost:3000
-    // In prod, we load a custom protocol reading from android assets.
-    // We'll read from Android's AssetManager via tao's ndk context or just raw jni.
+    // Support dynamic dev port or fallback to default 3000
+    let port = std::env::var("THREADLOOM_DEV_PORT").unwrap_or_else(|_| "3000".to_string());
+    let url = format!("http://localhost:{}/", port);
 
-    // For now localhost:3000 for dev, and a fallback for prod.
-    // The distaff CLI will run adb reverse tcp:3000 tcp:3000 to forward the dev server.
-    let url = "http://localhost:3000/";
-
-    let _webview = WebViewBuilder::new(&window)
-        .with_url(url)
-        .build()
-        .unwrap();
+    let _webview = match WebViewBuilder::new(&window)
+        .with_url(&url)
+        .build() {
+            Ok(wv) => wv,
+            Err(e) => {
+                eprintln!("[Threadloom Android] Failed to build webview: {:?}", e);
+                return;
+            }
+        };
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

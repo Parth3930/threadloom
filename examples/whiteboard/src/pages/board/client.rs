@@ -242,16 +242,34 @@ async fn init_board_inner(
         .unwrap()
         .dyn_into::<CanvasRenderingContext2d>()?;
 
+    let doc_ws = document.clone();
     let ws_onmsg = {
         let ctx = ctx.clone();
         let canvas_ws = canvas.clone();
         let window_ws = window.clone();
         let room_id_ws = room_id.clone();
         let update_cursor_ws = update_cursor.clone();
+        let doc_ws = doc_ws.clone();
         Closure::wrap(Box::new(move |e: MessageEvent| {
             if let Ok(txt) = e.data().dyn_into::<js_sys::JsString>() {
                 if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&String::from(txt)) {
-                    if msg["type"] == "snapshot" {
+                    let msg_type = msg["type"].as_str().unwrap_or("");
+                    if msg_type == "init" {
+                        // Initialize all currently present peer cursors
+                        if let Some(peers) = msg["peers"].as_array() {
+                            for peer in peers {
+                                if let Some(uid) = peer["user_id"].as_str() {
+                                    let x = peer["x"].as_f64().unwrap_or(100.0);
+                                    let y = peer["y"].as_f64().unwrap_or(100.0);
+                                    update_cursor_ws(uid, x, y, false);
+                                }
+                            }
+                        }
+                    } else if msg_type == "join" {
+                        if let Some(uid) = msg["user_id"].as_str() {
+                            let _ = get_or_create_cursor(uid, false, &doc_ws);
+                        }
+                    } else if msg_type == "snapshot" {
                         if let Some(base64) = msg["data"].as_str() {
                             let img = web_sys::HtmlImageElement::new().unwrap();
                             let ctx_clone = ctx.clone();
@@ -264,7 +282,14 @@ async fn init_board_inner(
                             onload.forget();
                             img.set_src(base64);
                         }
-                    } else if msg["type"] == "room_deleted" {
+                    } else if msg_type == "clear" {
+                        ctx.clear_rect(
+                            0.0,
+                            0.0,
+                            canvas_ws.width() as f64,
+                            canvas_ws.height() as f64,
+                        );
+                    } else if msg_type == "room_deleted" {
                         // This room was deleted server-side. Wipe the canvas,
                         // drop the cached snapshot, and head back home.
                         ctx.clear_rect(
@@ -278,7 +303,7 @@ async fn init_board_inner(
                         }
                         web_sys::console::log_1(&"Room was deleted. Redirecting...".into());
                         let _ = window_ws.location().assign("/");
-                    } else if msg["type"] == "stroke" {
+                    } else if msg_type == "stroke" {
                         if let Some(stroke) = msg.get("data") {
                             let tool = stroke["tool"].as_str().unwrap_or("brush");
                             let color = stroke["color"].as_str().unwrap_or("#000000");
@@ -341,13 +366,13 @@ async fn init_board_inner(
                                 ctx.stroke();
                             }
                         }
-                    } else if msg["type"] == "cursor" {
+                    } else if msg_type == "cursor" {
                         if let Some(uid) = msg["user_id"].as_str() {
-                            let x = msg["x"].as_f64().unwrap();
-                            let y = msg["y"].as_f64().unwrap();
+                            let x = msg["x"].as_f64().unwrap_or(0.0);
+                            let y = msg["y"].as_f64().unwrap_or(0.0);
                             update_cursor_ws(uid, x, y, false);
                         }
-                    } else if msg["type"] == "leave" {
+                    } else if msg_type == "leave" {
                         if let Some(uid) = msg["user_id"].as_str() {
                             if let Some(el) = window_ws.document().unwrap().get_element_by_id(&format!("cursor-{}", uid)) {
                                 el.remove();
@@ -361,6 +386,24 @@ async fn init_board_inner(
     ws_rc.ws.set_onmessage(Some(ws_onmsg.as_ref().unchecked_ref()));
     ws_onmsg.forget();
 
+    let get_coords = {
+        let canvas = canvas.clone();
+        Rc::new(move |client_x: f64, client_y: f64| -> (f64, f64) {
+            let rect = canvas.get_bounding_client_rect();
+            let rw = rect.width();
+            let rh = rect.height();
+            if rw > 0.0 && rh > 0.0 {
+                let sx = canvas.width() as f64 / rw;
+                let sy = canvas.height() as f64 / rh;
+                let x = (client_x - rect.left()) * sx;
+                let y = (client_y - rect.top()) * sy;
+                (x, y)
+            } else {
+                (client_x, client_y)
+            }
+        })
+    };
+
     let is_drawing_down = is_drawing.clone();
     let start_x_down = start_x.clone();
     let start_y_down = start_y.clone();
@@ -372,10 +415,10 @@ async fn init_board_inner(
     let color_sig_down = color_sig.clone();
     let window_down = window.clone();
     let send_snapshot_down = send_snapshot.clone();
+    let get_coords_down = get_coords.clone();
 
     let on_down = Closure::wrap(Box::new(move |e: MouseEvent| {
-        let x = e.offset_x() as f64;
-        let y = e.offset_y() as f64;
+        let (x, y) = get_coords_down(e.client_x() as f64, e.client_y() as f64);
         let tool = tool_sig_down.get();
         let color = color_sig_down.get();
 
@@ -453,6 +496,7 @@ async fn init_board_inner(
     let tool_sig_up = tool_sig.clone();
     let color_sig_up = color_sig.clone();
     let send_snapshot_up = send_snapshot.clone();
+    let get_coords_up = get_coords.clone();
 
     let on_up = Closure::wrap(Box::new(move |e: MouseEvent| {
         if !*is_drawing_up.borrow() {
@@ -460,13 +504,12 @@ async fn init_board_inner(
         }
         *is_drawing_up.borrow_mut() = false;
 
+        let (ex, ey) = get_coords_up(e.client_x() as f64, e.client_y() as f64);
         let tool = tool_sig_up.get();
         let color = color_sig_up.get();
         if tool == "shape" || tool == "rect" || tool == "circle" || tool == "triangle" {
             let sx = *start_x_up.borrow();
             let sy = *start_y_up.borrow();
-            let ex = e.offset_x() as f64;
-            let ey = e.offset_y() as f64;
 
             ctx_up
                 .set_global_composite_operation("source-over")
@@ -514,13 +557,13 @@ async fn init_board_inner(
     let last_ws_send_move = last_ws_send.clone();
     let tool_sig_move = tool_sig.clone();
     let color_sig_move = color_sig.clone();
+    let get_coords_move = get_coords.clone();
 
     let on_move = Closure::wrap(Box::new(move |e: MouseEvent| {
-        let x = e.offset_x() as f64;
-        let y = e.offset_y() as f64;
+        let (x, y) = get_coords_move(e.client_x() as f64, e.client_y() as f64);
 
         let now = js_sys::Date::now();
-        if now - *last_ws_send_move.borrow() > 30.0 {
+        if now - *last_ws_send_move.borrow() > 25.0 {
             if ws_move.ws.ready_state() == WebSocket::OPEN {
                 let msg = format!(r#"{{"type":"cursor","x":{},"y":{}}}"#, x, y);
                 let _ = ws_move.send(&msg);
@@ -574,6 +617,7 @@ async fn init_board_inner(
         *last_y_move.borrow_mut() = y;
     }) as Box<dyn FnMut(_)>);
     canvas.add_event_listener_with_callback("pointermove", on_move.as_ref().unchecked_ref())?;
+    canvas.add_event_listener_with_callback("pointerenter", on_move.as_ref().unchecked_ref())?;
     on_move.forget();
 
     let f = Rc::new(RefCell::new(None as Option<Closure<dyn FnMut()>>));

@@ -9,11 +9,16 @@ use uuid::Uuid;
 
 use std::sync::OnceLock;
 
+struct Peer {
+    sender: mpsc::UnboundedSender<String>,
+    cursor: Option<(f64, f64)>,
+}
+
 static ROOMS: OnceLock<
-    Arc<Mutex<HashMap<String, HashMap<String, mpsc::UnboundedSender<String>>>>>,
+    Arc<Mutex<HashMap<String, HashMap<String, Peer>>>>,
 > = OnceLock::new();
 
-fn rooms() -> &'static Arc<Mutex<HashMap<String, HashMap<String, mpsc::UnboundedSender<String>>>>> {
+fn rooms() -> &'static Arc<Mutex<HashMap<String, HashMap<String, Peer>>>> {
     ROOMS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
 }
 
@@ -23,8 +28,8 @@ pub fn broadcast_room_deleted(room_id: &str) {
     let rooms_map = rooms().lock().unwrap();
     if let Some(room) = rooms_map.get(room_id) {
         let msg = serde_json::json!({ "type": "room_deleted" }).to_string();
-        for (_uid, sender) in room.iter() {
-            let _ = sender.send(msg.clone());
+        for (_uid, peer) in room.iter() {
+            let _ = peer.sender.send(msg.clone());
         }
     }
 }
@@ -56,7 +61,58 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
 
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
 
-    // Load existing strokes
+    // 1. Get current active peers and send "init" to new client with existing cursors
+    let active_peers: Vec<serde_json::Value> = {
+        let mut rooms_map = rooms().lock().unwrap();
+        let room = rooms_map
+            .entry(room_id.clone())
+            .or_insert_with(HashMap::new);
+
+        let peers_list = room
+            .iter()
+            .map(|(uid, p)| {
+                let (x, y) = p.cursor.unwrap_or((100.0, 100.0));
+                serde_json::json!({
+                    "user_id": uid,
+                    "x": x,
+                    "y": y
+                })
+            })
+            .collect::<Vec<_>>();
+
+        // Notify existing room members that a new peer joined
+        let join_msg = serde_json::json!({
+            "type": "join",
+            "user_id": user_id.clone()
+        })
+        .to_string();
+
+        for (_, p) in room.iter() {
+            let _ = p.sender.send(join_msg.clone());
+        }
+
+        // Register the new peer
+        room.insert(
+            user_id.clone(),
+            Peer {
+                sender: tx.clone(),
+                cursor: None,
+            },
+        );
+
+        peers_list
+    };
+
+    // Send init packet to the new client
+    let init_msg = serde_json::json!({
+        "type": "init",
+        "user_id": user_id.clone(),
+        "peers": active_peers
+    })
+    .to_string();
+    let _ = tx.send(init_msg);
+
+    // 2. Load existing canvas snapshot from DB for the joining user
     if let Ok(conn) = crate::db::connect().await {
         if let Ok(mut rows) = conn
             .query(
@@ -67,7 +123,6 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
         {
             while let Ok(Some(row)) = rows.next().await {
                 if let Ok(data) = row.get::<String>(0) {
-                    // data stored as JSON string of the stroke object
                     let parsed: serde_json::Value =
                         serde_json::from_str(&data).unwrap_or(serde_json::Value::Null);
                     let msg = serde_json::json!({
@@ -81,18 +136,10 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
         }
     }
 
-    {
-        let mut rooms_map = rooms().lock().unwrap();
-        let room = rooms_map
-            .entry(room_id.clone())
-            .or_insert_with(HashMap::new);
-        room.insert(user_id.clone(), tx);
-    }
-
     let user_id_cloned = user_id.clone();
     let room_id_cloned = room_id.clone();
 
-    // spawn task to send messages from tx to session
+    // Spawn task to forward outgoing channel messages to WebSocket session
     actix_web::rt::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if session.text(msg).await.is_err() {
@@ -101,36 +148,84 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
         }
     });
 
+    // Spawn task to process incoming WebSocket messages from this client
     actix_web::rt::spawn(async move {
         while let Some(Ok(msg)) = msg_stream.next().await {
             match msg {
                 Message::Text(text) => {
-                    // Try parse
                     if let Ok(mut parsed) = serde_json::from_str::<WsMsg>(&text) {
                         parsed.user_id = Some(user_id_cloned.clone());
-                        let to_send = serde_json::to_string(&parsed).unwrap();
-                        let rooms_map = rooms().lock().unwrap();
-                        if let Some(room) = rooms_map.get(&room_id_cloned) {
-                            for (uid, sender) in room.iter() {
-                                if uid != &user_id_cloned {
-                                    let _ = sender.send(to_send.clone());
+
+                        if parsed.msg_type == "cursor" {
+                            // Update cursor position in room state and broadcast
+                            let mut rooms_map = rooms().lock().unwrap();
+                            if let Some(room) = rooms_map.get_mut(&room_id_cloned) {
+                                if let Some(peer) = room.get_mut(&user_id_cloned) {
+                                    peer.cursor = Some((parsed.x, parsed.y));
+                                }
+                                let cursor_msg = serde_json::json!({
+                                    "type": "cursor",
+                                    "user_id": user_id_cloned.clone(),
+                                    "x": parsed.x,
+                                    "y": parsed.y
+                                })
+                                .to_string();
+
+                                for (uid, p) in room.iter() {
+                                    if uid != &user_id_cloned {
+                                        let _ = p.sender.send(cursor_msg.clone());
+                                    }
                                 }
                             }
-                        }
+                        } else if parsed.msg_type == "stroke" {
+                            // Broadcast stroke to all active peers immediately
+                            let stroke_msg = serde_json::to_string(&parsed).unwrap_or_default();
+                            let rooms_map = rooms().lock().unwrap();
+                            if let Some(room) = rooms_map.get(&room_id_cloned) {
+                                for (uid, p) in room.iter() {
+                                    if uid != &user_id_cloned {
+                                        let _ = p.sender.send(stroke_msg.clone());
+                                    }
+                                }
+                            }
+                        } else if parsed.msg_type == "clear" {
+                            // Broadcast clear canvas to all peers and clear DB
+                            let clear_msg = serde_json::json!({
+                                "type": "clear",
+                                "user_id": user_id_cloned.clone()
+                            })
+                            .to_string();
+                            let rooms_map = rooms().lock().unwrap();
+                            if let Some(room) = rooms_map.get(&room_id_cloned) {
+                                for (uid, p) in room.iter() {
+                                    if uid != &user_id_cloned {
+                                        let _ = p.sender.send(clear_msg.clone());
+                                    }
+                                }
+                            }
 
-                        // Save snapshot to DB
-                        if parsed.msg_type == "snapshot" {
+                            let room_id_for_db = room_id_cloned.clone();
+                            actix_web::rt::spawn(async move {
+                                if let Ok(conn) = crate::db::connect().await {
+                                    let _ = conn
+                                        .execute(
+                                            "DELETE FROM strokes WHERE room_id = ?",
+                                            libsql::params![room_id_for_db],
+                                        )
+                                        .await;
+                                }
+                            });
+                        } else if parsed.msg_type == "snapshot" {
+                            // Save latest canvas snapshot to DB for new joiners (do NOT broadcast to avoid clobbering active drawing)
                             let data_str = parsed.data.to_string();
                             let room_id_for_db = room_id_cloned.clone();
                             actix_web::rt::spawn(async move {
                                 if let Ok(conn) = crate::db::connect().await {
-                                    // Ensure the room is visible on the dashboard!
                                     let _ = conn.execute(
                                         "INSERT OR IGNORE INTO rooms (id, name, user_id) VALUES (?, ?, ?)",
                                         libsql::params![room_id_for_db.clone(), room_id_for_db.clone(), "auto-joined"]
                                     ).await;
 
-                                    // Delete old history to prevent bloat
                                     let _ = conn
                                         .execute(
                                             "DELETE FROM strokes WHERE room_id = ?",
@@ -159,7 +254,7 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
             }
         }
 
-        // Remove on disconnect
+        // Remove on disconnect and notify peers
         {
             let mut rooms_map = rooms().lock().unwrap();
             if let Some(room) = rooms_map.get_mut(&room_id_cloned) {
@@ -171,8 +266,8 @@ pub async fn ws_route(req: HttpRequest, body: web::Payload) -> Result<HttpRespon
                 })
                 .to_string();
 
-                for (_, sender) in room.iter() {
-                    let _ = sender.send(msg.clone());
+                for (_, p) in room.iter() {
+                    let _ = p.sender.send(msg.clone());
                 }
             }
         }

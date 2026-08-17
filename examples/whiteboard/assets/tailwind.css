@@ -2026,6 +2026,10 @@ select.tl-input {
   display: grid;
 }
 
+.contents {
+  display: contents;
+}
+
 .hidden {
   display: none;
 }
@@ -3288,6 +3292,10 @@ select.tl-input {
 
 .text-background {
   color: var(--background);
+}
+
+.text-card-foreground {
+  color: var(--card-foreground);
 }
 
 .text-destructive {

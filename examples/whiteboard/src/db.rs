@@ -3,13 +3,13 @@ pub async fn connect() -> Result<libsql::Connection, String> {
     use std::env;
     let url = env::var("TURSO_URL").unwrap_or_else(|_| "file:local.db".to_string());
     let token = env::var("TURSO_TOKEN").unwrap_or_default();
-    
+
     let db = if url.starts_with("file:") {
         libsql::Builder::new_local(url).build().await.map_err(|e| e.to_string())?
     } else {
         libsql::Builder::new_remote(url, token).build().await.map_err(|e| e.to_string())?
     };
-    
+
     let conn = db.connect().map_err(|e| e.to_string())?;
     Ok(conn)
 }
@@ -17,7 +17,7 @@ pub async fn connect() -> Result<libsql::Connection, String> {
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn init() -> Result<(), String> {
     let conn = connect().await?;
-    
+
     // Create users table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS users (
@@ -45,7 +45,7 @@ pub async fn init() -> Result<(), String> {
         )",
         ()
     ).await.map_err(|e| e.to_string())?;
-    
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS strokes (
             id TEXT PRIMARY KEY,
