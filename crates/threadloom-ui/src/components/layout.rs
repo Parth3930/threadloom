@@ -1853,126 +1853,113 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
     topbar = topbar.child(title_el).child(btn);
     container = container.child(topbar);
 
-    // ── Sidebar ───────────────────────────────────────────────────────
-    //
-    // Variant-specific classes:
-    //   SlideLeft  – fixed, left edge,  slides in/out on X axis
-    //   SlideRight – fixed, right edge, slides in/out on X axis (reversed)
-    //   SlideDown  – fixed, top,        slides in/out on Y axis, full width
-    //
+    // ── Sidebar & Backdrop Dynamic Node ──────────────────────────────────
     let is_open_for_sidebar = is_open;
-
-    let blur_class = if s_blur { "backdrop-blur-md" } else { "" }.to_string();
-
-    let sidebar_class_fn = {
-        let s_width = s_width.clone();
-        let s_bg = s_bg.clone();
-        let blur_class = blur_class.clone();
-        let s_border = s_border.clone();
-        let s_padding = s_padding.clone();
-        let s_extra = s_extra.clone();
-
-        move || {
-            // Static parts shared across variants
-            let blur = if blur_class.is_empty() {
-                String::new()
-            } else {
-                format!(" {}", blur_class)
-            };
-            let extra = if s_extra.is_empty() {
-                String::new()
-            } else {
-                format!(" {}", s_extra)
-            };
-
-            let open = is_open_for_sidebar.get();
-
-            match variant {
-                SidebarVariant::SlideLeft => {
-                    let pos = if open {
-                        "fixed inset-y-0 left-0 translate-x-0 shadow-2xl"
-                    } else {
-                        "fixed inset-y-0 left-0 -translate-x-full"
-                    };
-                    format!(
-                        "shrink-0 border-r {border} h-screen {bg}{blur} {pad} overflow-y-auto \
-                         transition-all duration-300 ease-in-out z-30 {w} \
-                         md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
-                        border = s_border,
-                        bg = s_bg,
-                        blur = blur,
-                        pad = s_padding,
-                        w = s_width,
-                        pos = pos,
-                        extra = extra,
-                    )
-                }
-                SidebarVariant::SlideRight => {
-                    let pos = if open {
-                        "fixed inset-y-0 right-0 translate-x-0 shadow-2xl"
-                    } else {
-                        "fixed inset-y-0 right-0 translate-x-full"
-                    };
-                    format!(
-                        "shrink-0 border-l {border} h-screen {bg}{blur} {pad} overflow-y-auto \
-                         transition-all duration-300 ease-in-out z-30 {w} \
-                         md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
-                        border = s_border,
-                        bg = s_bg,
-                        blur = blur,
-                        pad = s_padding,
-                        w = s_width,
-                        pos = pos,
-                        extra = extra,
-                    )
-                }
-                SidebarVariant::SlideDown => {
-                    let pos = if open {
-                        "fixed inset-x-0 top-0 translate-y-0 shadow-2xl"
-                    } else {
-                        "fixed inset-x-0 top-0 -translate-y-full"
-                    };
-                    // SlideDown ignores sidebar_width (full-width panel)
-                    format!(
-                        "border-b {border} w-full max-h-[70vh] {bg}{blur} {pad} overflow-y-auto \
-                         transition-all duration-300 ease-in-out z-30 \
-                         md:hidden {pos}{extra}",
-                        border = s_border,
-                        bg = s_bg,
-                        blur = blur,
-                        pad = s_padding,
-                        pos = pos,
-                        extra = extra,
-                    )
-                }
-            }
-        }
-    };
-
-    let mut sidebar_container = element("aside")
-        .attr("id", "__app-sidebar".to_string())
-        .attr("class", sidebar_class_fn);
-
-    if let Some(sidebar) = props.sidebar {
-        sidebar_container = sidebar_container.child(sidebar);
-    }
-
-    container = container.child(sidebar_container);
-
-    // ── Backdrop ──────────────────────────────────────────────────────
     let set_is_open_backdrop = set_is_open;
-    let backdrop_cls_for_fn = backdrop_cls.clone();
-    let backdrop = element("div")
-        .attr("class", move || {
-            if is_open.get() {
-                format!("fixed inset-0 {} z-20 md:hidden block", backdrop_cls_for_fn)
-            } else {
-                "hidden".to_string()
-            }
-        })
-        .on("click", move || set_is_open_backdrop.set(false));
+    let backdrop_cls_for_node = backdrop_cls.clone();
+    let blur_class = if s_blur { "backdrop-blur-md" } else { "" }.to_string();
+    let sidebar_content_rc = props.sidebar.map(std::rc::Rc::new);
 
-    container = container.child(backdrop);
+    let sidebar_and_backdrop_node = threadloom_core::dyn_node(move || {
+        let open = is_open_for_sidebar.get();
+        let blur = if blur_class.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", blur_class)
+        };
+        let extra = if s_extra.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", s_extra)
+        };
+
+        let pos = match variant {
+            SidebarVariant::SlideLeft => {
+                if open {
+                    "fixed inset-y-0 left-0 translate-x-0 shadow-2xl"
+                } else {
+                    "fixed inset-y-0 left-0 -translate-x-full"
+                }
+            }
+            SidebarVariant::SlideRight => {
+                if open {
+                    "fixed inset-y-0 right-0 translate-x-0 shadow-2xl"
+                } else {
+                    "fixed inset-y-0 right-0 translate-x-full"
+                }
+            }
+            SidebarVariant::SlideDown => {
+                if open {
+                    "fixed inset-x-0 top-0 translate-y-0 shadow-2xl"
+                } else {
+                    "fixed inset-x-0 top-0 -translate-y-full"
+                }
+            }
+        };
+
+        let sidebar_cls = match variant {
+            SidebarVariant::SlideLeft => format!(
+                "shrink-0 border-r {border} h-screen {bg}{blur} {pad} overflow-y-auto \
+                 transition-all duration-300 ease-in-out z-30 {w} \
+                 md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
+                border = s_border,
+                bg = s_bg,
+                blur = blur,
+                pad = s_padding,
+                w = s_width,
+                pos = pos,
+                extra = extra,
+            ),
+            SidebarVariant::SlideRight => format!(
+                "shrink-0 border-l {border} h-screen {bg}{blur} {pad} overflow-y-auto \
+                 transition-all duration-300 ease-in-out z-30 {w} \
+                 md:sticky md:top-0 md:translate-x-0 md:flex flex-col {pos}{extra}",
+                border = s_border,
+                bg = s_bg,
+                blur = blur,
+                pad = s_padding,
+                w = s_width,
+                pos = pos,
+                extra = extra,
+            ),
+            SidebarVariant::SlideDown => format!(
+                "border-b {border} w-full max-h-[70vh] {bg}{blur} {pad} overflow-y-auto \
+                 transition-all duration-300 ease-in-out z-30 \
+                 md:hidden {pos}{extra}",
+                border = s_border,
+                bg = s_bg,
+                blur = blur,
+                pad = s_padding,
+                pos = pos,
+                extra = extra,
+            ),
+        };
+
+        let mut sidebar_container = element("aside")
+            .attr("id", "__app-sidebar".to_string())
+            .attr("class", sidebar_cls);
+
+        if let Some(sidebar_rc) = &sidebar_content_rc {
+            sidebar_container = sidebar_container.child((**sidebar_rc).clone());
+        }
+
+        let backdrop_view = if open {
+            let set_backdrop_fn = set_is_open_backdrop;
+            element("div")
+                .attr(
+                    "class",
+                    format!("fixed inset-0 {} z-20 md:hidden block", backdrop_cls_for_node),
+                )
+                .on("click", move || set_backdrop_fn.set(false))
+                .into_view()
+        } else {
+            threadloom_core::View::None
+        };
+
+        threadloom_core::fragment(vec![sidebar_container.into_view(), backdrop_view]).into_view()
+    });
+
+    container = container.child(sidebar_and_backdrop_node);
 
     // ── Main content ──────────────────────────────────────────────────
     let mut main_el = element("main").attr("class", "flex-1 min-w-0 bg-background".to_string());
