@@ -113,6 +113,7 @@ impl From<()> for OptTuple {
 #[derive(Clone)]
 pub struct ViewCallback(pub Option<Rc<dyn Fn() -> View>>);
 
+
 impl Default for ViewCallback {
     fn default() -> Self { ViewCallback(None) }
 }
@@ -141,4 +142,61 @@ impl From<Rc<dyn Fn() -> Option<View>>> for MiddlewareCallback {
 }
 impl From<()> for MiddlewareCallback {
     fn from(_: ()) -> Self { MiddlewareCallback(None) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use threadloom_core::render_to_string;
+
+    #[test]
+    fn test_button_disabled_prop() {
+        let btn = Button(ButtonProps {
+            label: "Click Me".to_string(),
+            disabled: true,
+            ..Default::default()
+        });
+        let html = render_to_string(&btn);
+        assert!(html.contains("disabled=\"disabled\""));
+        assert!(html.contains("aria-disabled=\"true\""));
+        assert!(html.contains("opacity-50"));
+        assert!(html.contains("cursor-not-allowed"));
+    }
+
+    #[test]
+    fn test_alert_component() {
+        let alert = Alert(AlertProps {
+            title: "Info Notice".to_string(),
+            description: "Everything is fine.".to_string(),
+            variant: OptClass(Some("info".to_string())),
+            ..Default::default()
+        });
+        let html = render_to_string(&alert);
+        assert!(html.contains("role=\"alert\""));
+        assert!(html.contains("Info Notice"));
+        assert!(html.contains("Everything is fine."));
+    }
+
+    #[test]
+    fn test_badge_component() {
+        let badge = Badge(BadgeProps {
+            label: "Beta".to_string(),
+            variant: OptClass(Some("outline".to_string())),
+            ..Default::default()
+        });
+        let html = render_to_string(&badge);
+        assert!(html.contains("Beta"));
+        assert!(html.contains("text-foreground"));
+    }
+
+    #[test]
+    fn test_divider_component() {
+        let divider = Divider(DividerProps {
+            my: 6,
+            ..Default::default()
+        });
+        let html = render_to_string(&divider);
+        assert!(html.contains("<hr"));
+        assert!(html.contains("my-6"));
+    }
 }

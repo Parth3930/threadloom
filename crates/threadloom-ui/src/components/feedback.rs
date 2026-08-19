@@ -1,7 +1,61 @@
 use std::rc::Rc;
 use threadloom_core::{element, text, fragment, View, IntoView};
-use crate::Callback;
+use crate::{Callback, OptClass};
 use crate::components::form::{Button, ButtonProps};
+
+/// Properties for the Alert component.
+#[derive(Default)]
+pub struct AlertProps {
+    /// Alert title text.
+    pub title: String,
+    /// Alert description / body text.
+    pub description: String,
+    /// Variant: "default", "destructive", "success", "warning", "info".
+    pub variant: OptClass,
+    /// Custom CSS class.
+    pub class: OptClass,
+    /// Any additional child elements.
+    pub children: Vec<View>,
+}
+
+/// Renders an Alert component for notifications and messages.
+#[allow(non_snake_case)]
+pub fn Alert(props: AlertProps) -> View {
+    let mut class_str = match props.variant.0.as_deref() {
+        Some("destructive") => "relative w-full rounded-lg border border-destructive/50 p-4 text-destructive dark:border-destructive [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 bg-destructive/10".to_string(),
+        Some("success") => "relative w-full rounded-lg border border-green-500/50 p-4 text-green-700 dark:text-green-300 dark:border-green-800 bg-green-500/10".to_string(),
+        Some("warning") => "relative w-full rounded-lg border border-yellow-500/50 p-4 text-yellow-800 dark:text-yellow-200 dark:border-yellow-800 bg-yellow-500/10".to_string(),
+        Some("info") => "relative w-full rounded-lg border border-blue-500/50 p-4 text-blue-800 dark:text-blue-200 dark:border-blue-800 bg-blue-500/10".to_string(),
+        _ => "relative w-full rounded-lg border border-border p-4 text-foreground bg-background".to_string(),
+    };
+
+    if let Some(c) = props.class.0 {
+        class_str.push(' ');
+        class_str.push_str(&c);
+    }
+
+    let mut el = element("div").attr("class", class_str).attr("role", "alert");
+
+    if !props.title.is_empty() {
+        el = el.child(element("h5").attr("class", "mb-1 font-medium leading-none tracking-tight").child(text(props.title)));
+    }
+    if !props.description.is_empty() {
+        el = el.child(element("div").attr("class", "text-sm [&_p]:leading-relaxed").child(text(props.description)));
+    }
+    for child in props.children {
+        el = el.child(child);
+    }
+    el.into_view()
+}
+
+pub fn alert(title: impl Into<String>, description: impl Into<String>, variant: impl Into<OptClass>) -> View {
+    Alert(AlertProps {
+        title: title.into(),
+        description: description.into(),
+        variant: variant.into(),
+        ..Default::default()
+    })
+}
 
 /// Properties for the Dialog component.
 #[derive(Default)]

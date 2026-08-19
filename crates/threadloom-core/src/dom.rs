@@ -66,18 +66,12 @@ impl From<Rc<dyn Fn() -> AttributeValue>> for AttributeValue {
 /// Represents a dynamic UI boundary.
 ///
 /// ```compile_fail
-/// use std::sync::mpsc;
-/// use std::rc::Rc;
-/// use std::cell::RefCell;
-/// use threadloom_core::{Boundary, NodeId, View};
+/// use threadloom_core::Boundary;
 ///
-/// // This test proves that Boundary cannot cross threads!
-/// // If someone tries to send a Boundary over a channel, it will fail to compile
-/// // because Boundary contains an Rc.
-/// let (tx, rx) = mpsc::channel::<Boundary>();
-/// std::thread::spawn(move || {
-///     // tx is moved into the thread, requiring T (Boundary) to be Send
-/// });
+/// fn assert_send<T: Send>() {}
+///
+/// // Boundary contains Rc and RefCell, so it is !Send and will fail to compile here.
+/// assert_send::<Boundary>();
 /// ```
 #[derive(Clone)]
 pub struct Boundary {

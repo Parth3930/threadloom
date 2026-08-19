@@ -16,6 +16,8 @@ pub struct ButtonProps {
     pub class: OptClass,
     pub href: OptClass,
     pub target: OptClass,
+    /// If true, disables the button and prevents interaction.
+    pub disabled: bool,
     /// Callback triggered when the button is clicked.
     pub on_click: Callback,
     /// Callback triggered when the mouse enters or leaves the button.
@@ -33,6 +35,7 @@ pub struct ButtonProps {
 /// - `primary: bool`
 /// - `variant: OptClass`
 /// - `class: OptClass`
+/// - `disabled: bool`
 /// - `on_click: Callback`
 /// - `on_hover: Callback`
 /// - `children: Vec<View>`
@@ -51,6 +54,9 @@ pub fn Button(props: ButtonProps) -> View {
     } else { 
         "tl-btn tl-btn-secondary".to_string() 
     };
+    if props.disabled {
+        class_str.push_str(" opacity-50 cursor-not-allowed pointer-events-none");
+    }
     if let Some(c) = props.class.0 {
         class_str.push(' ');
         class_str.push_str(&c);
@@ -58,6 +64,9 @@ pub fn Button(props: ButtonProps) -> View {
     let tag = if props.href.0.is_some() { "a" } else { "button" };
     let mut b = element(tag).attr("class", class_str);
     
+    if props.disabled {
+        b = b.attr("disabled", true).attr("aria-disabled", "true");
+    }
     if let Some(href) = props.href.0 {
         b = b.attr("href", href);
     }
@@ -70,7 +79,9 @@ pub fn Button(props: ButtonProps) -> View {
     }
 
     if let Some(f) = props.on_click.0 {
-        b = b.on("click", move || f());
+        if !props.disabled {
+            b = b.on("click", move || f());
+        }
     }
     if let Some(f) = props.on_hover.0 {
         let f2 = f.clone();

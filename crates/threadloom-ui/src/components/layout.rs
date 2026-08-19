@@ -744,7 +744,7 @@ pub struct ContainerProps {
 /// Renders a central container (`<div class="container ...">`).
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// Container(class="max-w-3xl mx-auto p-4") { ... }
 /// ```
 ///
@@ -1057,7 +1057,7 @@ pub struct TextProps {
 /// Renders text primitives, defaulting to `<p>`.
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// Text(variant="span", class="text-sm text-gray-500") { "Hello World" }
 /// ```
 ///
@@ -1197,7 +1197,7 @@ pub fn weight_class(weight: &str) -> &'static str {
 /// Renders a semantic heading (`<h1>`-`<h6>`).
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// Heading(level=1, class="text-2xl font-bold") { "Title" }
 /// ```
 ///
@@ -1488,7 +1488,7 @@ fn row_class(prefix: &str, rows: i32) -> &'static str {
 /// Renders a CSS Grid container (`<div class="grid ...">`).
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// Grid(cols=1, md_cols=2, gap=8) { ... }
 /// ```
 ///

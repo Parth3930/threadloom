@@ -9,7 +9,12 @@ pub(crate) fn setup_global_listeners(document: &Document) {
     GLOBAL_LISTENERS_SETUP.with(|s| s.set(true));
 
     let window = web_sys::window().unwrap();
-    let events = ["click", "input", "change", "keydown", "mouseleave"];
+    let events = [
+        "click", "dblclick", "input", "change", "keydown", "keyup",
+        "wheel", "contextmenu", "copy", "paste",
+        "drag", "dragstart", "dragend", "dragover", "drop",
+        "mouseleave", "mouseenter", "scroll",
+    ];
     for event_name in events {
         let event_name_str = event_name.to_string();
         let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::Event| {

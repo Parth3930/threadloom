@@ -3,11 +3,11 @@ error[E0308]: mismatched types
   |
 3 |   fn main() {
   |            - expected `()` because of default return type
-4 | /     weave! {
+4 | /     threadloom! {
 5 | |         div(id="test") {
 6 | |             span "Hello"
 7 | |         }
 8 | |     }
   | |_____^ expected `()`, found `View`
   |
-  = note: this error originates in the macro `weave` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the macro `threadloom` (in Nightly builds, run with -Z macro-backtrace for more info)

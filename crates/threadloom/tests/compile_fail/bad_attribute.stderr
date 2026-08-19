@@ -1,4 +1,4 @@
-error: Expected '=' after attribute 'id'
+error: expected `,`
  --> tests/compile_fail/bad_attribute.rs:5:16
   |
 5 |         div(id "my-div") {

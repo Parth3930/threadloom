@@ -16,16 +16,16 @@ pub fn page() -> View {
             }
 
             // Signup Card
-            Section(row=false, class="w-full max-w-sm border border-border rounded-xl bg-card shadow-sm p-8 flex flex-col gap-6") {
-                Heading(level=2, class="text-3xl font-extrabold tracking-tight text-center") {
+            Section(row=false, class="w-full max-w-sm border border-border rounded-xl bg-card shadow-sm p-8 flex flex-col gap-5") {
+                Heading(level=2, class="text-2xl font-bold tracking-tight text-center") {
                     "Create Account"
                 }
                 
-                Text(variant="p", class="text-muted-foreground text-center text-sm") {
+                Text(variant="p", class="text-muted-foreground text-center text-xs") {
                     "Sign up to save your whiteboard sessions"
                 }
 
-                Form(class="w-full mt-4 flex flex-col items-center gap-4", on_submit=move || {
+                Form(class="w-full mt-2 flex flex-col items-center gap-3.5", on_submit=move || {
                     form_ctx_submit.clear_all();
                     set_error_msg.set(String::new());
                     
@@ -75,7 +75,7 @@ pub fn page() -> View {
                     Button(
                         label="Sign Up",
                         primary=true,
-                        class="w-full py-2 flex items-center justify-center text-sm font-semibold mt-2"
+                        class="w-full py-2 flex items-center justify-center text-sm font-semibold mt-1"
                     )
                 }
 
@@ -85,13 +85,13 @@ pub fn page() -> View {
                     if msg.is_empty() {
                         threadloom_core::element("div").into_view()
                     } else {
-                        threadloom_core::element("p").attr("class", "text-destructive text-sm text-center font-medium mt-2").child(msg).into_view()
+                        threadloom_core::element("p").attr("class", "text-destructive text-xs text-center font-medium mt-1").child(msg).into_view()
                     }
                 }}
                 
-                Row(justify="center", class="mt-2 text-sm text-muted-foreground") {
-                    Text(variant="span") { "Already have an account? " }
-                    { threadloom_core::element("a").attr("href", "/login").attr("class", "text-primary hover:underline ml-1 font-medium").child("Log in").into_view() }
+                Row(justify="center", class="mt-1 text-xs text-muted-foreground") {
+                    Text(variant="span", class="text-xs text-muted-foreground") { "Already have an account? " }
+                    { threadloom_core::element("a").attr("href", "/login").attr("class", "text-primary hover:underline ml-1 font-medium text-xs").child("Log in").into_view() }
                 }
             }
         }

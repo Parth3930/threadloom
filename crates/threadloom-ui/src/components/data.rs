@@ -255,10 +255,22 @@ pub fn Badge(props: BadgeProps) -> View {
         class_str.push_str(&c);
     }
 
-    element("div")
-        .attr("class", class_str)
-        .child(text(props.label))
-        .into_view()
+    let mut el = element("span").attr("class", class_str);
+    if !props.label.is_empty() {
+        el = el.child(text(props.label));
+    }
+    for child in props.children {
+        el = el.child(child);
+    }
+    el.into_view()
+}
+
+pub fn badge(label: impl Into<String>, variant: impl Into<OptClass>) -> View {
+    Badge(BadgeProps {
+        label: label.into(),
+        variant: variant.into(),
+        ..Default::default()
+    })
 }
 
 /// Properties for the Avatar component.

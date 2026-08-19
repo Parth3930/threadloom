@@ -231,12 +231,17 @@ fn render_node(node: &Node, path: String) -> TokenStream2 {
                         } else {
                             name_str.strip_prefix("on_").unwrap()
                         };
-                        let event_name = if event_name_raw == "mouse_leave" {
-                            "mouseleave"
-                        } else if event_name_raw == "mouse_enter" {
-                            "mouseenter"
-                        } else {
-                            event_name_raw
+                        let event_name = match event_name_raw {
+                            "mouse_leave" | "mouseleave" => "mouseleave",
+                            "mouse_enter" | "mouseenter" => "mouseenter",
+                            "key_up" | "keyup" => "keyup",
+                            "key_down" | "keydown" => "keydown",
+                            "dbl_click" | "dblclick" => "dblclick",
+                            "context_menu" | "contextmenu" => "contextmenu",
+                            "drag_start" | "dragstart" => "dragstart",
+                            "drag_end" | "dragend" => "dragend",
+                            "drag_over" | "dragover" => "dragover",
+                            other => other,
                         };
                         builder = quote::quote_spanned! {span=> #builder.on(#event_name, #value) };
                     } else {
@@ -364,7 +369,7 @@ pub fn server(_args: TokenStream, item: TokenStream) -> TokenStream {
 /// `#[wasm_main]` — replaces a bare `fn main()` with the full wasm32 router boilerplate.
 ///
 /// Write your main body as just the route-render expression:
-/// ```rust
+/// ```rust,ignore
 /// #[cfg(target_arch = "wasm32")]
 /// #[threadloom_macro::wasm_main]
 /// fn main() {
