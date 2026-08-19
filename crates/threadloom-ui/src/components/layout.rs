@@ -1833,7 +1833,7 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
     let is_open_for_btn = is_open;
     let set_is_open_btn = set_is_open;
     let btn = element("button")
-        .attr("class", "p-2 border border-border bg-muted/50 rounded flex justify-center items-center w-10 h-10 hover:bg-muted transition-colors".to_string())
+        .attr("class", "p-2 border border-border bg-muted/50 rounded flex justify-center items-center w-10 h-10 hover:bg-muted transition-colors cursor-pointer".to_string())
         .on("click", move || set_is_open_btn.set(!is_open_for_btn.get()));
 
     let is_open_for_icon = is_open;
