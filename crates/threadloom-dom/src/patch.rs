@@ -111,20 +111,55 @@ pub(crate) fn patch_node(document: &Document, dom_node: &Node, new_view: View) -
                                 AttributeValue::Dynamic(f) => {
                                     let attr_key = format!("data-th-dyn-{}", k);
                                     if !el.has_attribute(&attr_key) {
-                                        let _ = el.set_attribute(&attr_key, "");
-                                        let el_clone = el.clone();
-                                        let k_clone = k.clone();
-                                        let f_rc = f.clone();
-                                        let val = f_rc();
-                                        if let AttributeValue::String(s) = &val {
-                                            let _ = el.set_attribute(&k, s);
-                                        }
-                                        create_effect(move || {
-                                            let val = f_rc();
-                                            if let AttributeValue::String(s) = val {
-                                                let _ = el_clone.set_attribute(&k_clone, &s);
-                                            }
-                                        });
+                                         let _ = el.set_attribute(&attr_key, "");
+                                         let el_clone = el.clone();
+                                         let k_clone = k.clone();
+                                         let f_rc = f.clone();
+                                         let val = f_rc();
+                                         let apply_attr = move |el_target: &Element, attr_name: &str, v: AttributeValue| {
+                                             match v {
+                                                 AttributeValue::String(s) => {
+                                                     if attr_name == "class" {
+                                                         let s_interned = wasm_bindgen::intern(&s);
+                                                         el_target.set_class_name(s_interned);
+                                                     } else {
+                                                         let _ = el_target.set_attribute(attr_name, &s);
+                                                     }
+                                                 }
+                                                 AttributeValue::RcString(s) => {
+                                                     if attr_name == "class" {
+                                                         let s_interned = wasm_bindgen::intern(&s);
+                                                         el_target.set_class_name(s_interned);
+                                                     } else {
+                                                         let _ = el_target.set_attribute(attr_name, &s);
+                                                     }
+                                                 }
+                                                 _ => {}
+                                             }
+                                         };
+                                         apply_attr(el, &k, val);
+                                         create_effect(move || {
+                                             let val = f_rc();
+                                             match val {
+                                                 AttributeValue::String(s) => {
+                                                     if k_clone == "class" {
+                                                         let s_interned = wasm_bindgen::intern(&s);
+                                                         el_clone.set_class_name(s_interned);
+                                                     } else {
+                                                         let _ = el_clone.set_attribute(&k_clone, &s);
+                                                     }
+                                                 }
+                                                 AttributeValue::RcString(s) => {
+                                                     if k_clone == "class" {
+                                                         let s_interned = wasm_bindgen::intern(&s);
+                                                         el_clone.set_class_name(s_interned);
+                                                     } else {
+                                                         let _ = el_clone.set_attribute(&k_clone, &s);
+                                                     }
+                                                 }
+                                                 _ => {}
+                                             }
+                                         });
                                     }
                                 }
                                 AttributeValue::Event(cb) => {

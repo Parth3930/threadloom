@@ -1836,18 +1836,19 @@ pub fn AppLayout(props: AppLayoutProps) -> View {
         .attr("class", "p-2 border border-border bg-muted/50 rounded flex justify-center items-center w-10 h-10 hover:bg-muted transition-colors".to_string())
         .on("click", move || set_is_open_btn.set(!is_open_for_btn.get()));
 
-    // Hamburger icon — changes to ✕ when open
     let is_open_for_icon = is_open;
-    let icon_span = element("span")
-        .attr("class", move || {
-            if is_open_for_icon.get() {
-                "text-foreground text-xl leading-none font-bold".to_string()
+    let icon_btn_content = threadloom_core::dyn_node(move || {
+        let open = is_open_for_icon.get();
+        element("span")
+            .attr("class", if open {
+                "text-foreground text-xl leading-none font-bold"
             } else {
-                "text-foreground text-2xl leading-none mt-[1px]".to_string()
-            }
-        })
-        .child(text("☰"));
-    let btn = btn.child(icon_span);
+                "text-foreground text-2xl leading-none mt-[1px]"
+            })
+            .child(text(if open { "✕" } else { "☰" }))
+            .into_view()
+    });
+    let btn = btn.child(icon_btn_content);
 
     topbar = topbar.child(title_el).child(btn);
     container = container.child(topbar);

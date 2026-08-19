@@ -116,17 +116,48 @@ pub(crate) fn render_view(document: &Document, view: View) -> Result<Node, JsVal
                         let k_clone = k.clone();
                         let f_rc = f.clone();
                         let val = f_rc();
-                        if let AttributeValue::String(s) = &val {
-                            let _ = el.set_attribute(k_interned, s);
-                        } else if let AttributeValue::RcString(s) = &val {
-                            let _ = el.set_attribute(k_interned, s);
-                        }
+                        let apply_attr = move |el_target: &Element, attr_name: &str, v: AttributeValue| {
+                            match v {
+                                AttributeValue::String(s) => {
+                                    if attr_name == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        el_target.set_class_name(s_interned);
+                                    } else {
+                                        let _ = el_target.set_attribute(attr_name, &s);
+                                    }
+                                }
+                                AttributeValue::RcString(s) => {
+                                    if attr_name == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        el_target.set_class_name(s_interned);
+                                    } else {
+                                        let _ = el_target.set_attribute(attr_name, &s);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        };
+                        apply_attr(&el, &k, val);
                         create_effect(move || {
                             let val = f_rc();
-                            if let AttributeValue::String(s) = val {
-                                let _ = el_clone.set_attribute(&k_clone, &s);
-                            } else if let AttributeValue::RcString(s) = val {
-                                let _ = el_clone.set_attribute(&k_clone, &s);
+                            match val {
+                                AttributeValue::String(s) => {
+                                    if k_clone == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        el_clone.set_class_name(s_interned);
+                                    } else {
+                                        let _ = el_clone.set_attribute(&k_clone, &s);
+                                    }
+                                }
+                                AttributeValue::RcString(s) => {
+                                    if k_clone == "class" {
+                                        let s_interned = wasm_bindgen::intern(&s);
+                                        el_clone.set_class_name(s_interned);
+                                    } else {
+                                        let _ = el_clone.set_attribute(&k_clone, &s);
+                                    }
+                                }
+                                _ => {}
                             }
                         });
                     }
